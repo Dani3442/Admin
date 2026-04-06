@@ -8,6 +8,7 @@ import { ProductsClient } from '@/components/products/ProductsClient'
 import { TableViewClient } from '@/components/table/TableViewClient'
 import type { ProductListItem } from '@/lib/product-list'
 import { cn } from '@/lib/utils'
+import { InfoPopover } from '@/components/ui/InfoPopover'
 
 type ProductsLayoutMode = 'list' | 'table'
 
@@ -115,11 +116,32 @@ export function ProductsWorkspace({
               )
             })}
           </div>
-          <div>
+          <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold text-slate-900">Продукты</h1>
-            <p className="text-sm text-slate-500">
-              Один раздел для работы со списком и таблицей этапов. Переключайся без ухода в отдельный экран.
-            </p>
+            <InfoPopover title={layout === 'table' ? 'Подсказка по таблице' : 'Подсказка по разделу'}>
+              {layout === 'table' ? (
+                <>
+                  <p>Таблица показывает продукты по строкам, а этапы по колонкам. Дату можно менять прямо в ячейке.</p>
+                  <div className="space-y-2">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Легенда цветов</div>
+                    <div className="grid gap-2">
+                      <div className="flex items-center gap-2"><span className="h-3 w-3 rounded border border-emerald-200 bg-emerald-100" /> Выполнен</div>
+                      <div className="flex items-center gap-2"><span className="h-3 w-3 rounded border border-blue-200 bg-blue-100" /> В работе</div>
+                      <div className="flex items-center gap-2"><span className="h-3 w-3 rounded border border-amber-200 bg-amber-100" /> Срок 7 дней или меньше</div>
+                      <div className="flex items-center gap-2"><span className="h-3 w-3 rounded border border-red-200 bg-red-100" /> Просрочен</div>
+                      <div className="flex items-center gap-2"><span className="h-3 w-3 rounded border border-slate-200 bg-slate-100" /> Нет данных</div>
+                      <div className="flex items-center gap-2"><span className="h-3 w-3 rounded border-2 border-orange-400 bg-orange-50" /> Пересечение дат</div>
+                    </div>
+                  </div>
+                  <p>Правый клик по заголовку этапа открывает управление колонкой.</p>
+                </>
+              ) : (
+                <>
+                  <p>Внутри раздела можно переключаться между списком продуктов и таблицей этапов.</p>
+                  <p>В списке доступны ручная сортировка, избранное, закрепление и контекстное меню по правому клику.</p>
+                </>
+              )}
+            </InfoPopover>
           </div>
         </div>
 

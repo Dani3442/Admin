@@ -410,17 +410,6 @@ export function TableViewClient({ products: initial, stages: initialStages, curr
         </div>
       </div>
 
-      {/* Legend */}
-      <div className="flex items-center gap-4 text-xs text-slate-500 flex-wrap">
-        <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-emerald-100 border border-emerald-200" /> Выполнен</div>
-        <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-blue-100 border border-blue-200" /> В работе</div>
-        <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-amber-100 border border-amber-200" /> Срок ≤7 дней</div>
-        <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-red-100 border border-red-200" /> Просрочен</div>
-        <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-slate-100 border border-slate-200" /> Нет данных</div>
-        <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-orange-100 border-2 border-orange-400" /> Пересечение дат</div>
-        <span className="ml-auto text-slate-400 italic">ПКМ по заголовку этапа для управления</span>
-      </div>
-
       {/* Search */}
       <div className="relative max-w-xs">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />

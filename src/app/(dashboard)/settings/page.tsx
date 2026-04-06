@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { getRoleLabel } from '@/lib/utils'
 import { prisma } from '@/lib/prisma'
 import { UserAvatar } from '@/components/users/UserAvatar'
+import { InfoPopover } from '@/components/ui/InfoPopover'
 
 export default async function SettingsPage() {
   const session = await auth()
@@ -14,9 +15,12 @@ export default async function SettingsPage() {
 
   return (
     <div className="space-y-6 animate-fade-in max-w-2xl">
-      <div>
+      <div className="flex items-center gap-3">
         <h1 className="text-2xl font-bold text-slate-900">Настройки</h1>
-        <p className="text-slate-500 text-sm mt-1">Параметры системы</p>
+        <InfoPopover title="Что здесь находится">
+          <p>Раздел для личного профиля и базовых параметров системы.</p>
+          <p>Здесь можно быстро перейти в свой профиль, посмотреть состояние системы и служебную информацию.</p>
+        </InfoPopover>
       </div>
 
       <div className="card">

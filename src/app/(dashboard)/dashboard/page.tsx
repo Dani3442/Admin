@@ -8,6 +8,7 @@ import { AnalyticsClient } from '@/components/dashboard/AnalyticsClient'
 import { recalculateAllRisks } from '@/lib/risk'
 import { addDays } from 'date-fns'
 import { detectStageOverlaps } from '@/lib/utils'
+import { InfoPopover } from '@/components/ui/InfoPopover'
 
 async function getDashboardData() {
   // Recalculate risks on every page load
@@ -177,9 +178,13 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div>
+      <div className="flex items-center gap-3">
         <h1 className="text-2xl font-bold text-slate-900">Дашборд</h1>
-        <p className="text-slate-500 text-sm mt-1">Общая картина и аналитика по всем продуктам</p>
+        <InfoPopover title="Что на этом экране">
+          <p>Сводка по всем продуктам: статусы, риски, сроки и узкие места.</p>
+          <p>Карточки сверху показывают ключевые метрики, а ниже идут графики и список самых проблемных продуктов.</p>
+          <p>Если продукт попал в блок риска, значит у него просрочены этапы, есть пересечения дат или горит финальный срок.</p>
+        </InfoPopover>
       </div>
 
       <DashboardMetricsCards metrics={data.metrics} />

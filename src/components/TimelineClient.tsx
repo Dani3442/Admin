@@ -8,6 +8,7 @@ import { ru } from 'date-fns/locale'
 import { cn, formatDate, detectStageOverlaps } from '@/lib/utils'
 import { ChevronLeft, ChevronRight, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { buildProductHref, getRouteWithSearch } from '@/lib/navigation'
+import { InfoPopover } from '@/components/ui/InfoPopover'
 
 interface ProductStage {
   id: string; stageName: string; stageOrder: number;
@@ -68,9 +69,12 @@ export function TimelineClient({ products }: { products: Product[] }) {
   return (
     <div className="space-y-4 animate-fade-in">
       <div className="flex items-center justify-between">
-        <div>
+        <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold text-slate-900">Timeline</h1>
-          <p className="text-slate-500 text-sm mt-0.5">Временная шкала продуктов и этапов (90 дней)</p>
+          <InfoPopover title="Что показывает timeline">
+            <p>На шкале видно продукты и их этапы на горизонте 90 дней.</p>
+            <p>Маркеры и подсветка помогают быстро увидеть просрочки, критичные этапы и пересечения дат.</p>
+          </InfoPopover>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setViewStart(d => addDays(d, -30))} className="btn-secondary p-2">

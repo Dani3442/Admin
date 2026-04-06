@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Zap, CheckCircle2, Circle, Info, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { InfoPopover } from '@/components/ui/InfoPopover'
 
 const ACTION_LABELS: Record<string, { label: string; desc: string; color: string }> = {
   SHIFT_ALL_FOLLOWING: {
@@ -56,9 +57,13 @@ export function AutomationsClient({ automations: initial, stages }: { automation
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div>
+      <div className="flex items-center gap-3">
         <h1 className="text-2xl font-bold text-slate-900">Автоматизации</h1>
-        <p className="text-slate-500 text-sm mt-1">Настройте логику автоматического пересчёта дат при изменениях</p>
+        <InfoPopover title="Что делает этот раздел">
+          <p>Здесь выбирается логика автоматической реакции на изменение дат этапов.</p>
+          <p>Одновременно активна только одна глобальная автоматизация.</p>
+          <p>Ниже можно посмотреть шаблоны правил и понять, как именно система будет сдвигать сроки.</p>
+        </InfoPopover>
       </div>
 
       {/* How it works */}
