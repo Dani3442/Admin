@@ -13,9 +13,14 @@ model User {
   id            String    @id @default(cuid())
   email         String    @unique
   name          String
+  lastName      String?
   password      String
   role          String    @default("EMPLOYEE")
   avatar        String?
+  jobTitle      String?
+  department    String?
+  employeeType  String    @default("INTERNAL")
+  verificationStatus String @default("UNVERIFIED")
   isActive      Boolean   @default(true)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt

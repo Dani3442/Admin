@@ -7,11 +7,11 @@ import {
   LayoutDashboard, Package, Table2, Zap, Users, Settings,
   ChevronRight, Package2
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import { getRoleLabel } from '@/lib/utils'
+import { UserAvatar } from '@/components/users/UserAvatar'
+import { cn, getRoleLabel, getUserDisplayName } from '@/lib/utils'
 
 interface SidebarProps {
-  user: { name?: string; email?: string; role: string }
+  user: { name?: string; lastName?: string | null; email?: string; role: string; avatar?: string | null }
 }
 
 const nav = [
@@ -79,15 +79,13 @@ export function Sidebar({ user }: SidebarProps) {
 
       {/* User Info */}
       <div className="px-3 py-4 border-t border-slate-800">
-        <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg">
-          <div className="w-8 h-8 rounded-full bg-brand-600 flex items-center justify-center flex-shrink-0 text-white text-sm font-semibold">
-            {user.name?.charAt(0).toUpperCase() || 'U'}
-          </div>
+        <Link href="/profile" className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition hover:bg-sidebar-hover">
+          <UserAvatar user={user} size="sm" />
           <div className="min-w-0 flex-1">
-            <p className="text-white text-sm font-medium truncate">{user.name}</p>
+            <p className="text-white text-sm font-medium truncate">{getUserDisplayName(user)}</p>
             <p className="text-slate-400 text-xs truncate">{getRoleLabel(user.role)}</p>
           </div>
-        </div>
+        </Link>
       </div>
     </motion.aside>
   )

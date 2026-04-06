@@ -6,6 +6,8 @@ export const authConfig = {
       if (user) {
         token.role = (user as any).role
         token.id = user.id
+        token.lastName = (user as any).lastName
+        token.avatar = (user as any).avatar
       }
 
       return token
@@ -14,6 +16,8 @@ export const authConfig = {
       if (session.user) {
         ;(session.user as any).role = token.role
         ;(session.user as any).id = token.id
+        ;(session.user as any).lastName = token.lastName
+        ;(session.user as any).avatar = token.avatar
       }
 
       return session

@@ -31,17 +31,82 @@ async function main() {
     data: {
       email: process.env.ADMIN_EMAIL || 'admin@company.com',
       name: process.env.ADMIN_NAME || 'Данила',
+      lastName: 'Гурьянов',
       password: adminPassword,
       role: UserRole.ADMIN,
+      jobTitle: 'Системный администратор',
+      department: 'Операционное управление',
+      employeeType: 'INTERNAL',
+      verificationStatus: 'VERIFIED',
     }
   })
 
   const users = await Promise.all([
-    prisma.user.create({ data: { email: 'lana@company.com', name: 'Лана', password: await bcrypt.hash('Pass1234!', 12), role: UserRole.PRODUCT_MANAGER } }),
-    prisma.user.create({ data: { email: 'adelya@company.com', name: 'Аделя', password: await bcrypt.hash('Pass1234!', 12), role: UserRole.PRODUCT_MANAGER } }),
-    prisma.user.create({ data: { email: 'katya@company.com', name: 'Катя', password: await bcrypt.hash('Pass1234!', 12), role: UserRole.PRODUCT_MANAGER } }),
-    prisma.user.create({ data: { email: 'kirill@company.com', name: 'Кирилл', password: await bcrypt.hash('Pass1234!', 12), role: UserRole.EMPLOYEE } }),
-    prisma.user.create({ data: { email: 'viewer@company.com', name: 'Просмотр', password: await bcrypt.hash('Pass1234!', 12), role: UserRole.VIEWER } }),
+    prisma.user.create({
+      data: {
+        email: 'lana@company.com',
+        name: 'Лана',
+        lastName: 'Соколова',
+        password: await bcrypt.hash('Pass1234!', 12),
+        role: UserRole.PRODUCT_MANAGER,
+        jobTitle: 'Менеджер продукта',
+        department: 'Разработка продукта',
+        employeeType: 'INTERNAL',
+        verificationStatus: 'VERIFIED',
+      }
+    }),
+    prisma.user.create({
+      data: {
+        email: 'adelya@company.com',
+        name: 'Аделя',
+        lastName: 'Ахметова',
+        password: await bcrypt.hash('Pass1234!', 12),
+        role: UserRole.PRODUCT_MANAGER,
+        jobTitle: 'Менеджер продукта',
+        department: 'Разработка продукта',
+        employeeType: 'INTERNAL',
+        verificationStatus: 'VERIFIED',
+      }
+    }),
+    prisma.user.create({
+      data: {
+        email: 'katya@company.com',
+        name: 'Катя',
+        lastName: 'Миронова',
+        password: await bcrypt.hash('Pass1234!', 12),
+        role: UserRole.PRODUCT_MANAGER,
+        jobTitle: 'Менеджер продукта',
+        department: 'Разработка продукта',
+        employeeType: 'INTERNAL',
+        verificationStatus: 'PENDING',
+      }
+    }),
+    prisma.user.create({
+      data: {
+        email: 'kirill@company.com',
+        name: 'Кирилл',
+        lastName: 'Павлов',
+        password: await bcrypt.hash('Pass1234!', 12),
+        role: UserRole.EMPLOYEE,
+        jobTitle: 'Специалист по запуску',
+        department: 'Операционное сопровождение',
+        employeeType: 'INTERNAL',
+        verificationStatus: 'VERIFIED',
+      }
+    }),
+    prisma.user.create({
+      data: {
+        email: 'viewer@company.com',
+        name: 'Просмотр',
+        lastName: 'Наблюдатель',
+        password: await bcrypt.hash('Pass1234!', 12),
+        role: UserRole.VIEWER,
+        jobTitle: 'Наблюдатель',
+        department: 'Внешние пользователи',
+        employeeType: 'PARTNER',
+        verificationStatus: 'UNVERIFIED',
+      }
+    }),
   ])
 
   const userMap: Record<string, string> = {

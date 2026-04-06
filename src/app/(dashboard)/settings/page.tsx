@@ -1,6 +1,8 @@
 import { auth } from '@/lib/auth'
+import Link from 'next/link'
 import { getRoleLabel } from '@/lib/utils'
 import { prisma } from '@/lib/prisma'
+import { UserAvatar } from '@/components/users/UserAvatar'
 
 export default async function SettingsPage() {
   const session = await auth()
@@ -19,15 +21,18 @@ export default async function SettingsPage() {
 
       <div className="card">
         <h2 className="text-sm font-semibold text-slate-700 mb-4">Мой профиль</h2>
-        <div className="flex items-center gap-4 mb-6">
-          <div className="w-14 h-14 rounded-full bg-brand-600 flex items-center justify-center text-white text-xl font-bold">
-            {user?.name?.charAt(0) || 'U'}
-          </div>
+        <div className="flex items-center justify-between gap-4 mb-6">
+          <div className="flex items-center gap-4">
+          <UserAvatar user={user || {}} size="lg" />
           <div>
             <p className="text-lg font-semibold text-slate-800">{user?.name}</p>
             <p className="text-sm text-slate-500">{user?.email}</p>
             <span className="badge bg-brand-100 text-brand-700 text-xs mt-1">{getRoleLabel(user?.role)}</span>
           </div>
+          </div>
+          <Link href="/profile" className="btn-secondary">
+            Открыть профиль
+          </Link>
         </div>
       </div>
 

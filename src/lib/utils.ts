@@ -2,7 +2,7 @@ import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 import { format, differenceInDays, isAfter, isBefore, addDays, parse, isValid, startOfDay } from 'date-fns'
 import { ru } from 'date-fns/locale'
-import type { ProductStatus, Priority } from '@/types'
+import type { EmployeeType, ProductStatus, Priority, VerificationStatus } from '@/types'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -124,6 +124,56 @@ export function getRoleLabel(role: string): string {
     VIEWER: 'Только просмотр',
   }
   return map[role] || role
+}
+
+export function getEmployeeTypeLabel(type: EmployeeType | string): string {
+  const map: Record<string, string> = {
+    INTERNAL: 'Штатный сотрудник',
+    CONTRACTOR: 'Подрядчик',
+    PARTNER: 'Партнёр',
+  }
+  return map[type] || type
+}
+
+export function getVerificationStatusLabel(status: VerificationStatus | string): string {
+  const map: Record<string, string> = {
+    VERIFIED: 'Верифицирован',
+    PENDING: 'На проверке',
+    UNVERIFIED: 'Не верифицирован',
+  }
+  return map[status] || status
+}
+
+export function getVerificationStatusColor(status: VerificationStatus | string): string {
+  const map: Record<string, string> = {
+    VERIFIED: 'text-emerald-700 bg-emerald-50 border-emerald-200',
+    PENDING: 'text-amber-700 bg-amber-50 border-amber-200',
+    UNVERIFIED: 'text-slate-600 bg-slate-50 border-slate-200',
+  }
+  return map[status] || 'text-slate-600 bg-slate-50 border-slate-200'
+}
+
+export function getAccessLevelLabel(role: string): string {
+  const map: Record<string, string> = {
+    ADMIN: 'Полный доступ ко всей системе',
+    DIRECTOR: 'Управление бизнес-логикой и просмотр всех данных',
+    PRODUCT_MANAGER: 'Операционный доступ к продуктам и этапам',
+    EMPLOYEE: 'Базовый рабочий доступ',
+    VIEWER: 'Только просмотр без изменений',
+  }
+  return map[role] || 'Доступ определяется ролью'
+}
+
+export function getUserDisplayName(user: { name?: string | null; lastName?: string | null }) {
+  const parts = [user.name?.trim(), user.lastName?.trim()].filter(Boolean)
+  return parts.length > 0 ? parts.join(' ') : 'Без имени'
+}
+
+export function getUserInitials(user: { name?: string | null; lastName?: string | null }) {
+  const nameInitial = user.name?.trim().charAt(0) || ''
+  const lastNameInitial = user.lastName?.trim().charAt(0) || ''
+  const initials = `${nameInitial}${lastNameInitial}`.trim()
+  return initials || 'U'
 }
 
 export function abbreviate(name: string, maxLen = 30): string {

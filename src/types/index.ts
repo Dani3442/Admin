@@ -1,6 +1,8 @@
 // SQLite-compatible types (plain strings instead of Prisma enums)
 
 export type UserRole = 'ADMIN' | 'DIRECTOR' | 'PRODUCT_MANAGER' | 'EMPLOYEE' | 'VIEWER'
+export type EmployeeType = 'INTERNAL' | 'CONTRACTOR' | 'PARTNER'
+export type VerificationStatus = 'UNVERIFIED' | 'PENDING' | 'VERIFIED'
 export type ProductStatus = 'PLANNED' | 'IN_PROGRESS' | 'AT_RISK' | 'DELAYED' | 'COMPLETED' | 'CANCELLED'
 export type Priority = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW'
 export type StageStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' | 'SKIPPED' | 'BLOCKED'
@@ -15,7 +17,36 @@ export interface UserSession {
   id: string
   email: string
   name: string
+  lastName?: string | null
   role: UserRole
+  avatar?: string | null
+}
+
+export interface UserProfileData {
+  id: string
+  email: string
+  name: string
+  lastName: string | null
+  role: UserRole
+  avatar: string | null
+  jobTitle: string | null
+  department: string | null
+  employeeType: EmployeeType
+  verificationStatus: VerificationStatus
+  isActive: boolean
+  createdAt: Date
+  updatedAt: Date
+  _count: {
+    assignedProducts: number
+    comments: number
+    stageAssignments: number
+  }
+  assignedProducts?: Array<{
+    id: string
+    name: string
+    status: ProductStatus
+    finalDate: Date | null
+  }>
 }
 
 export interface ProductWithStages {

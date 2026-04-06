@@ -1,8 +1,10 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Plus, UserCheck, UserX, Shield } from 'lucide-react'
-import { cn, getRoleLabel, formatDate } from '@/lib/utils'
+import { UserAvatar } from '@/components/users/UserAvatar'
+import { cn, formatDate, getRoleLabel, getUserDisplayName, getVerificationStatusColor, getVerificationStatusLabel } from '@/lib/utils'
 import type { UserRole } from '@/types'
 // Types are string-based (no Prisma enums needed)
 
@@ -16,12 +18,14 @@ const ROLE_COLORS: Record<string, string> = {
   VIEWER: 'text-slate-400 bg-slate-50 border-slate-100',
 }
 
-export function UsersClient({ users: initial }: { users: any[] }) {
+export function UsersClient({ users: initial, currentUserRole }: { users: any[]; currentUserRole: string }) {
+  const router = useRouter()
   const [users, setUsers] = useState(initial)
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'EMPLOYEE' })
+  const [form, setForm] = useState({ name: '', lastName: '', email: '', password: '', role: 'EMPLOYEE' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const canCreateUsers = currentUserRole === 'ADMIN'
 
   const createUser = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -41,7 +45,7 @@ export function UsersClient({ users: initial }: { users: any[] }) {
       const user = await res.json()
       setUsers((prev) => [...prev, { ...user, _count: { assignedProducts: 0 } }])
       setShowForm(false)
-      setForm({ name: '', email: '', password: '', role: 'EMPLOYEE' })
+      setForm({ name: '', lastName: '', email: '', password: '', role: 'EMPLOYEE' })
     } finally {
       setSaving(false)
     }
@@ -54,19 +58,25 @@ export function UsersClient({ users: initial }: { users: any[] }) {
           <h1 className="text-2xl font-bold text-slate-900">Пользователи</h1>
           <p className="text-slate-500 text-sm mt-0.5">{users.length} сотрудников</p>
         </div>
-        <button onClick={() => setShowForm(!showForm)} className="btn-primary">
-          <Plus className="w-4 h-4" />
-          Добавить
-        </button>
+        {canCreateUsers && (
+          <button onClick={() => setShowForm(!showForm)} className="btn-primary">
+            <Plus className="w-4 h-4" />
+            Добавить
+          </button>
+        )}
       </div>
 
-      {showForm && (
+      {showForm && canCreateUsers && (
         <div className="card animate-slide-up">
           <h3 className="text-sm font-semibold text-slate-700 mb-4">Новый пользователь</h3>
           <form onSubmit={createUser} className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="label">Имя</label>
-              <input value={form.name} onChange={(e) => setForm(p => ({...p, name: e.target.value}))} className="input" placeholder="Иван Иванов" required />
+              <input value={form.name} onChange={(e) => setForm(p => ({...p, name: e.target.value}))} className="input" placeholder="Иван" required />
+            </div>
+            <div>
+              <label className="label">Фамилия</label>
+              <input value={form.lastName} onChange={(e) => setForm(p => ({...p, lastName: e.target.value}))} className="input" placeholder="Иванов" />
             </div>
             <div>
               <label className="label">Email</label>
@@ -100,6 +110,7 @@ export function UsersClient({ users: initial }: { users: any[] }) {
               <th className="table-header">Сотрудник</th>
               <th className="table-header">Email</th>
               <th className="table-header">Роль</th>
+              <th className="table-header">Верификация</th>
               <th className="table-header text-center">Продуктов</th>
               <th className="table-header">Добавлен</th>
               <th className="table-header text-center">Статус</th>
@@ -107,13 +118,18 @@ export function UsersClient({ users: initial }: { users: any[] }) {
           </thead>
           <tbody className="divide-y divide-slate-50">
             {users.map((user) => (
-              <tr key={user.id} className="hover:bg-slate-50 transition-colors">
+              <tr
+                key={user.id}
+                className="cursor-pointer hover:bg-slate-50 transition-colors"
+                onClick={() => router.push(`/users/${user.id}`)}
+              >
                 <td className="table-cell">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center text-brand-700 text-sm font-semibold flex-shrink-0">
-                      {user.name.charAt(0)}
+                    <UserAvatar user={user} size="sm" />
+                    <div>
+                      <span className="font-medium text-slate-800">{getUserDisplayName(user)}</span>
+                      {user.jobTitle && <div className="text-xs text-slate-400 mt-0.5">{user.jobTitle}</div>}
                     </div>
-                    <span className="font-medium text-slate-800">{user.name}</span>
                     {user.role === 'ADMIN' && <Shield className="w-3.5 h-3.5 text-red-500" />}
                   </div>
                 </td>
@@ -121,6 +137,11 @@ export function UsersClient({ users: initial }: { users: any[] }) {
                 <td className="table-cell">
                   <span className={cn('badge border text-xs', ROLE_COLORS[user.role] || 'text-slate-500 bg-slate-50 border-slate-200')}>
                     {getRoleLabel(user.role)}
+                  </span>
+                </td>
+                <td className="table-cell">
+                  <span className={cn('badge border text-xs', getVerificationStatusColor(user.verificationStatus))}>
+                    {getVerificationStatusLabel(user.verificationStatus)}
                   </span>
                 </td>
                 <td className="table-cell text-center">

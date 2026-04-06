@@ -21,6 +21,8 @@ async function ensureDefaultAdminUser(email: string, password: string) {
         name: process.env.ADMIN_NAME || 'Данила',
         password: passwordHash,
         role: 'ADMIN',
+        verificationStatus: 'VERIFIED',
+        employeeType: 'INTERNAL',
         isActive: true,
       },
     })
@@ -78,7 +80,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           id: user.id,
           email: user.email,
           name: user.name,
+          lastName: user.lastName,
           role: user.role,
+          avatar: user.avatar,
         }
       },
     }),
@@ -98,6 +102,9 @@ export enum Permission {
   ACCESS_SETTINGS = 'ACCESS_SETTINGS',
   DELETE_PRODUCTS = 'DELETE_PRODUCTS',
   IMPORT_DATA = 'IMPORT_DATA',
+  VIEW_USER_PROFILES = 'VIEW_USER_PROFILES',
+  EDIT_USER_PROFILES = 'EDIT_USER_PROFILES',
+  VERIFY_USERS = 'VERIFY_USERS',
 }
 
 export function hasPermission(role: string, permission: Permission): boolean {
@@ -106,6 +113,7 @@ export function hasPermission(role: string, permission: Permission): boolean {
     DIRECTOR: [
       Permission.VIEW_ALL_PRODUCTS, Permission.EDIT_STAGES, Permission.EDIT_DATES,
       Permission.VIEW_ANALYTICS, Permission.ADD_COMMENTS, Permission.MANAGE_AUTOMATIONS,
+      Permission.VIEW_USER_PROFILES, Permission.EDIT_USER_PROFILES, Permission.VERIFY_USERS,
     ],
     PRODUCT_MANAGER: [
       Permission.VIEW_ALL_PRODUCTS, Permission.EDIT_STAGES, Permission.EDIT_DATES,

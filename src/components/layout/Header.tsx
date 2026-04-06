@@ -1,11 +1,13 @@
 'use client'
 
+import Link from 'next/link'
 import { useState, useEffect, useRef } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { LogOut, Bell, AlertTriangle, Clock, History, X } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { UserAvatar } from '@/components/users/UserAvatar'
+import { cn, getUserDisplayName } from '@/lib/utils'
 import { buildProductHref, getRouteWithSearch } from '@/lib/navigation'
 
 interface Notification {
@@ -18,7 +20,7 @@ interface Notification {
 }
 
 interface HeaderProps {
-  user: { name?: string; email?: string; role: string }
+  user: { name?: string; lastName?: string | null; email?: string; role: string; avatar?: string | null }
 }
 
 export function Header({ user }: HeaderProps) {
@@ -220,12 +222,10 @@ export function Header({ user }: HeaderProps) {
           </AnimatePresence>
         </div>
 
-        <div className="flex items-center gap-2 pl-3 border-l border-slate-100">
-          <div className="w-7 h-7 rounded-full bg-brand-600 flex items-center justify-center text-white text-xs font-semibold">
-            {user.name?.charAt(0).toUpperCase() || 'U'}
-          </div>
-          <span className="text-sm font-medium text-slate-700">{user.name}</span>
-        </div>
+        <Link href="/profile" className="flex items-center gap-2 pl-3 border-l border-slate-100 rounded-lg px-2 py-1.5 transition hover:bg-slate-50">
+          <UserAvatar user={user} size="sm" />
+          <span className="text-sm font-medium text-slate-700">{getUserDisplayName(user)}</span>
+        </Link>
 
         <button
           onClick={() => signOut({ callbackUrl: '/login' })}
