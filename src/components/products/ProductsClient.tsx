@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -52,6 +52,7 @@ interface ProductsClientProps {
   users: Array<{ id: string; name: string }>
   currentUserRole: string
   embedded?: boolean
+  layoutSwitcher?: ReactNode
 }
 
 interface ContextMenuState {
@@ -72,7 +73,13 @@ const isValidSortField = (value: string | null): value is ProductListSortField =
 const isValidQuickView = (value: string | null): value is ProductQuickView =>
   QUICK_VIEW_OPTIONS.some((option) => option.value === value)
 
-export function ProductsClient({ products: initialProducts, users, currentUserRole, embedded = false }: ProductsClientProps) {
+export function ProductsClient({
+  products: initialProducts,
+  users,
+  currentUserRole,
+  embedded = false,
+  layoutSwitcher,
+}: ProductsClientProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -503,149 +510,142 @@ export function ProductsClient({ products: initialProducts, users, currentUserRo
         </div>
       )}
 
-      <div className="surface-panel space-y-4 p-5">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="relative flex-1 min-w-[240px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              className="input pl-9"
-              placeholder="Поиск по названию продукта"
-            />
-          </div>
+      <div className="surface-panel space-y-5 p-5">
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative min-w-[260px] flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                className="input pl-9"
+                placeholder="Поиск по названию продукта"
+              />
+            </div>
 
-          <select value={sortField} onChange={(event) => setSortField(event.target.value as ProductListSortField)} className="input w-[210px]">
-            {SORT_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-
-          {sortField !== 'manual' && (
-            <select
-              value={sortDirection}
-              onChange={(event) => setSortDirection(event.target.value as ProductListSortDirection)}
-              className="input w-[160px]"
-            >
-              <option value="asc">По возрастанию</option>
-              <option value="desc">По убыванию</option>
+            <select value={sortField} onChange={(event) => setSortField(event.target.value as ProductListSortField)} className="input w-[210px]">
+              {SORT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
             </select>
-          )}
 
-          <button
-            onClick={() => setShowAdvancedFilters((current) => !current)}
-            className={cn('btn-secondary', showAdvancedFilters && 'border-brand-200 text-brand-700 bg-brand-50')}
-          >
-            <Filter className="w-4 h-4" />
-            Расширенные фильтры
-          </button>
+            {sortField !== 'manual' && (
+              <select
+                value={sortDirection}
+                onChange={(event) => setSortDirection(event.target.value as ProductListSortDirection)}
+                className="input w-[170px]"
+              >
+                <option value="asc">По возрастанию</option>
+                <option value="desc">По убыванию</option>
+              </select>
+            )}
 
-          {(hasActiveFilters || sortField !== 'manual') && (
-            <button onClick={resetFilters} className="btn-secondary">
-              <X className="w-4 h-4" />
-              Сбросить
-            </button>
-          )}
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          {QUICK_VIEW_OPTIONS.map((option) => (
             <button
-              key={option.value}
-              onClick={() => setQuickView(option.value)}
-              className={cn(
-                'rounded-xl border px-3.5 py-2 text-sm font-medium transition-colors',
-                quickView === option.value
-                  ? 'bg-brand-600 text-white border-brand-600'
-                  : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:text-slate-800'
-              )}
+              onClick={() => setShowAdvancedFilters((current) => !current)}
+              className={cn('btn-secondary', showAdvancedFilters && 'bg-slate-900 text-white border-slate-900 hover:bg-slate-800 hover:text-white')}
             >
-              {option.label}
+              <Filter className="w-4 h-4" />
+              Фильтры
             </button>
-          ))}
-        </div>
 
-        <AnimatePresence initial={false}>
-          {showAdvancedFilters && (
-            <motion.div
-              initial={{ opacity: 0, height: 0, y: -8 }}
-              animate={{ opacity: 1, height: 'auto', y: 0 }}
-              exit={{ opacity: 0, height: 0, y: -8 }}
-              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-              className="overflow-hidden"
-            >
-              <div className="surface-subtle grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4">
-            <label className="space-y-1.5">
-              <span className="label mb-0">Статус</span>
-              <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="input">
-                <option value="">Все статусы</option>
-                {ALL_STATUSES.map((status) => (
-                  <option key={status} value={status}>
-                    {getStatusLabel(status)}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="space-y-1.5">
-              <span className="label mb-0">Приоритет</span>
-              <select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)} className="input">
-                <option value="">Все приоритеты</option>
-                {ALL_PRIORITIES.map((priority) => (
-                  <option key={priority} value={priority}>
-                    {getPriorityLabel(priority)}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="space-y-1.5">
-              <span className="label mb-0">Ответственный</span>
-              <select value={responsibleFilter} onChange={(event) => setResponsibleFilter(event.target.value)} className="input">
-                <option value="">Все ответственные</option>
-                {users.map((user) => (
-                  <option key={user.id} value={user.id}>
-                    {user.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="space-y-1.5">
-              <span className="label mb-0">Страна</span>
-              <input
-                value={countryFilter}
-                onChange={(event) => setCountryFilter(event.target.value)}
-                className="input"
-                placeholder="Например, Китай"
-              />
-            </label>
-
-            <label className="inline-flex items-center gap-2 text-sm text-slate-600 pt-1">
-              <input
-                type="checkbox"
-                checked={onlyWithOverlaps}
-                onChange={(event) => setOnlyWithOverlaps(event.target.checked)}
-                className="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
-              />
-              Только с пересечениями дат
-            </label>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <div className="surface-subtle flex flex-wrap items-center justify-between gap-3 px-4 py-3.5">
-          <div className="text-sm text-slate-600">
-            {canReorder
-              ? 'Ручной порядок активен: продукты можно перетаскивать за маркер слева. Закреплённые элементы всегда остаются выше остальных.'
-              : 'Перетаскивание доступно только в режиме “Ручной порядок” без активных фильтров и быстрых представлений.'}
+            {(hasActiveFilters || sortField !== 'manual') && (
+              <button onClick={resetFilters} className="btn-secondary">
+                <X className="w-4 h-4" />
+                Сбросить
+              </button>
+            )}
           </div>
-          <div className="text-xs text-slate-500">
-            Удаление, закрепление и избранное доступны через правый клик по строке.
+
+          <div className="flex flex-wrap gap-2">
+            {QUICK_VIEW_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                onClick={() => setQuickView(option.value)}
+                className={cn(
+                  'rounded-full px-3.5 py-2 text-sm font-medium transition-colors',
+                  quickView === option.value
+                    ? 'bg-slate-900 text-white'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-800'
+                )}
+              >
+                {option.label}
+              </button>
+            ))}
           </div>
+
+          <AnimatePresence initial={false}>
+            {showAdvancedFilters && (
+              <motion.div
+                initial={{ opacity: 0, height: 0, y: -8 }}
+                animate={{ opacity: 1, height: 'auto', y: 0 }}
+                exit={{ opacity: 0, height: 0, y: -8 }}
+                transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                className="overflow-hidden"
+              >
+                <div className="surface-subtle grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4">
+                  <label className="space-y-1.5">
+                    <span className="label mb-0">Статус</span>
+                    <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="input">
+                      <option value="">Все статусы</option>
+                      {ALL_STATUSES.map((status) => (
+                        <option key={status} value={status}>
+                          {getStatusLabel(status)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="space-y-1.5">
+                    <span className="label mb-0">Приоритет</span>
+                    <select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)} className="input">
+                      <option value="">Все приоритеты</option>
+                      {ALL_PRIORITIES.map((priority) => (
+                        <option key={priority} value={priority}>
+                          {getPriorityLabel(priority)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="space-y-1.5">
+                    <span className="label mb-0">Ответственный</span>
+                    <select value={responsibleFilter} onChange={(event) => setResponsibleFilter(event.target.value)} className="input">
+                      <option value="">Все ответственные</option>
+                      {users.map((user) => (
+                        <option key={user.id} value={user.id}>
+                          {user.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="space-y-1.5">
+                    <span className="label mb-0">Страна</span>
+                    <input
+                      value={countryFilter}
+                      onChange={(event) => setCountryFilter(event.target.value)}
+                      className="input"
+                      placeholder="Например, Китай"
+                    />
+                  </label>
+
+                  <label className="inline-flex items-center gap-2 pt-1 text-sm text-slate-600">
+                    <input
+                      type="checkbox"
+                      checked={onlyWithOverlaps}
+                      onChange={(event) => setOnlyWithOverlaps(event.target.checked)}
+                      className="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                    />
+                    Только с пересечениями дат
+                  </label>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {layoutSwitcher && <div className="pt-1">{layoutSwitcher}</div>}
         </div>
       </div>
 
@@ -653,7 +653,7 @@ export function ProductsClient({ products: initialProducts, users, currentUserRo
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-slate-200/80">
+              <tr className="border-b border-slate-100">
                 <th className="table-header w-12 text-center">#</th>
                 <th className="table-header w-14 text-center">Порядок</th>
                 <th className="table-header min-w-[280px]">Продукт</th>
@@ -736,9 +736,9 @@ export function ProductsClient({ products: initialProducts, users, currentUserRo
                     </td>
                     <td className={cn('table-cell', isDragging && 'bg-brand-50/80')}>
                       <div className="flex items-start gap-3">
-                        <div className="mt-0.5 flex items-center gap-1">
-                          <Pin className={cn('w-3.5 h-3.5', product.isPinned ? 'text-brand-600 fill-brand-100' : 'text-slate-300')} />
-                          <Star className={cn('w-3.5 h-3.5', product.isFavorite ? 'text-amber-500 fill-amber-100' : 'text-slate-300')} />
+                          <div className="mt-0.5 flex items-center gap-1">
+                          <Pin className={cn('w-3.5 h-3.5', product.isPinned ? 'text-slate-700 fill-slate-200' : 'text-slate-300')} />
+                          <Star className={cn('w-3.5 h-3.5', product.isFavorite ? 'text-slate-700 fill-slate-200' : 'text-slate-300')} />
                         </div>
                         <div className="min-w-0">
                           <Link href={buildProductHref(product.id, currentRoute)} className="font-medium text-slate-800 hover:text-brand-700 transition-colors">
@@ -748,8 +748,8 @@ export function ProductsClient({ products: initialProducts, users, currentUserRo
                             <span>{product._count.stages} этапов</span>
                             <span>•</span>
                             <span>{product._count.comments} комм.</span>
-                            {product.isPinned && <span className="text-brand-600 font-medium">• закреплён</span>}
-                            {product.isFavorite && <span className="text-amber-600 font-medium">• избранное</span>}
+                            {product.isPinned && <span className="font-medium text-slate-600">• закреплён</span>}
+                            {product.isFavorite && <span className="font-medium text-slate-600">• избранное</span>}
                             {overlaps.length > 0 && (
                               <span
                                 className="text-orange-600 font-medium"

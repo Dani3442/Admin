@@ -27,7 +27,6 @@ export function DashboardMetricsCards({ metrics }: MetricsCardsProps) {
       icon: Package,
       color: 'text-slate-600',
       bg: 'bg-slate-50',
-      border: 'border-slate-200',
     },
     {
       label: 'В работе',
@@ -35,7 +34,6 @@ export function DashboardMetricsCards({ metrics }: MetricsCardsProps) {
       icon: Clock,
       color: 'text-blue-600',
       bg: 'bg-blue-50',
-      border: 'border-blue-200',
     },
     {
       label: 'Завершено',
@@ -43,7 +41,6 @@ export function DashboardMetricsCards({ metrics }: MetricsCardsProps) {
       icon: CheckCircle2,
       color: 'text-emerald-600',
       bg: 'bg-emerald-50',
-      border: 'border-emerald-200',
       sub: `${metrics.completionRate}% выполнено`,
     },
     {
@@ -52,7 +49,6 @@ export function DashboardMetricsCards({ metrics }: MetricsCardsProps) {
       icon: AlertTriangle,
       color: 'text-amber-600',
       bg: 'bg-amber-50',
-      border: 'border-amber-200',
     },
     {
       label: 'Просрочено',
@@ -60,7 +56,6 @@ export function DashboardMetricsCards({ metrics }: MetricsCardsProps) {
       icon: XCircle,
       color: 'text-red-600',
       bg: 'bg-red-50',
-      border: 'border-red-200',
     },
     {
       label: 'Отклонение',
@@ -68,7 +63,6 @@ export function DashboardMetricsCards({ metrics }: MetricsCardsProps) {
       icon: TrendingUp,
       color: metrics.avgDaysDeviation > 5 ? 'text-red-600' : 'text-slate-600',
       bg: metrics.avgDaysDeviation > 5 ? 'bg-red-50' : 'bg-slate-50',
-      border: metrics.avgDaysDeviation > 5 ? 'border-red-200' : 'border-slate-200',
       sub: 'Среднее по датам',
     },
     {
@@ -77,7 +71,6 @@ export function DashboardMetricsCards({ metrics }: MetricsCardsProps) {
       icon: CalendarClock,
       color: metrics.dueSoon7 > 0 ? 'text-orange-600' : 'text-slate-500',
       bg: metrics.dueSoon7 > 0 ? 'bg-orange-50' : 'bg-slate-50',
-      border: metrics.dueSoon7 > 0 ? 'border-orange-200' : 'border-slate-200',
       sub: `${metrics.dueSoon30} за 30 дней`,
     },
   ]
@@ -89,7 +82,7 @@ export function DashboardMetricsCards({ metrics }: MetricsCardsProps) {
         return (
           <div
             key={i}
-            className={cn('surface-panel p-4 transition-shadow duration-150 hover:shadow-card-hover lg:p-5', card.border)}
+            className="surface-panel p-4 transition-shadow duration-150 hover:shadow-card-hover lg:p-5"
           >
             <div className={cn('mb-3 flex h-9 w-9 items-center justify-center rounded-xl', card.bg)}>
               <Icon className={cn('h-4 w-4', card.color)} />

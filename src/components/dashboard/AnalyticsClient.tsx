@@ -3,7 +3,6 @@
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts'
 import { DashboardMetricsCards } from './MetricsCards'
 import { TrendingDown, Users, Globe } from 'lucide-react'
-import { InfoPopover } from '@/components/ui/InfoPopover'
 
 interface AnalyticsClientProps {
   data: {
@@ -24,10 +23,6 @@ export function AnalyticsClient({ data, showHeader = true }: AnalyticsClientProp
         <>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold text-slate-900">Аналитика</h1>
-            <InfoPopover title="Что здесь смотреть">
-              <p>Экран показывает сводные метрики, распределения и проблемные точки по всем продуктам.</p>
-              <p>Используй его, чтобы быстро понять нагрузку по странам, ответственным, статусам и прогрессу.</p>
-            </InfoPopover>
           </div>
           <DashboardMetricsCards metrics={data.metrics} />
         </>

@@ -1,9 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Zap, CheckCircle2, Circle, Info, Plus } from 'lucide-react'
+import { CheckCircle2, Circle } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { InfoPopover } from '@/components/ui/InfoPopover'
 
 const ACTION_LABELS: Record<string, { label: string; desc: string; color: string }> = {
   SHIFT_ALL_FOLLOWING: {
@@ -59,26 +58,6 @@ export function AutomationsClient({ automations: initial, stages }: { automation
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center gap-3">
         <h1 className="text-2xl font-bold text-slate-900">Автоматизации</h1>
-        <InfoPopover title="Что делает этот раздел">
-          <p>Здесь выбирается логика автоматической реакции на изменение дат этапов.</p>
-          <p>Одновременно активна только одна глобальная автоматизация.</p>
-          <p>Ниже можно посмотреть шаблоны правил и понять, как именно система будет сдвигать сроки.</p>
-        </InfoPopover>
-      </div>
-
-      {/* How it works */}
-      <div className="card bg-brand-50 border-brand-200">
-        <div className="flex gap-3">
-          <Info className="w-5 h-5 text-brand-600 flex-shrink-0 mt-0.5" />
-          <div>
-            <h3 className="text-sm font-semibold text-brand-800 mb-1">Как работают автоматизации</h3>
-            <p className="text-sm text-brand-700 leading-relaxed">
-              Когда вы меняете дату любого этапа в таблице или карточке продукта — система автоматически применяет
-              активную автоматизацию. Только <strong>одна</strong> автоматизация может быть активна одновременно.
-              Активируйте нужную ниже.
-            </p>
-          </div>
-        </div>
       </div>
 
       {/* Template Automations */}
@@ -93,10 +72,7 @@ export function AutomationsClient({ automations: initial, stages }: { automation
             return (
               <div
                 key={automation.id}
-                className={cn(
-                  'card border transition-all duration-200',
-                  isActive ? 'ring-2 ring-brand-500 border-brand-200 bg-brand-50/30' : 'hover:shadow-card-hover'
-                )}
+                className={cn('card transition-all duration-200', isActive ? 'ring-2 ring-slate-900/10 bg-slate-50' : 'hover:shadow-card-hover')}
               >
                 <div className="flex items-start gap-3 mb-3">
                   <div className={cn('badge border text-xs mt-0.5', info.color)}>{info.label}</div>
@@ -125,7 +101,7 @@ export function AutomationsClient({ automations: initial, stages }: { automation
       </div>
 
       {/* Example */}
-      <div className="card border-dashed border-2 border-slate-200">
+      <div className="card">
         <h3 className="text-sm font-semibold text-slate-600 mb-3">Пример работы</h3>
         <div className="space-y-2 text-sm text-slate-500">
           <div className="flex items-start gap-2">

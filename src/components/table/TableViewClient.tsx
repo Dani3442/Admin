@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback, useEffect, type ReactNode } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Search, CheckCircle2, AlertTriangle, Plus, ChevronLeft, ChevronRight, Pencil, X, Trash2 } from 'lucide-react'
@@ -31,6 +31,7 @@ interface TableViewClientProps {
   stages: Stage[]
   currentUserRole: string
   embedded?: boolean
+  layoutSwitcher?: ReactNode
 }
 
 interface EditingCellState {
@@ -92,7 +93,13 @@ function resolveStageMapForProduct(productStages: ProductStage[], stageTemplates
   return resolvedMap
 }
 
-export function TableViewClient({ products: initial, stages: initialStages, currentUserRole, embedded = false }: TableViewClientProps) {
+export function TableViewClient({
+  products: initial,
+  stages: initialStages,
+  currentUserRole,
+  embedded = false,
+  layoutSwitcher,
+}: TableViewClientProps) {
   const [products, setProducts] = useState(initial)
   const [stages, setStages] = useState(initialStages)
   const [search, setSearch] = useState('')
@@ -387,8 +394,8 @@ export function TableViewClient({ products: initial, stages: initialStages, curr
 
   return (
     <div className="space-y-5 animate-fade-in">
-      <div className="surface-panel flex flex-col gap-4 p-4 lg:flex-row lg:items-center lg:justify-between lg:p-5">
-        <div className="space-y-3">
+      <div className="surface-panel flex flex-col gap-5 p-4 lg:p-5">
+        <div className="space-y-4">
           {!embedded ? (
             <div>
               <h1 className="page-heading">Таблица этапов</h1>
@@ -400,25 +407,27 @@ export function TableViewClient({ products: initial, stages: initialStages, curr
             </div>
           )}
 
-          <div className="relative max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="input pl-9 text-sm"
-              placeholder="Поиск продукта..."
-            />
-          </div>
-        </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative min-w-[260px] flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="input pl-9 text-sm"
+                placeholder="Поиск продукта..."
+              />
+            </div>
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setShowOnlyRisk(!showOnlyRisk)}
-            className={cn('btn text-sm', showOnlyRisk ? 'btn-danger' : 'btn-secondary')}
-          >
-            <AlertTriangle className="w-3.5 h-3.5" />
-            {showOnlyRisk ? 'Только риски' : 'Все'}
-          </button>
+            <button
+              onClick={() => setShowOnlyRisk(!showOnlyRisk)}
+              className={cn('btn text-sm', showOnlyRisk ? 'bg-slate-900 text-white hover:bg-slate-800' : 'btn-secondary')}
+            >
+              <AlertTriangle className="w-3.5 h-3.5" />
+              {showOnlyRisk ? 'Только риски' : 'Все'}
+            </button>
+          </div>
+
+          {layoutSwitcher && <div className="pt-1">{layoutSwitcher}</div>}
         </div>
       </div>
 

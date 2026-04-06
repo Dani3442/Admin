@@ -3,7 +3,6 @@ import Link from 'next/link'
 import { getRoleLabel } from '@/lib/utils'
 import { prisma } from '@/lib/prisma'
 import { UserAvatar } from '@/components/users/UserAvatar'
-import { InfoPopover } from '@/components/ui/InfoPopover'
 
 export default async function SettingsPage() {
   const session = await auth()
@@ -17,10 +16,6 @@ export default async function SettingsPage() {
     <div className="space-y-6 animate-fade-in max-w-2xl">
       <div className="flex items-center gap-3">
         <h1 className="text-2xl font-bold text-slate-900">Настройки</h1>
-        <InfoPopover title="Что здесь находится">
-          <p>Раздел для личного профиля и базовых параметров системы.</p>
-          <p>Здесь можно быстро перейти в свой профиль, посмотреть состояние системы и служебную информацию.</p>
-        </InfoPopover>
       </div>
 
       <div className="card">
@@ -62,7 +57,7 @@ export default async function SettingsPage() {
         </div>
       </div>
 
-      <div className="card bg-slate-900 border-slate-800">
+      <div className="card bg-slate-900">
         <h2 className="text-sm font-semibold text-slate-300 mb-3">Документация</h2>
         <div className="space-y-2 text-sm text-slate-400">
           <p>• Для смены пароля обратитесь к администратору</p>
