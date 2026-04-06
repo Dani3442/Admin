@@ -60,13 +60,29 @@ export function NewProductForm({ users }: NewProductFormProps) {
         }),
       })
 
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || 'Ошибка создания продукта')
+      const text = await res.text()
+      let data: any = null
+
+      if (text) {
+        try {
+          data = JSON.parse(text)
+        } catch {
+          data = null
+        }
       }
 
-      const product = await res.json()
-      router.push(`/products/${product.id}`)
+      if (!res.ok) {
+        throw new Error(data?.error || 'Ошибка создания продукта')
+      }
+
+      const productId = typeof data?.id === 'string' ? data.id : ''
+
+      if (!productId) {
+        throw new Error('Продукт создан, но не удалось открыть его карточку')
+      }
+
+      router.push(`/products/${encodeURIComponent(productId)}`)
+      router.refresh()
     } catch (err: any) {
       setError(err.message)
     } finally {

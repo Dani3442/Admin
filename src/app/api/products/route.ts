@@ -47,33 +47,42 @@ export async function POST(req: NextRequest) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const body = await req.json()
-  const { name, country, category, sku, priority, responsibleId, notes } = body
+  try {
+    const body = await req.json()
+    const { name, country, category, sku, priority, responsibleId, notes } = body
 
-  const stageTemplates = await prisma.stageTemplate.findMany({ orderBy: { order: 'asc' } })
+    if (!name?.trim()) {
+      return NextResponse.json({ error: 'Name is required' }, { status: 400 })
+    }
 
-  const product = await prisma.product.create({
-    data: {
-      name,
-      country,
-      category,
-      sku,
-      priority: priority || 'MEDIUM',
-      responsibleId,
-      notes,
-      stages: {
-        create: stageTemplates.map((t) => ({
-          stageTemplateId: t.id,
-          stageOrder: t.order,
-          stageName: t.name,
-          isCritical: t.isCritical,
-          affectsFinalDate: t.affectsFinalDate,
-          participatesInAutoshift: t.participatesInAutoshift,
-        })),
+    const stageTemplates = await prisma.stageTemplate.findMany({ orderBy: { order: 'asc' } })
+
+    const product = await prisma.product.create({
+      data: {
+        name: name.trim(),
+        country,
+        category,
+        sku,
+        priority: priority || 'MEDIUM',
+        responsibleId,
+        notes,
+        stages: {
+          create: stageTemplates.map((t) => ({
+            stageTemplateId: t.id,
+            stageOrder: t.order,
+            stageName: t.name,
+            isCritical: t.isCritical,
+            affectsFinalDate: t.affectsFinalDate,
+            participatesInAutoshift: t.participatesInAutoshift,
+          })),
+        },
       },
-    },
-    include: { stages: true, responsible: true },
-  })
+      select: { id: true },
+    })
 
-  return NextResponse.json(product, { status: 201 })
+    return NextResponse.json({ id: product.id }, { status: 201 })
+  } catch (error) {
+    console.error('[products:create] Failed to create product', error)
+    return NextResponse.json({ error: 'Не удалось создать продукт' }, { status: 500 })
+  }
 }
