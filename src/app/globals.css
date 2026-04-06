@@ -110,6 +110,21 @@
   .toolbar-button {
     @apply inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 text-sm font-medium text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900;
   }
+
+  .floating-island {
+    @apply rounded-[30px] border border-white/80 bg-white/90 shadow-[0_24px_48px_-28px_rgba(15,23,42,0.38)] backdrop-blur-xl;
+  }
+}
+
+@layer utilities {
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 @keyframes fade-in {

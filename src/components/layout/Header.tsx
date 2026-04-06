@@ -5,7 +5,23 @@ import { useState, useEffect, useRef } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { LogOut, Bell, AlertTriangle, Clock, History, X, ChevronRight, ChevronsLeft, ChevronsRight, Search, Command } from 'lucide-react'
+import {
+  Bell,
+  AlertTriangle,
+  Clock,
+  History,
+  X,
+  ChevronDown,
+  ChevronRight,
+  LayoutDashboard,
+  Package,
+  Settings,
+  UserCircle2,
+  Users,
+  Zap,
+  LogOut,
+  Package2,
+} from 'lucide-react'
 import { UserAvatar } from '@/components/users/UserAvatar'
 import { cn, getRoleLabel, getUserDisplayName } from '@/lib/utils'
 import { buildProductHref, getRouteWithSearch } from '@/lib/navigation'
@@ -21,100 +37,111 @@ interface Notification {
 
 interface HeaderProps {
   user: { name?: string; lastName?: string | null; email?: string; role: string; avatar?: string | null }
-  isSidebarCollapsed?: boolean
-  onToggleSidebar?: () => void
 }
 
-const PAGE_META: Array<{ match: string; title: string; description: string }> = [
-  { match: '/dashboard', title: 'Дашборд', description: 'Сводка по срокам, статусам и критичным изменениям' },
-  { match: '/products', title: 'Продукты', description: 'Управление списком, таблицей и карточками продуктов' },
-  { match: '/users', title: 'Пользователи', description: 'Команда, роли, доступы и рабочие профили' },
-  { match: '/automations', title: 'Автоматизации', description: 'Сценарии, правила и служебные процессы' },
-  { match: '/settings', title: 'Настройки', description: 'Параметры системы и справочные конфигурации' },
-  { match: '/profile', title: 'Профиль', description: 'Личные данные, роль и рабочий контекст' },
-  { match: '/timeline', title: 'Таймлайн', description: 'Хронология этапов и контроль сроков' },
-  { match: '/analytics', title: 'Аналитика', description: 'Метрики, тенденции и распределение нагрузки' },
-  { match: '/table', title: 'Таблица', description: 'Плотный табличный режим для этапов и дат' },
+const NAV_ITEMS: Array<{
+  label: string
+  href: string
+  icon: typeof LayoutDashboard
+  adminOnly?: boolean
+}> = [
+  { label: 'Дашборд', href: '/dashboard', icon: LayoutDashboard },
+  { label: 'Продукты', href: '/products', icon: Package },
+  { label: 'Автоматизации', href: '/automations', icon: Zap },
+  { label: 'Пользователи', href: '/users', icon: Users, adminOnly: true },
 ]
 
-function getPageMeta(pathname: string) {
-  const matched = PAGE_META.find((item) => pathname === item.match || pathname.startsWith(`${item.match}/`))
-  return matched || { title: 'Product Admin', description: 'Рабочее пространство системы управления продуктами' }
-}
-
-export function Header({ user, isSidebarCollapsed = false, onToggleSidebar }: HeaderProps) {
-  const [open, setOpen] = useState(false)
+export function Header({ user }: HeaderProps) {
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [counts, setCounts] = useState({ overdue: 0, risk: 0, changes: 0, total: 0 })
   const [loading, setLoading] = useState(false)
   const [loaded, setLoaded] = useState(false)
-  const dropdownRef = useRef<HTMLDivElement>(null)
+  const notificationsRef = useRef<HTMLDivElement>(null)
+  const profileRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const currentRoute = getRouteWithSearch(pathname, searchParams.toString())
-  const pageMeta = getPageMeta(pathname)
+  const isAdmin = ['ADMIN', 'DIRECTOR'].includes(user.role)
 
-  // Close on outside click
   useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setOpen(false)
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node
+      if (notificationsRef.current && !notificationsRef.current.contains(target)) {
+        setNotificationsOpen(false)
+      }
+      if (profileRef.current && !profileRef.current.contains(target)) {
+        setProfileOpen(false)
       }
     }
-    if (open) document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [open])
 
-  // Fetch notifications on first open
+    document.addEventListener('mousedown', handlePointerDown)
+    return () => document.removeEventListener('mousedown', handlePointerDown)
+  }, [])
+
   const fetchNotifications = async () => {
     setLoading(true)
     try {
       const res = await fetch('/api/notifications')
-      if (res.ok) {
-        const data = await res.json()
-        setNotifications(data.notifications)
-        setCounts(data.counts)
-        setLoaded(true)
-      }
+      if (!res.ok) return
+
+      const data = await res.json()
+      setNotifications(data.notifications)
+      setCounts(data.counts)
+      setLoaded(true)
     } finally {
       setLoading(false)
     }
   }
 
-  // Auto-fetch count on mount
   useEffect(() => {
     fetchNotifications()
   }, [])
 
-  const handleToggle = () => {
-    const next = !open
-    setOpen(next)
-    if (next && !loaded) fetchNotifications()
+  const handleToggleNotifications = () => {
+    const nextOpen = !notificationsOpen
+    setNotificationsOpen(nextOpen)
+    setProfileOpen(false)
+
+    if (nextOpen && !loaded) {
+      fetchNotifications()
+    }
   }
 
-  const handleClickNotification = (n: Notification) => {
-    if (n.productId) {
-      router.push(buildProductHref(n.productId, currentRoute))
-      setOpen(false)
-    }
+  const handleToggleProfile = () => {
+    setProfileOpen((current) => !current)
+    setNotificationsOpen(false)
+  }
+
+  const handleClickNotification = (notification: Notification) => {
+    if (!notification.productId) return
+    router.push(buildProductHref(notification.productId, currentRoute))
+    setNotificationsOpen(false)
   }
 
   const getIcon = (type: string) => {
     switch (type) {
-      case 'overdue': return <Clock className="w-3.5 h-3.5 text-red-500" />
-      case 'risk': return <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
-      case 'change': return <History className="w-3.5 h-3.5 text-blue-500" />
-      default: return <Bell className="w-3.5 h-3.5 text-slate-400" />
+      case 'overdue':
+        return <Clock className="h-3.5 w-3.5 text-red-500" />
+      case 'risk':
+        return <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+      case 'change':
+        return <History className="h-3.5 w-3.5 text-blue-500" />
+      default:
+        return <Bell className="h-3.5 w-3.5 text-slate-400" />
     }
   }
 
   const getBg = (type: string) => {
     switch (type) {
-      case 'overdue': return 'bg-red-50 hover:bg-red-100/60'
-      case 'risk': return 'bg-amber-50 hover:bg-amber-100/60'
-      case 'change': return 'hover:bg-slate-50'
-      default: return 'hover:bg-slate-50'
+      case 'overdue':
+        return 'bg-red-50 hover:bg-red-100/70'
+      case 'risk':
+        return 'bg-amber-50 hover:bg-amber-100/70'
+      default:
+        return 'hover:bg-slate-50'
     }
   }
 
@@ -134,166 +161,228 @@ export function Header({ user, isSidebarCollapsed = false, onToggleSidebar }: He
   const totalBadge = counts.overdue + counts.risk
 
   return (
-    <header className="flex-shrink-0 border-b border-slate-200/70 bg-slate-50/90 px-6 py-4 backdrop-blur-sm">
-      <div className="page-shell">
-        <div className="surface-panel flex items-center justify-between gap-6 px-5 py-4">
-        <div className="flex min-w-0 items-center gap-4">
-          <button
-            type="button"
-            onClick={onToggleSidebar}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700"
-            aria-label={isSidebarCollapsed ? 'Показать боковую панель' : 'Скрыть боковую панель'}
-            title={isSidebarCollapsed ? 'Показать меню' : 'Скрыть меню'}
-          >
-            {isSidebarCollapsed ? <ChevronsRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}
-          </button>
-
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.08em] text-slate-400">
-              <span>Product Admin</span>
-              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500">Workspace</span>
-            </div>
-            <div className="mt-1">
-              <h1 className="truncate text-[21px] font-semibold tracking-[-0.03em] text-slate-900">{pageMeta.title}</h1>
-              <p className="truncate text-sm text-slate-500">{pageMeta.description}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            className="toolbar-button hidden lg:inline-flex"
-          >
-            <Search className="h-4 w-4" />
-            Поиск
-            <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] text-slate-400">
-              <Command className="h-3 w-3" />K
-            </span>
-          </button>
-
-          <div className="relative" ref={dropdownRef}>
-            <button
-              onClick={handleToggle}
-              className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-600"
-            >
-              <Bell className="w-4 h-4" />
-              {totalBadge > 0 && (
-                <span className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-                  {totalBadge > 99 ? '99+' : totalBadge}
-                </span>
-              )}
-            </button>
-
-            <AnimatePresence>
-            {open && (
-              <motion.div
-                className="absolute right-0 top-full z-50 mt-2 w-96 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl"
-                initial={{ opacity: 0, y: 8, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 6, scale: 0.98 }}
-                transition={{ duration: 0.14, ease: 'easeOut' }}
-              >
-              {/* Header */}
-              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50">
-                <div className="flex items-center gap-2">
-                  <Bell className="w-4 h-4 text-slate-500" />
-                  <span className="text-sm font-semibold text-slate-700">Уведомления</span>
-                  {counts.total > 0 && (
-                    <span className="text-xs text-slate-400">{counts.total}</span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={fetchNotifications}
-                    className="text-xs text-brand-600 hover:text-brand-700"
-                    disabled={loading}
-                  >
-                    {loading ? 'Загрузка...' : 'Обновить'}
-                  </button>
-                  <button onClick={() => setOpen(false)} className="text-slate-400 hover:text-slate-600">
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Summary badges */}
-              {(counts.overdue > 0 || counts.risk > 0) && (
-                <div className="flex items-center gap-2 px-4 py-2 border-b border-slate-100">
-                  {counts.overdue > 0 && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-medium">
-                      {counts.overdue} просрочено
-                    </span>
-                  )}
-                  {counts.risk > 0 && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">
-                      {counts.risk} под риском
-                    </span>
-                  )}
-                  {counts.changes > 0 && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">
-                      {counts.changes} изменений
-                    </span>
-                  )}
-                </div>
-              )}
-
-              {/* Notifications list */}
-              <div className="max-h-80 overflow-y-auto divide-y divide-slate-50">
-                {loading && notifications.length === 0 ? (
-                  <div className="py-8 text-center text-sm text-slate-400">Загрузка...</div>
-                ) : notifications.length === 0 ? (
-                  <div className="py-8 text-center">
-                    <Bell className="w-6 h-6 text-slate-200 mx-auto mb-2" />
-                    <p className="text-sm text-slate-400">Нет уведомлений</p>
-                  </div>
-                ) : (
-                  notifications.map((n) => (
-                    <button
-                      key={n.id}
-                      onClick={() => handleClickNotification(n)}
-                      className={cn(
-                        'w-full text-left px-4 py-2.5 flex items-start gap-2.5 transition-colors',
-                        getBg(n.type),
-                        n.productId && 'cursor-pointer'
-                      )}
-                    >
-                      <div className="mt-0.5 flex-shrink-0">{getIcon(n.type)}</div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-slate-700 truncate">{n.title}</p>
-                        <p className="text-[11px] text-slate-500 truncate">{n.description}</p>
-                      </div>
-                      <span className="text-[10px] text-slate-400 flex-shrink-0 mt-0.5">{formatTime(n.createdAt)}</span>
-                    </button>
-                  ))
-                )}
-              </div>
-              </motion.div>
-            )}
-            </AnimatePresence>
-          </div>
-
+    <header className="flex-shrink-0 px-4 pb-2 pt-5 sm:px-6 lg:px-8">
+      <div className="page-shell flex justify-center">
+        <motion.div
+          layout
+          className="floating-island flex w-full max-w-full items-center gap-2 px-2 py-2 sm:w-auto sm:min-w-[720px]"
+          transition={{ type: 'spring', stiffness: 360, damping: 32 }}
+        >
           <Link
-            href="/profile"
-            className="flex min-w-[220px] items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 transition hover:border-slate-300 hover:bg-slate-50"
+            href="/dashboard"
+            className="hidden h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-slate-950 text-white shadow-sm transition hover:scale-[1.03] sm:inline-flex"
+            aria-label="Перейти на дашборд"
           >
-            <UserAvatar user={user} size="sm" className="shrink-0" />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-slate-800">{getUserDisplayName(user)}</p>
-              <p className="truncate text-xs text-slate-500">{getRoleLabel(user.role)}</p>
-            </div>
-            <ChevronRight className="h-4 w-4 text-slate-300" />
+            <Package2 className="h-5 w-5" />
           </Link>
 
-        <button
-          onClick={() => signOut({ callbackUrl: '/login' })}
-          className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-transparent px-3 text-sm text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600"
-        >
-          <LogOut className="w-3.5 h-3.5" />
-          Выйти
-        </button>
-        </div>
-      </div>
+          <div className="no-scrollbar flex min-w-0 flex-1 items-center gap-1 overflow-x-auto px-1">
+            {NAV_ITEMS.map((item) => {
+              if (item.adminOnly && !isAdmin) return null
+
+              const Icon = item.icon
+              const active = pathname === item.href || pathname.startsWith(`${item.href}/`)
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    'relative inline-flex h-11 flex-shrink-0 items-center gap-2 rounded-full px-4 text-sm font-medium transition-colors',
+                    active ? 'text-white' : 'text-slate-600 hover:text-slate-900'
+                  )}
+                >
+                  {active && (
+                    <motion.span
+                      layoutId="top-island-nav-pill"
+                      className="absolute inset-0 rounded-full bg-slate-950 shadow-[0_14px_28px_-18px_rgba(15,23,42,0.7)]"
+                      transition={{ type: 'spring', stiffness: 390, damping: 34 }}
+                    />
+                  )}
+                  <Icon className="relative z-10 h-4 w-4" />
+                  <span className="relative z-10 whitespace-nowrap">{item.label}</span>
+                </Link>
+              )
+            })}
+          </div>
+
+          <div className="ml-auto flex flex-shrink-0 items-center gap-2">
+            <div className="relative" ref={notificationsRef}>
+              <button
+                type="button"
+                onClick={handleToggleNotifications}
+                className="relative inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200/80 bg-white/90 text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                aria-label="Открыть уведомления"
+              >
+                <Bell className="h-[18px] w-[18px]" />
+                {totalBadge > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                    {totalBadge > 99 ? '99+' : totalBadge}
+                  </span>
+                )}
+              </button>
+
+              <AnimatePresence>
+                {notificationsOpen && (
+                  <motion.div
+                    className="absolute right-0 top-[calc(100%+10px)] z-50 w-[min(92vw,24rem)] overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-2xl"
+                    initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 6, scale: 0.98 }}
+                    transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+                  >
+                    <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/90 px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <Bell className="h-4 w-4 text-slate-500" />
+                        <span className="text-sm font-semibold text-slate-700">Уведомления</span>
+                        {counts.total > 0 && <span className="text-xs text-slate-400">{counts.total}</span>}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={fetchNotifications}
+                          className="text-xs text-brand-600 transition hover:text-brand-700"
+                          disabled={loading}
+                        >
+                          {loading ? 'Загрузка...' : 'Обновить'}
+                        </button>
+                        <button onClick={() => setNotificationsOpen(false)} className="text-slate-400 transition hover:text-slate-600">
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {(counts.overdue > 0 || counts.risk > 0 || counts.changes > 0) && (
+                      <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-4 py-2.5">
+                        {counts.overdue > 0 && (
+                          <span className="rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-medium text-red-700">
+                            {counts.overdue} просрочено
+                          </span>
+                        )}
+                        {counts.risk > 0 && (
+                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                            {counts.risk} под риском
+                          </span>
+                        )}
+                        {counts.changes > 0 && (
+                          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-medium text-blue-700">
+                            {counts.changes} изменений
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="max-h-80 overflow-y-auto divide-y divide-slate-50">
+                      {loading && notifications.length === 0 ? (
+                        <div className="py-8 text-center text-sm text-slate-400">Загрузка...</div>
+                      ) : notifications.length === 0 ? (
+                        <div className="py-8 text-center">
+                          <Bell className="mx-auto mb-2 h-6 w-6 text-slate-200" />
+                          <p className="text-sm text-slate-400">Нет уведомлений</p>
+                        </div>
+                      ) : (
+                        notifications.map((notification) => (
+                          <button
+                            key={notification.id}
+                            onClick={() => handleClickNotification(notification)}
+                            className={cn(
+                              'flex w-full items-start gap-2.5 px-4 py-2.5 text-left transition-colors',
+                              getBg(notification.type),
+                              notification.productId && 'cursor-pointer'
+                            )}
+                          >
+                            <div className="mt-0.5 flex-shrink-0">{getIcon(notification.type)}</div>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-xs font-medium text-slate-700">{notification.title}</p>
+                              <p className="truncate text-[11px] text-slate-500">{notification.description}</p>
+                            </div>
+                            <span className="mt-0.5 flex-shrink-0 text-[10px] text-slate-400">
+                              {formatTime(notification.createdAt)}
+                            </span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            <div className="relative" ref={profileRef}>
+              <button
+                type="button"
+                onClick={handleToggleProfile}
+                className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200/80 bg-white/90 pl-1.5 pr-3 text-left transition hover:border-slate-300"
+                aria-label="Открыть меню профиля"
+              >
+                <UserAvatar user={user} size="sm" />
+                <div className="hidden min-w-0 text-left sm:block">
+                  <p className="max-w-[140px] truncate text-sm font-medium text-slate-800">{getUserDisplayName(user)}</p>
+                  <p className="truncate text-[11px] text-slate-500">{getRoleLabel(user.role)}</p>
+                </div>
+                <ChevronDown className={cn('h-4 w-4 text-slate-400 transition-transform', profileOpen && 'rotate-180')} />
+              </button>
+
+              <AnimatePresence>
+                {profileOpen && (
+                  <motion.div
+                    className="absolute right-0 top-[calc(100%+10px)] z-50 w-[min(92vw,21rem)] overflow-hidden rounded-[26px] border border-slate-200 bg-white p-2 shadow-2xl"
+                    initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 6, scale: 0.98 }}
+                    transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+                  >
+                    <div className="mb-2 flex items-center gap-3 rounded-[22px] bg-slate-50 px-3 py-3">
+                      <UserAvatar user={user} size="md" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold text-slate-900">{getUserDisplayName(user)}</p>
+                        <p className="truncate text-xs text-slate-500">{user.email}</p>
+                        <p className="mt-1 text-[11px] text-slate-400">{getRoleLabel(user.role)}</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <Link
+                        href="/profile"
+                        onClick={() => setProfileOpen(false)}
+                        className="flex items-center justify-between rounded-2xl px-3 py-2.5 text-sm text-slate-700 transition hover:bg-slate-50 hover:text-slate-900"
+                      >
+                        <span className="flex items-center gap-2">
+                          <UserCircle2 className="h-4 w-4 text-slate-400" />
+                          Профиль
+                        </span>
+                        <ChevronRight className="h-4 w-4 text-slate-300" />
+                      </Link>
+                      <Link
+                        href="/settings"
+                        onClick={() => setProfileOpen(false)}
+                        className="flex items-center justify-between rounded-2xl px-3 py-2.5 text-sm text-slate-700 transition hover:bg-slate-50 hover:text-slate-900"
+                      >
+                        <span className="flex items-center gap-2">
+                          <Settings className="h-4 w-4 text-slate-400" />
+                          Настройки
+                        </span>
+                        <ChevronRight className="h-4 w-4 text-slate-300" />
+                      </Link>
+                    </div>
+
+                    <div className="mt-2 border-t border-slate-100 pt-2">
+                      <button
+                        onClick={() => signOut({ callbackUrl: '/login' })}
+                        className="flex w-full items-center justify-between rounded-2xl px-3 py-2.5 text-sm text-red-600 transition hover:bg-red-50"
+                      >
+                        <span className="flex items-center gap-2">
+                          <LogOut className="h-4 w-4" />
+                          Выйти
+                        </span>
+                        <ChevronRight className="h-4 w-4 text-red-300" />
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+        </motion.div>
       </div>
     </header>
   )
