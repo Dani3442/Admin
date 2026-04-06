@@ -32,6 +32,14 @@ interface TableViewClientProps {
   currentUserRole: string
 }
 
+function resolveStageForColumn(productStages: ProductStage[], stageTemplate: Stage) {
+  const directMatch = productStages.find((productStage) => productStage.stageTemplateId === stageTemplate.id)
+  if (directMatch) return directMatch
+
+  // Fallback for legacy/corrupted rows where template linkage drifted but the visual order remained.
+  return productStages.find((productStage) => productStage.stageOrder === stageTemplate.order)
+}
+
 export function TableViewClient({ products: initial, stages: initialStages, currentUserRole }: TableViewClientProps) {
   const [products, setProducts] = useState(initial)
   const [stages, setStages] = useState(initialStages)
@@ -468,10 +476,7 @@ export function TableViewClient({ products: initial, stages: initialStages, curr
 
                     {/* Stage cells */}
                     {stages.map((stageTemplate) => {
-                      const stage = product.stages.find((productStage) =>
-                        productStage.stageTemplateId === stageTemplate.id &&
-                        productStage.stageName === stageTemplate.name
-                      )
+                      const stage = resolveStageForColumn(product.stages, stageTemplate)
                       const isEditing = editingCell?.stageId === stage?.id && editingCell?.productId === product.id
                       const cellClass = getCellClass(stage, stageTemplate)
                       const cellText = getCellText(stage)
