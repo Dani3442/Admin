@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth, hasPermission, Permission } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { ensureDefaultShiftFollowingAutomation } from '@/lib/automation'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -12,6 +13,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const productId = searchParams.get('productId')
 
+  await ensureDefaultShiftFollowingAutomation()
   const automations = await prisma.automation.findMany({
     where: productId ? { OR: [{ productId }, { isTemplate: true }] } : { isTemplate: true },
     orderBy: { createdAt: 'asc' },

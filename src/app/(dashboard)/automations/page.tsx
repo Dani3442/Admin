@@ -2,8 +2,10 @@ import { prisma } from '@/lib/prisma'
 import { auth, hasPermission, Permission } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { AutomationsClient } from '@/components/AutomationsClient'
+import { ensureDefaultShiftFollowingAutomation } from '@/lib/automation'
 
 async function getData() {
+  await ensureDefaultShiftFollowingAutomation()
   const [automations, stages] = await Promise.all([
     prisma.automation.findMany({ orderBy: { createdAt: 'asc' } }),
     prisma.stageTemplate.findMany({ orderBy: { order: 'asc' } }),

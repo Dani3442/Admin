@@ -104,14 +104,24 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
       const res = await fetch('/api/stages', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stageId, updates: vals }),
+        body: JSON.stringify({ stageId, updates: vals, applyAutomations: true }),
       })
-      const { stage } = await res.json()
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data?.error || 'Не удалось обновить этап')
+      }
+
       setProduct((p: any) => ({
         ...p,
-        stages: p.stages.map((s: any) => s.id === stageId ? { ...s, ...stage } : s),
+        stages: data.stages || p.stages,
+        finalDate: data.product?.finalDate ?? p.finalDate,
+        progressPercent: data.product?.progressPercent ?? p.progressPercent,
+        riskScore: data.product?.riskScore ?? p.riskScore,
+        status: data.product?.status ?? p.status,
       }))
       setEditingStageId(null)
+    } catch (error: any) {
+      alert(error.message || 'Не удалось обновить этап')
     } finally {
       setSaving(false)
     }

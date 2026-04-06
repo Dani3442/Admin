@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth, hasPermission, Permission } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { applyAutomation } from '@/lib/automation'
+import { applyAutomation, ensureDefaultShiftFollowingAutomation } from '@/lib/automation'
 import { recalculateProductRisk } from '@/lib/risk'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  await ensureDefaultShiftFollowingAutomation()
   const stages = await prisma.stageTemplate.findMany({ orderBy: { order: 'asc' } })
   return NextResponse.json(stages)
 }
@@ -121,7 +122,7 @@ export async function PATCH(req: NextRequest) {
     await prisma.changeHistory.create({
       data: {
         productId: existingStage.productId,
-        productStageId: stageId,
+        productStageId: existingStage.id,
         field: 'dateValue',
         oldValue: oldDate.toISOString(),
         newValue: newDate?.toISOString() || null,
@@ -132,7 +133,7 @@ export async function PATCH(req: NextRequest) {
   }
 
   const updatedStage = await prisma.productStage.update({
-    where: { id: stageId },
+    where: { id: existingStage.id },
     data: updates,
   })
 
@@ -163,10 +164,21 @@ export async function PATCH(req: NextRequest) {
   // Recalculate risk after any stage change
   await recalculateProductRisk(existingStage.productId)
 
+  const updatedProduct = await prisma.product.findUnique({
+    where: { id: existingStage.productId },
+    select: {
+      id: true,
+      finalDate: true,
+      progressPercent: true,
+      riskScore: true,
+      status: true,
+    },
+  })
+
   const stages = await prisma.productStage.findMany({
     where: { productId: existingStage.productId },
     orderBy: { stageOrder: 'asc' },
   })
 
-  return NextResponse.json({ stage: updatedStage, stages, automationResult })
+  return NextResponse.json({ stage: updatedStage, stages, automationResult, product: updatedProduct })
 }

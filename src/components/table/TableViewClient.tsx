@@ -428,6 +428,10 @@ export function TableViewClient({
           p.id !== activeCell.productId ? p : {
             ...p,
             stages: data?.stages || p.stages,
+            finalDate: data?.product?.finalDate ?? p.finalDate,
+            progressPercent: data?.product?.progressPercent ?? p.progressPercent,
+            riskScore: data?.product?.riskScore ?? p.riskScore,
+            status: data?.product?.status ?? p.status,
           }
         )
       )

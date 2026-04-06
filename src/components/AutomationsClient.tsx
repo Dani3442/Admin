@@ -68,6 +68,7 @@ export function AutomationsClient({ automations: initial, stages }: { automation
             const info = ACTION_LABELS[automation.actionType] || { label: automation.actionType, desc: '', color: 'text-slate-600 bg-slate-50 border-slate-200' }
             const isActive = automation.isActive
             const isSaving = saving === automation.id
+            const isDefaultCascade = automation.actionType === 'SHIFT_ALL_FOLLOWING'
 
             return (
               <div
@@ -92,7 +93,12 @@ export function AutomationsClient({ automations: initial, stages }: { automation
                     </button>
                   </div>
                 </div>
-                <h3 className="text-sm font-semibold text-slate-800 mb-1">{automation.name}</h3>
+                <div className="mb-1 flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-slate-800">{automation.name}</h3>
+                  {isDefaultCascade && (
+                    <span className="badge bg-brand-100 text-brand-700">По умолчанию</span>
+                  )}
+                </div>
                 <p className="text-xs text-slate-500 leading-relaxed">{automation.description || info.desc}</p>
               </div>
             )

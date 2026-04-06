@@ -1,6 +1,62 @@
 import { prisma } from './prisma'
 import { addDays, differenceInDays } from 'date-fns'
 
+const DEFAULT_SHIFT_AUTOMATION = {
+  name: 'Сдвиг всех следующих этапов',
+  description: 'При изменении даты любого этапа — сдвигает все последующие этапы на такое же количество дней',
+  isTemplate: true,
+  isActive: true,
+  actionType: 'SHIFT_ALL_FOLLOWING',
+  config: JSON.stringify({ shiftType: 'cascade', includeWeekends: false }),
+  excludeStageOrders: '[]',
+} as const
+
+export async function ensureDefaultShiftFollowingAutomation() {
+  const existing = await prisma.automation.findFirst({
+    where: {
+      isTemplate: true,
+      actionType: DEFAULT_SHIFT_AUTOMATION.actionType,
+    },
+    orderBy: { createdAt: 'asc' },
+  })
+
+  if (existing) return existing
+
+  return prisma.automation.create({
+    data: DEFAULT_SHIFT_AUTOMATION,
+  })
+}
+
+function selectEffectiveAutomation(
+  automations: Array<{
+    id: string
+    productId: string | null
+    isTemplate: boolean
+    isActive: boolean
+    actionType: string
+    excludeStageOrders: string
+    name: string
+  }>
+) {
+  const priority = [
+    'SHIFT_ALL_FOLLOWING',
+    'RECALCULATE_BY_DURATIONS',
+    'SHIFT_FINAL_DATE_ONLY',
+    'MARK_AS_RISK',
+    'NOTIFY_ONLY',
+  ]
+
+  for (const actionType of priority) {
+    const productSpecific = automations.find((automation) => automation.actionType === actionType && automation.productId)
+    if (productSpecific) return productSpecific
+
+    const template = automations.find((automation) => automation.actionType === actionType && automation.isTemplate)
+    if (template) return template
+  }
+
+  return null
+}
+
 export async function applyAutomation(
   productId: string,
   changedStageOrder: number,
@@ -12,13 +68,17 @@ export async function applyAutomation(
   const shiftDays = differenceInDays(newDate, oldDate)
   if (shiftDays === 0) return null
 
-  const automation = await prisma.automation.findFirst({
+  await ensureDefaultShiftFollowingAutomation()
+
+  const automations = await prisma.automation.findMany({
     where: {
       OR: [{ productId }, { isTemplate: true }],
       isActive: true,
     },
-    orderBy: { productId: 'desc' },
+    orderBy: [{ productId: 'desc' }, { createdAt: 'asc' }],
   })
+
+  const automation = selectEffectiveAutomation(automations)
 
   if (!automation) return null
 
