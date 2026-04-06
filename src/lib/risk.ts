@@ -1,3 +1,4 @@
+import { startOfDay } from 'date-fns'
 import { prisma } from './prisma'
 
 /**
@@ -64,8 +65,8 @@ export async function recalculateAllRisks() {
       const curr = stagesWithDates[i]
       const next = stagesWithDates[i + 1]
       if (curr.dateValue && next.dateValue) {
-        const currDate = new Date(curr.dateValue)
-        const nextDate = new Date(next.dateValue)
+        const currDate = startOfDay(new Date(curr.dateValue))
+        const nextDate = startOfDay(new Date(next.dateValue))
         if (currDate > nextDate) {
           riskScore += 15
           issues.push(`overlap:${curr.stageName}->${next.stageName}`)
@@ -134,7 +135,11 @@ export async function recalculateProductRisk(productId: string) {
   for (let i = 0; i < stagesWithDates.length - 1; i++) {
     const curr = stagesWithDates[i]
     const next = stagesWithDates[i + 1]
-    if (curr.dateValue && next.dateValue && new Date(curr.dateValue) > new Date(next.dateValue)) {
+    if (
+      curr.dateValue &&
+      next.dateValue &&
+      startOfDay(new Date(curr.dateValue)) > startOfDay(new Date(next.dateValue))
+    ) {
       riskScore += 15
     }
   }

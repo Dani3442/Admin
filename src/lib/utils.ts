@@ -1,6 +1,6 @@
 import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
-import { format, differenceInDays, isAfter, isBefore, addDays, parse, isValid } from 'date-fns'
+import { format, differenceInDays, isAfter, isBefore, addDays, parse, isValid, startOfDay } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import type { ProductStatus, Priority } from '@/types'
 
@@ -149,8 +149,8 @@ export function detectStageOverlaps(
     const curr = sorted[i]
     const next = sorted[i + 1]
     if (curr.dateValue && next.dateValue) {
-      const currDate = new Date(curr.dateValue)
-      const nextDate = new Date(next.dateValue)
+      const currDate = startOfDay(new Date(curr.dateValue))
+      const nextDate = startOfDay(new Date(next.dateValue))
       if (currDate > nextDate) {
         overlappingIds.add(curr.id)
         overlappingIds.add(next.id)
