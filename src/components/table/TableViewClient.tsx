@@ -50,6 +50,21 @@ export function TableViewClient({ products: initial, stages: initialStages }: Ta
   const [newStageDuration, setNewStageDuration] = useState('')
   const menuRef = useRef<HTMLDivElement>(null)
 
+  useEffect(() => {
+    setProducts(initial)
+  }, [initial])
+
+  useEffect(() => {
+    setStages(initialStages)
+    setColumnWidths((prev) => {
+      const next = { ...prev }
+      initialStages.forEach((stage) => {
+        if (!next[stage.id]) next[stage.id] = 130
+      })
+      return next
+    })
+  }, [initialStages])
+
   // Close menu on outside click
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -142,15 +157,31 @@ export function TableViewClient({ products: initial, stages: initialStages }: Ta
         body: JSON.stringify({ name: newStageName, durationText: newStageDuration || null }),
       })
       if (res.ok) {
-        const createdStage = await res.json()
+        const { template: createdStage, productStages } = await res.json()
         setStages((prev) => [...prev, createdStage].sort((a, b) => a.order - b.order))
-        setColumnWidths((prev) => ({ ...prev, [createdStage.id]: 130 }))
+        setProducts((prev) =>
+          prev.map((product) => {
+            const createdProductStage = productStages.find((stage: ProductStage & { productId: string }) => stage.productId === product.id)
+            if (!createdProductStage) return product
+
+            return {
+              ...product,
+              stages: [...product.stages, createdProductStage].sort((a, b) => a.stageOrder - b.stageOrder),
+            }
+          })
+        )
+        setColumnWidths((prev) => ({ ...prev, [createdStage.id]: prev[createdStage.id] ?? 130 }))
         setNewStageName('')
         setNewStageDuration('')
         setShowNewStageForm(false)
         router.refresh()
+      } else {
+        const data = await res.json().catch(() => null)
+        window.alert(data?.error || 'Не удалось создать этап')
       }
-    } catch {}
+    } catch {
+      window.alert('Не удалось создать этап')
+    }
   }
 
   const handleDeleteStage = async (stageId: string) => {

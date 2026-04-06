@@ -25,47 +25,77 @@ export async function POST(req: NextRequest) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const body = await req.json()
-  const { name, durationText, isCritical = false } = body
+  try {
+    const body = await req.json()
+    const { name, durationText, isCritical = false } = body
 
-  if (!name?.trim()) {
-    return NextResponse.json({ error: 'Name is required' }, { status: 400 })
-  }
+    if (!name?.trim()) {
+      return NextResponse.json({ error: 'Name is required' }, { status: 400 })
+    }
 
-  // Get max order
-  const last = await prisma.stageTemplate.findFirst({ orderBy: { order: 'desc' } })
-  const newOrder = (last?.order ?? 0) + 1
+    const result = await prisma.$transaction(async (tx) => {
+      const last = await tx.stageTemplate.findFirst({ orderBy: { order: 'desc' } })
+      const newOrder = (last?.order ?? -1) + 1
 
-  const template = await prisma.stageTemplate.create({
-    data: {
-      name: name.trim(),
-      order: newOrder,
-      durationText: durationText || null,
-      isCritical,
-    },
-  })
+      const template = await tx.stageTemplate.create({
+        data: {
+          name: name.trim(),
+          order: newOrder,
+          durationText: durationText || null,
+          isCritical,
+        },
+      })
 
-  // Add this stage to all existing non-archived products
-  const products = await prisma.product.findMany({
-    where: { isArchived: false },
-    select: { id: true },
-  })
+      const products = await tx.product.findMany({
+        where: { isArchived: false },
+        select: { id: true },
+      })
 
-  if (products.length > 0) {
-    await prisma.productStage.createMany({
-      data: products.map((p) => ({
-        productId: p.id,
-        stageTemplateId: template.id,
-        stageOrder: newOrder,
-        stageName: template.name,
-        isCritical: template.isCritical,
-        affectsFinalDate: template.affectsFinalDate,
-        participatesInAutoshift: template.participatesInAutoshift,
-      })),
+      const productStages = []
+
+      for (const product of products) {
+        const lastStage = await tx.productStage.findFirst({
+          where: { productId: product.id },
+          orderBy: [{ stageOrder: 'desc' }, { createdAt: 'desc' }],
+          select: { stageOrder: true },
+        })
+
+        const createdStage = await tx.productStage.create({
+          data: {
+            productId: product.id,
+            stageTemplateId: template.id,
+            stageOrder: (lastStage?.stageOrder ?? -1) + 1,
+            stageName: template.name,
+            isCritical: template.isCritical,
+            affectsFinalDate: template.affectsFinalDate,
+            participatesInAutoshift: template.participatesInAutoshift,
+            status: 'NOT_STARTED',
+          },
+          select: {
+            id: true,
+            productId: true,
+            stageTemplateId: true,
+            stageOrder: true,
+            stageName: true,
+            dateValue: true,
+            dateRaw: true,
+            isCompleted: true,
+            isCritical: true,
+            status: true,
+          },
+        })
+
+        productStages.push(createdStage)
+      }
+
+      return { template, productStages }
     })
-  }
 
-  return NextResponse.json(template, { status: 201 })
+    return NextResponse.json(result, { status: 201 })
+  } catch (error) {
+    console.error('[stage-templates:create] Failed to create stage template', error)
+    return NextResponse.json({ error: 'Не удалось создать этап' }, { status: 500 })
+  }
 }
 
 // Rename or reorder stage templates
