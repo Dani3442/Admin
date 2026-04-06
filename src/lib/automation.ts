@@ -92,15 +92,39 @@ export async function applyAutomation(
     (s) => s.stageOrder > changedStageOrder && s.participatesInAutoshift
   )
   const excludeOrders: number[] = JSON.parse(automation.excludeStageOrders || '[]')
+  const stageTemplates = await prisma.stageTemplate.findMany({
+    where: {
+      order: {
+        in: laterStages.map((stage) => stage.stageOrder),
+      },
+    },
+    select: {
+      order: true,
+      durationDays: true,
+    },
+  })
+  const durationByOrder = new Map(stageTemplates.map((template) => [template.order, template.durationDays ?? 1]))
 
   let affected = 0
 
   switch (automation.actionType) {
     case 'SHIFT_ALL_FOLLOWING':
+      let cascadeCursor = newDate
+
       for (const stage of laterStages) {
         if (excludeOrders.includes(stage.stageOrder)) continue
-        if (!stage.dateValue) continue
-        const newStageDate = addDays(stage.dateValue, shiftDays)
+        const baseDate = stage.dateValue ?? stage.plannedDate
+        let newStageDate: Date | null = null
+
+        if (baseDate) {
+          newStageDate = addDays(baseDate, shiftDays)
+        } else if (cascadeCursor) {
+          const durationDays = durationByOrder.get(stage.stageOrder) ?? 1
+          newStageDate = addDays(cascadeCursor, durationDays)
+        }
+
+        if (!newStageDate) continue
+
         await prisma.productStage.update({
           where: { id: stage.id },
           data: { dateValue: newStageDate, plannedDate: newStageDate },
@@ -108,11 +132,13 @@ export async function applyAutomation(
         await prisma.changeHistory.create({
           data: {
             productId, productStageId: stage.id, field: 'dateValue',
-            oldValue: stage.dateValue.toISOString(), newValue: newStageDate.toISOString(),
+            oldValue: (baseDate ?? null)?.toISOString() ?? null,
+            newValue: newStageDate.toISOString(),
             changedById: userId, reason: `Авто-сдвиг: ${automation.name}`,
           },
         })
         affected++
+        cascadeCursor = newStageDate
       }
       if (product.finalDate) {
         await prisma.product.update({
