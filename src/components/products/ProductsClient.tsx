@@ -59,6 +59,12 @@ interface ContextMenuState {
   y: number
 }
 
+interface DragPreviewState {
+  x: number
+  y: number
+  productName: string
+}
+
 const isValidSortField = (value: string | null): value is ProductListSortField =>
   SORT_OPTIONS.some((option) => option.value === value)
 
@@ -87,6 +93,7 @@ export function ProductsClient({ products: initialProducts, users, currentUserRo
   const [savingProductId, setSavingProductId] = useState<string | null>(null)
   const [draggingProductId, setDraggingProductId] = useState<string | null>(null)
   const [dragOverState, setDragOverState] = useState<{ productId: string; position: 'before' | 'after' } | null>(null)
+  const [dragPreview, setDragPreview] = useState<DragPreviewState | null>(null)
 
   const canManageProducts = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUserRole)
   const canDeleteProducts = ['ADMIN', 'DIRECTOR'].includes(currentUserRole)
@@ -146,6 +153,19 @@ export function ProductsClient({ products: initialProducts, users, currentUserRo
       window.removeEventListener('scroll', closeOnScroll, true)
     }
   }, [contextMenu])
+
+  useEffect(() => {
+    if (!draggingProductId) {
+      document.body.classList.remove('cursor-grabbing')
+      return
+    }
+
+    document.body.classList.add('cursor-grabbing')
+
+    return () => {
+      document.body.classList.remove('cursor-grabbing')
+    }
+  }, [draggingProductId])
 
   const now = new Date()
   const filters = useMemo<ProductListFilters>(() => ({
@@ -262,8 +282,45 @@ export function ProductsClient({ products: initialProducts, users, currentUserRo
 
     event.dataTransfer.effectAllowed = 'move'
     event.dataTransfer.setData('text/plain', productId)
+    event.dataTransfer.dropEffect = 'move'
+    if (typeof document !== 'undefined') {
+      const transparentPreview = document.createElement('div')
+      transparentPreview.style.width = '1px'
+      transparentPreview.style.height = '1px'
+      transparentPreview.style.position = 'fixed'
+      transparentPreview.style.top = '-9999px'
+      transparentPreview.style.opacity = '0'
+      document.body.appendChild(transparentPreview)
+      event.dataTransfer.setDragImage(transparentPreview, 0, 0)
+      requestAnimationFrame(() => {
+        document.body.removeChild(transparentPreview)
+      })
+    }
     setDraggingProductId(productId)
+    const draggedProduct = products.find((product) => product.id === productId)
+    if (draggedProduct) {
+      setDragPreview({
+        x: event.clientX || 0,
+        y: event.clientY || 0,
+        productName: draggedProduct.name,
+      })
+    }
     setContextMenu(null)
+  }
+
+  const handleDrag = (event: React.DragEvent<HTMLButtonElement>) => {
+    if (!draggingProductId) return
+    if (event.clientX === 0 && event.clientY === 0) return
+
+    setDragPreview((current) =>
+      current
+        ? {
+            ...current,
+            x: event.clientX,
+            y: event.clientY,
+          }
+        : current
+    )
   }
 
   const handleDragOver = (event: React.DragEvent<HTMLTableRowElement>, productId: string) => {
@@ -278,6 +335,7 @@ export function ProductsClient({ products: initialProducts, users, currentUserRo
   const handleDragEnd = () => {
     setDraggingProductId(null)
     setDragOverState(null)
+    setDragPreview(null)
   }
 
   const handleDrop = async (event: React.DragEvent<HTMLTableRowElement>, targetProductId: string) => {
@@ -499,6 +557,8 @@ export function ProductsClient({ products: initialProducts, users, currentUserRo
                 const { overlaps } = detectStageOverlaps(product.stages)
                 const isDragging = draggingProductId === product.id
                 const isDropTarget = dragOverState?.productId === product.id
+                const showDropBefore = isDropTarget && dragOverState?.position === 'before'
+                const showDropAfter = isDropTarget && dragOverState?.position === 'after'
 
                 return (
                   <tr
@@ -508,32 +568,59 @@ export function ProductsClient({ products: initialProducts, users, currentUserRo
                     onDragOver={(event) => handleDragOver(event, product.id)}
                     onDrop={(event) => handleDrop(event, product.id)}
                     className={cn(
-                      'cursor-pointer transition-colors hover:bg-slate-50/70',
-                      isDragging && 'opacity-60',
-                      isDropTarget && dragOverState?.position === 'before' && 'border-t-2 border-brand-500',
-                      isDropTarget && dragOverState?.position === 'after' && 'border-b-2 border-brand-500'
+                      'relative cursor-pointer transition-all duration-150 hover:bg-slate-50/70',
+                      isDragging && 'bg-brand-50/80 scale-[0.995]',
+                      showDropBefore && 'border-t-2 border-brand-500',
+                      showDropAfter && 'border-b-2 border-brand-500'
                     )}
                   >
-                    <td className="table-cell text-center text-slate-400 text-xs">{index + 1}</td>
-                    <td className="table-cell text-center" onClick={(event) => event.stopPropagation()}>
+                    <td className={cn('table-cell text-center text-slate-400 text-xs', isDragging && 'bg-brand-50/80')}>
+                      <div className="flex flex-col items-center justify-center gap-1">
+                        <span>{index + 1}</span>
+                        {isDragging && (
+                          <span className="rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-semibold text-brand-700">
+                            тащу
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className={cn('table-cell text-center relative', isDragging && 'bg-brand-50/80')} onClick={(event) => event.stopPropagation()}>
+                      {showDropBefore && (
+                        <div className="pointer-events-none absolute inset-x-2 -top-[10px] z-10 flex items-center gap-2">
+                          <div className="h-[3px] flex-1 rounded-full bg-brand-500 shadow-[0_0_0_3px_rgba(37,99,235,0.12)]" />
+                          <span className="rounded-full bg-brand-600 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
+                            Вставить выше
+                          </span>
+                        </div>
+                      )}
+                      {showDropAfter && (
+                        <div className="pointer-events-none absolute inset-x-2 -bottom-[10px] z-10 flex items-center gap-2">
+                          <div className="h-[3px] flex-1 rounded-full bg-brand-500 shadow-[0_0_0_3px_rgba(37,99,235,0.12)]" />
+                          <span className="rounded-full bg-brand-600 px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
+                            Вставить ниже
+                          </span>
+                        </div>
+                      )}
                       <button
                         type="button"
                         draggable={canReorder}
                         onDragStart={(event) => handleDragStart(event, product.id)}
+                        onDrag={handleDrag}
                         onDragEnd={handleDragEnd}
                         disabled={!canReorder || savingProductId === product.id || deletingProductId === product.id}
                         className={cn(
-                          'inline-flex h-8 w-8 items-center justify-center rounded-lg border transition-colors',
+                          'inline-flex h-8 w-8 items-center justify-center rounded-lg border transition-all duration-150',
                           canReorder
                             ? 'border-slate-200 text-slate-400 hover:border-slate-300 hover:text-slate-600 cursor-grab active:cursor-grabbing'
-                            : 'border-slate-100 text-slate-300 cursor-not-allowed'
+                            : 'border-slate-100 text-slate-300 cursor-not-allowed',
+                          isDragging && 'border-brand-300 bg-brand-100 text-brand-700 shadow-sm scale-110'
                         )}
                         title={canReorder ? 'Перетащить продукт' : 'Перетаскивание сейчас недоступно'}
                       >
                         <GripVertical className="w-4 h-4" />
                       </button>
                     </td>
-                    <td className="table-cell">
+                    <td className={cn('table-cell', isDragging && 'bg-brand-50/80')}>
                       <div className="flex items-start gap-3">
                         <div className="mt-0.5 flex items-center gap-1">
                           <Pin className={cn('w-3.5 h-3.5', product.isPinned ? 'text-brand-600 fill-brand-100' : 'text-slate-300')} />
@@ -561,19 +648,19 @@ export function ProductsClient({ products: initialProducts, users, currentUserRo
                         </div>
                       </div>
                     </td>
-                    <td className="table-cell">
+                    <td className={cn('table-cell', isDragging && 'bg-brand-50/80')}>
                       <span className="text-xs text-slate-500">{product.country || '—'}</span>
                     </td>
-                    <td className="table-cell">
+                    <td className={cn('table-cell', isDragging && 'bg-brand-50/80')}>
                       <span className={cn('badge text-xs', getStatusColor(product.status))}>{getStatusLabel(product.status)}</span>
                     </td>
-                    <td className="table-cell">
+                    <td className={cn('table-cell', isDragging && 'bg-brand-50/80')}>
                       <span className={cn('badge text-xs border', getPriorityColor(product.priority))}>{getPriorityLabel(product.priority)}</span>
                     </td>
-                    <td className="table-cell">
+                    <td className={cn('table-cell', isDragging && 'bg-brand-50/80')}>
                       <span className="text-xs text-slate-600">{product.responsible?.name || '—'}</span>
                     </td>
-                    <td className="table-cell">
+                    <td className={cn('table-cell', isDragging && 'bg-brand-50/80')}>
                       <div className="flex items-center gap-2">
                         <div className="progress-bar flex-1">
                           <div
@@ -587,13 +674,13 @@ export function ProductsClient({ products: initialProducts, users, currentUserRo
                         <span className="text-xs text-slate-500 w-8 text-right">{product.progressPercent}%</span>
                       </div>
                     </td>
-                    <td className="table-cell">
+                    <td className={cn('table-cell', isDragging && 'bg-brand-50/80')}>
                       <span className={cn('text-xs font-medium', isOverdue ? 'text-red-600' : 'text-slate-600')}>
                         {formatDate(product.finalDate)}
                       </span>
                       {isOverdue && <div className="text-xs text-red-500 mt-0.5">просрочен</div>}
                     </td>
-                    <td className="table-cell">
+                    <td className={cn('table-cell', isDragging && 'bg-brand-50/80')}>
                       <div
                         className={cn(
                           'inline-flex items-center justify-center w-8 h-8 rounded-lg text-xs font-bold',
@@ -623,6 +710,33 @@ export function ProductsClient({ products: initialProducts, users, currentUserRo
           )}
         </div>
       </div>
+
+      <AnimatePresence>
+        {dragPreview && canReorder && (
+          <motion.div
+            className="pointer-events-none fixed z-[80] hidden min-w-[220px] max-w-[320px] rounded-2xl border border-brand-200 bg-white/96 px-3 py-2 shadow-2xl backdrop-blur md:block"
+            style={{ left: dragPreview.x + 18, top: dragPreview.y + 18 }}
+            initial={{ opacity: 0, scale: 0.94 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.94 }}
+            transition={{ duration: 0.12 }}
+          >
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand-100 text-brand-700">
+                <GripVertical className="h-4 w-4" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-600">
+                  Перетаскивание
+                </div>
+                <div className="truncate text-sm font-medium text-slate-800">
+                  {dragPreview.productName}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {contextMenu && contextProduct && (
