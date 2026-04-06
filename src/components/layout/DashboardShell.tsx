@@ -38,7 +38,9 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
       <Sidebar user={user} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed((current) => !current)} />
       <div className="flex-1 flex min-w-0 flex-col overflow-hidden">
         <Header user={user} isSidebarCollapsed={sidebarCollapsed} onToggleSidebar={() => setSidebarCollapsed((current) => !current)} />
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+        <main className="flex-1 overflow-y-auto">
+          <div className="page-shell px-6 py-6">{children}</div>
+        </main>
       </div>
     </div>
   )

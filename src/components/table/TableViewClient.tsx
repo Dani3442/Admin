@@ -386,19 +386,31 @@ export function TableViewClient({ products: initial, stages: initialStages, curr
   const addColumnWidth = 50
 
   return (
-    <div className="space-y-4 animate-fade-in">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        {!embedded ? (
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Таблица этапов</h1>
-            <p className="text-slate-500 text-sm mt-0.5">{filteredProducts.length} продуктов × {stages.length} этапов</p>
+    <div className="space-y-5 animate-fade-in">
+      <div className="surface-panel flex flex-col gap-4 p-4 lg:flex-row lg:items-center lg:justify-between lg:p-5">
+        <div className="space-y-3">
+          {!embedded ? (
+            <div>
+              <h1 className="page-heading">Таблица этапов</h1>
+              <p className="subtle-copy mt-1">{filteredProducts.length} продуктов × {stages.length} этапов</p>
+            </div>
+          ) : (
+            <div className="text-sm text-slate-500">
+              {filteredProducts.length} продуктов × {stages.length} этапов
+            </div>
+          )}
+
+          <div className="relative max-w-xs">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="input pl-9 text-sm"
+              placeholder="Поиск продукта..."
+            />
           </div>
-        ) : (
-          <div className="text-sm text-slate-500">
-            {filteredProducts.length} продуктов × {stages.length} этапов
-          </div>
-        )}
+        </div>
+
         <div className="flex items-center gap-3">
           <button
             onClick={() => setShowOnlyRisk(!showOnlyRisk)}
@@ -410,19 +422,8 @@ export function TableViewClient({ products: initial, stages: initialStages, curr
         </div>
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-xs">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="input pl-9 text-sm"
-          placeholder="Поиск продукта..."
-        />
-      </div>
-
       {/* Matrix Table */}
-      <div className="bg-white rounded-xl border border-slate-100 shadow-card overflow-hidden">
+      <div className="surface-panel overflow-hidden">
         <div className="overflow-x-auto">
           <table className="border-collapse" style={{ tableLayout: 'fixed', width: Object.values(columnWidths).reduce((a, b) => a + b, 0) + addColumnWidth }}>
             <thead className="sticky top-0 z-10">

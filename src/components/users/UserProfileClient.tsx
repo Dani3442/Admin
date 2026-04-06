@@ -164,118 +164,104 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
   const canEditAnything = permissions.canEditPersonal || permissions.canEditOperational || permissions.canEditSensitive
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 animate-fade-in">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">{isSelf ? 'Мой профиль' : 'Профиль сотрудника'}</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            {isSelf ? 'Личные данные и системный статус вашего аккаунта' : 'Карточка сотрудника и его статус в многопользовательской системе'}
-          </p>
+    <div className="page-section animate-fade-in">
+      <div className="surface-panel overflow-hidden">
+        <div className="flex flex-col gap-5 p-6 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex items-start gap-4">
+            <div className="relative shrink-0">
+              <UserAvatar user={{ name: form.name, lastName: form.lastName, avatar: form.avatar }} size="xl" />
+              {isEditing && permissions.canEditPersonal && (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="absolute -bottom-1 -right-1 flex h-9 w-9 items-center justify-center rounded-full border border-white bg-white text-brand-600 shadow-md transition hover:scale-105 hover:text-brand-700"
+                >
+                  <Camera className="h-4 w-4" />
+                </button>
+              )}
+              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
+            </div>
+
+            <div className="min-w-0 space-y-4">
+              <div>
+                <h1 className="page-heading">{isSelf ? 'Мой профиль' : 'Профиль сотрудника'}</h1>
+                <p className="subtle-copy">
+                  {isSelf ? 'Личные данные и системный статус вашего аккаунта' : 'Карточка сотрудника и его статус в многопользовательской системе'}
+                </p>
+              </div>
+
+              <div>
+                <h2 className="text-[26px] font-semibold tracking-[-0.03em] text-slate-900">{getUserDisplayName({ name: form.name, lastName: form.lastName })}</h2>
+                <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-slate-500">
+                  <span className="inline-flex items-center gap-1.5">
+                    <Mail className="h-3.5 w-3.5" />
+                    {profile.email}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <Briefcase className="h-3.5 w-3.5" />
+                    {form.jobTitle || 'Должность не указана'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <span className="badge border border-slate-200 bg-slate-50 text-slate-700 text-xs">{getRoleLabel(profile.role)}</span>
+                <span className={cn('badge border text-xs', getVerificationStatusColor(profile.verificationStatus))}>
+                  {getVerificationStatusLabel(profile.verificationStatus)}
+                </span>
+                <span className={cn('badge border text-xs', profile.isActive ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-200 bg-red-50 text-red-700')}>
+                  {profile.isActive ? 'Активный аккаунт' : 'Аккаунт отключён'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {canEditAnything && !isEditing && (
+              <button onClick={() => setIsEditing(true)} className="btn-primary">
+                <UserCog className="h-4 w-4" />
+                Редактировать профиль
+              </button>
+            )}
+            {isEditing && (
+              <>
+                <button onClick={handleSave} disabled={saving} className="btn-primary">
+                  <Save className="h-4 w-4" />
+                  {saving ? 'Сохранение...' : 'Сохранить'}
+                </button>
+                <button onClick={resetForm} disabled={saving} className="btn-secondary">
+                  <X className="h-4 w-4" />
+                  Отмена
+                </button>
+              </>
+            )}
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {canEditAnything && !isEditing && (
-            <button onClick={() => setIsEditing(true)} className="btn-primary">
-              <UserCog className="h-4 w-4" />
-              Редактировать профиль
-            </button>
-          )}
-          {isEditing && (
-            <>
-              <button onClick={handleSave} disabled={saving} className="btn-primary">
-                <Save className="h-4 w-4" />
-                {saving ? 'Сохранение...' : 'Сохранить'}
-              </button>
-              <button onClick={resetForm} disabled={saving} className="btn-secondary">
-                <X className="h-4 w-4" />
-                Отмена
-              </button>
-            </>
-          )}
+
+        <div className="grid gap-3 border-t border-slate-200/80 bg-slate-50/70 p-6 md:grid-cols-3">
+          <div className="surface-subtle px-4 py-4">
+            <div className="text-xs uppercase tracking-[0.08em] text-slate-400">Уровень доступа</div>
+            <div className="mt-2 text-sm font-semibold text-slate-800">{getAccessLevelLabel(profile.role)}</div>
+          </div>
+          <div className="surface-subtle px-4 py-4">
+            <div className="text-xs uppercase tracking-[0.08em] text-slate-400">Тип сотрудника</div>
+            <div className="mt-2 text-sm font-semibold text-slate-800">{getEmployeeTypeLabel(profile.employeeType)}</div>
+          </div>
+          <div className="surface-subtle px-4 py-4">
+            <div className="text-xs uppercase tracking-[0.08em] text-slate-400">Отдел</div>
+            <div className="mt-2 text-sm font-semibold text-slate-800">{profile.department || 'Не назначен'}</div>
+          </div>
         </div>
       </div>
 
       {(error || success) && (
-        <div className={cn('rounded-xl border px-4 py-3 text-sm', error ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700')}>
+        <div className={cn('rounded-2xl border px-4 py-3 text-sm', error ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700')}>
           {error || success}
         </div>
       )}
 
-      <div className="grid gap-6 xl:grid-cols-[1.7fr_1fr]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-6">
-          <div className="card">
-            <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
-              <div className="flex items-start gap-4">
-                <div className="relative">
-                  <UserAvatar user={{ name: form.name, lastName: form.lastName, avatar: form.avatar }} size="xl" />
-                  {isEditing && permissions.canEditPersonal && (
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="absolute -bottom-1 -right-1 flex h-9 w-9 items-center justify-center rounded-full border border-white bg-white text-brand-600 shadow-md transition hover:scale-105 hover:text-brand-700"
-                    >
-                      <Camera className="h-4 w-4" />
-                    </button>
-                  )}
-                  <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
-                </div>
-                <div className="min-w-0 space-y-3">
-                  <div>
-                    <h2 className="text-xl font-semibold text-slate-900">{getUserDisplayName({ name: form.name, lastName: form.lastName })}</h2>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-500">
-                      <span className="inline-flex items-center gap-1.5">
-                        <Mail className="h-3.5 w-3.5" />
-                        {profile.email}
-                      </span>
-                      <span className="inline-flex items-center gap-1.5">
-                        <Briefcase className="h-3.5 w-3.5" />
-                        {form.jobTitle || 'Должность не указана'}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <span className="badge border border-slate-200 bg-slate-50 text-slate-700 text-xs">{getRoleLabel(profile.role)}</span>
-                    <span className={cn('badge border text-xs', getVerificationStatusColor(profile.verificationStatus))}>
-                      {getVerificationStatusLabel(profile.verificationStatus)}
-                    </span>
-                    <span className={cn('badge border text-xs', profile.isActive ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-200 bg-red-50 text-red-700')}>
-                      {profile.isActive ? 'Активный аккаунт' : 'Аккаунт отключён'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid min-w-[220px] gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                <div>
-                  <div className="text-xs uppercase tracking-[0.08em] text-slate-400">Уровень доступа</div>
-                  <div className="mt-1 text-sm font-medium text-slate-700">{getAccessLevelLabel(profile.role)}</div>
-                </div>
-                <div>
-                  <div className="text-xs uppercase tracking-[0.08em] text-slate-400">Тип сотрудника</div>
-                  <div className="mt-1 text-sm font-medium text-slate-700">{getEmployeeTypeLabel(profile.employeeType)}</div>
-                </div>
-                <div>
-                  <div className="text-xs uppercase tracking-[0.08em] text-slate-400">Отдел</div>
-                  <div className="mt-1 text-sm font-medium text-slate-700">{profile.department || 'Не назначен'}</div>
-                </div>
-              </div>
-            </div>
-
-            {isEditing && permissions.canEditPersonal && (
-              <div className="mt-4 flex flex-wrap gap-2">
-                <button type="button" className="btn-secondary" onClick={() => fileInputRef.current?.click()}>
-                  <Camera className="h-4 w-4" />
-                  Загрузить аватар
-                </button>
-                {form.avatar && (
-                  <button type="button" className="btn-secondary" onClick={() => updateField('avatar', null)}>
-                    <X className="h-4 w-4" />
-                    Удалить аватар
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-
           <div className="grid gap-6 lg:grid-cols-2">
             <div className="card space-y-4">
               <div className="flex items-center gap-2">
@@ -396,7 +382,7 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
                   )}
                 </label>
 
-                <label className="flex items-center justify-between rounded-xl border border-slate-200 px-3.5 py-3">
+                <label className="flex items-center justify-between rounded-2xl border border-slate-200 px-4 py-3.5">
                   <div>
                     <div className="text-sm font-medium text-slate-700">Активность аккаунта</div>
                     <div className="text-xs text-slate-400">Отключённый пользователь не сможет войти в систему.</div>
@@ -412,6 +398,21 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
               </div>
             </div>
           </div>
+
+          {isEditing && permissions.canEditPersonal && (
+            <div className="surface-panel flex flex-wrap gap-2 p-4">
+              <button type="button" className="btn-secondary" onClick={() => fileInputRef.current?.click()}>
+                <Camera className="h-4 w-4" />
+                Загрузить аватар
+              </button>
+              {form.avatar && (
+                <button type="button" className="btn-secondary" onClick={() => updateField('avatar', null)}>
+                  <X className="h-4 w-4" />
+                  Удалить аватар
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="space-y-6">
@@ -421,17 +422,17 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
               <h3 className="text-sm font-semibold text-slate-800">Сводка</h3>
             </div>
             <div className="mt-4 grid gap-3">
-              <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+              <div className="surface-subtle px-4 py-4">
                 <div className="text-xs text-slate-400">Назначено продуктов</div>
-                <div className="mt-1 text-2xl font-semibold text-slate-900">{profile._count.assignedProducts}</div>
+                <div className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-slate-900">{profile._count.assignedProducts}</div>
               </div>
-              <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+              <div className="surface-subtle px-4 py-4">
                 <div className="text-xs text-slate-400">Комментариев оставлено</div>
-                <div className="mt-1 text-2xl font-semibold text-slate-900">{profile._count.comments}</div>
+                <div className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-slate-900">{profile._count.comments}</div>
               </div>
-              <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+              <div className="surface-subtle px-4 py-4">
                 <div className="text-xs text-slate-400">Назначений по этапам</div>
-                <div className="mt-1 text-2xl font-semibold text-slate-900">{profile._count.stageAssignments}</div>
+                <div className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-slate-900">{profile._count.stageAssignments}</div>
               </div>
             </div>
           </div>
@@ -465,7 +466,7 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
                   <Link
                     key={assignedProduct.id}
                     href={`/products/${assignedProduct.id}`}
-                    className="flex items-center justify-between rounded-xl border border-slate-100 px-3.5 py-3 transition hover:border-brand-200 hover:bg-brand-50/40"
+                    className="flex items-center justify-between rounded-2xl border border-slate-100 px-4 py-3 transition hover:border-brand-200 hover:bg-brand-50/40"
                   >
                     <div className="min-w-0">
                       <div className="truncate text-sm font-medium text-slate-800">{assignedProduct.name}</div>
@@ -477,7 +478,7 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
                   </Link>
                 ))
               ) : (
-                <div className="rounded-xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-400">
+                <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-400">
                   Для этого сотрудника пока не назначено продуктов.
                 </div>
               )}

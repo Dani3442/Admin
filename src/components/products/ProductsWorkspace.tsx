@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { motion } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import { LayoutList, Plus, Table2 } from 'lucide-react'
 import { ProductsClient } from '@/components/products/ProductsClient'
 import { TableViewClient } from '@/components/table/TableViewClient'
@@ -85,10 +85,10 @@ export function ProductsWorkspace({
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div className="space-y-1.5">
-          <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-2 py-1 shadow-sm">
+    <div className="page-section">
+      <div className="surface-panel flex flex-col gap-5 p-5 lg:flex-row lg:items-start lg:justify-between">
+        <div className="space-y-3">
+          <div className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50/80 p-1 shadow-sm">
             {layoutOptions.map((option) => {
               const Icon = option.icon
               const active = layout === option.value
@@ -99,15 +99,15 @@ export function ProductsWorkspace({
                   type="button"
                   onClick={() => updateLayout(option.value)}
                   className={cn(
-                    'relative inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium transition-colors',
+                    'relative inline-flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-medium transition-colors',
                     active ? 'text-white' : 'text-slate-600 hover:text-slate-900'
                   )}
                 >
                   {active && (
                     <motion.span
                       layoutId="products-layout-pill"
-                      className="absolute inset-0 rounded-full bg-brand-600 shadow-sm"
-                      transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+                      className="absolute inset-0 rounded-xl bg-brand-600 shadow-sm"
+                      transition={{ type: 'spring', stiffness: 380, damping: 34 }}
                     />
                   )}
                   <Icon className="relative z-10 h-4 w-4" />
@@ -117,7 +117,12 @@ export function ProductsWorkspace({
             })}
           </div>
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-slate-900">Продукты</h1>
+            <div>
+              <h1 className="page-heading">Продукты</h1>
+              <p className="subtle-copy">
+                Переключайтесь между визуальным списком и плотной таблицей этапов без потери контекста.
+              </p>
+            </div>
             <InfoPopover title={layout === 'table' ? 'Подсказка по таблице' : 'Подсказка по разделу'}>
               {layout === 'table' ? (
                 <>
@@ -145,26 +150,36 @@ export function ProductsWorkspace({
           </div>
         </div>
 
-        <Link href="/products/new" className="btn-primary">
+        <Link href="/products/new" className="btn-primary self-start">
           <Plus className="h-4 w-4" /> Новый продукт
         </Link>
       </div>
 
-      {layout === 'table' ? (
-        <TableViewClient
-          products={tableProducts as any}
-          stages={stages as any}
-          currentUserRole={currentUserRole}
-          embedded
-        />
-      ) : (
-        <ProductsClient
-          products={listProducts}
-          users={users}
-          currentUserRole={currentUserRole}
-          embedded
-        />
-      )}
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={layout}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -6 }}
+          transition={{ duration: 0.16, ease: 'easeOut' }}
+        >
+          {layout === 'table' ? (
+            <TableViewClient
+              products={tableProducts as any}
+              stages={stages as any}
+              currentUserRole={currentUserRole}
+              embedded
+            />
+          ) : (
+            <ProductsClient
+              products={listProducts}
+              users={users}
+              currentUserRole={currentUserRole}
+              embedded
+            />
+          )}
+        </motion.div>
+      </AnimatePresence>
     </div>
   )
 }

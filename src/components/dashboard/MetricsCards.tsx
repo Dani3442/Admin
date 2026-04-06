@@ -83,20 +83,20 @@ export function DashboardMetricsCards({ metrics }: MetricsCardsProps) {
   ]
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+    <div className="grid grid-cols-2 gap-4 md:grid-cols-4 xl:grid-cols-7">
       {cards.map((card, i) => {
         const Icon = card.icon
         return (
           <div
             key={i}
-            className={cn('bg-white rounded-xl border p-4 shadow-card transition-all duration-200 hover:shadow-card-hover', card.border)}
+            className={cn('surface-panel p-4 transition-shadow duration-150 hover:shadow-card-hover lg:p-5', card.border)}
           >
-            <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center mb-3', card.bg)}>
-              <Icon className={cn('w-4 h-4', card.color)} />
+            <div className={cn('mb-3 flex h-9 w-9 items-center justify-center rounded-xl', card.bg)}>
+              <Icon className={cn('h-4 w-4', card.color)} />
             </div>
-            <div className={cn('text-2xl font-bold', card.color)}>{card.value}</div>
-            <div className="text-xs text-slate-500 mt-1 font-medium">{card.label}</div>
-            {card.sub && <div className="text-xs text-slate-400 mt-0.5">{card.sub}</div>}
+            <div className={cn('text-[26px] font-semibold tracking-[-0.03em]', card.color)}>{card.value}</div>
+            <div className="mt-1 text-xs font-medium uppercase tracking-[0.06em] text-slate-500">{card.label}</div>
+            {card.sub && <div className="mt-1 text-xs text-slate-400">{card.sub}</div>}
           </div>
         )
       })}

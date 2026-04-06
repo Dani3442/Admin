@@ -5,9 +5,9 @@ import { useState, useEffect, useRef } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { LogOut, Bell, AlertTriangle, Clock, History, X, ChevronsLeft, ChevronsRight } from 'lucide-react'
+import { LogOut, Bell, AlertTriangle, Clock, History, X, ChevronRight, ChevronsLeft, ChevronsRight, Search, Command } from 'lucide-react'
 import { UserAvatar } from '@/components/users/UserAvatar'
-import { cn, getUserDisplayName } from '@/lib/utils'
+import { cn, getRoleLabel, getUserDisplayName } from '@/lib/utils'
 import { buildProductHref, getRouteWithSearch } from '@/lib/navigation'
 
 interface Notification {
@@ -25,6 +25,23 @@ interface HeaderProps {
   onToggleSidebar?: () => void
 }
 
+const PAGE_META: Array<{ match: string; title: string; description: string }> = [
+  { match: '/dashboard', title: 'Дашборд', description: 'Сводка по срокам, статусам и критичным изменениям' },
+  { match: '/products', title: 'Продукты', description: 'Управление списком, таблицей и карточками продуктов' },
+  { match: '/users', title: 'Пользователи', description: 'Команда, роли, доступы и рабочие профили' },
+  { match: '/automations', title: 'Автоматизации', description: 'Сценарии, правила и служебные процессы' },
+  { match: '/settings', title: 'Настройки', description: 'Параметры системы и справочные конфигурации' },
+  { match: '/profile', title: 'Профиль', description: 'Личные данные, роль и рабочий контекст' },
+  { match: '/timeline', title: 'Таймлайн', description: 'Хронология этапов и контроль сроков' },
+  { match: '/analytics', title: 'Аналитика', description: 'Метрики, тенденции и распределение нагрузки' },
+  { match: '/table', title: 'Таблица', description: 'Плотный табличный режим для этапов и дат' },
+]
+
+function getPageMeta(pathname: string) {
+  const matched = PAGE_META.find((item) => pathname === item.match || pathname.startsWith(`${item.match}/`))
+  return matched || { title: 'Product Admin', description: 'Рабочее пространство системы управления продуктами' }
+}
+
 export function Header({ user, isSidebarCollapsed = false, onToggleSidebar }: HeaderProps) {
   const [open, setOpen] = useState(false)
   const [notifications, setNotifications] = useState<Notification[]>([])
@@ -36,6 +53,7 @@ export function Header({ user, isSidebarCollapsed = false, onToggleSidebar }: He
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const currentRoute = getRouteWithSearch(pathname, searchParams.toString())
+  const pageMeta = getPageMeta(pathname)
 
   // Close on outside click
   useEffect(() => {
@@ -116,44 +134,66 @@ export function Header({ user, isSidebarCollapsed = false, onToggleSidebar }: He
   const totalBadge = counts.overdue + counts.risk
 
   return (
-    <header className="h-14 bg-white border-b border-slate-100 flex items-center justify-between px-6 flex-shrink-0">
-      <div className="flex items-center gap-2 text-sm text-slate-400">
-        <button
-          type="button"
-          onClick={onToggleSidebar}
-          className="mr-1 inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700"
-          aria-label={isSidebarCollapsed ? 'Показать боковую панель' : 'Скрыть боковую панель'}
-          title={isSidebarCollapsed ? 'Показать меню' : 'Скрыть меню'}
-        >
-          {isSidebarCollapsed ? <ChevronsRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}
-        </button>
-        <span>Product Admin</span>
-      </div>
-
-      <div className="flex items-center gap-3">
-        {/* Notifications */}
-        <div className="relative" ref={dropdownRef}>
+    <header className="flex-shrink-0 border-b border-slate-200/70 bg-slate-50/90 px-6 py-4 backdrop-blur-sm">
+      <div className="page-shell">
+        <div className="surface-panel flex items-center justify-between gap-6 px-5 py-4">
+        <div className="flex min-w-0 items-center gap-4">
           <button
-            onClick={handleToggle}
-            className="relative w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors"
+            type="button"
+            onClick={onToggleSidebar}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700"
+            aria-label={isSidebarCollapsed ? 'Показать боковую панель' : 'Скрыть боковую панель'}
+            title={isSidebarCollapsed ? 'Показать меню' : 'Скрыть меню'}
           >
-            <Bell className="w-4 h-4" />
-            {totalBadge > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                {totalBadge > 99 ? '99+' : totalBadge}
-              </span>
-            )}
+            {isSidebarCollapsed ? <ChevronsRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}
           </button>
 
-          <AnimatePresence>
-          {open && (
-            <motion.div
-              className="absolute right-0 top-full mt-2 w-96 bg-white rounded-xl shadow-xl border border-slate-200 z-50 overflow-hidden"
-              initial={{ opacity: 0, y: 8, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 6, scale: 0.98 }}
-              transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.08em] text-slate-400">
+              <span>Product Admin</span>
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500">Workspace</span>
+            </div>
+            <div className="mt-1">
+              <h1 className="truncate text-[21px] font-semibold tracking-[-0.03em] text-slate-900">{pageMeta.title}</h1>
+              <p className="truncate text-sm text-slate-500">{pageMeta.description}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            className="toolbar-button hidden lg:inline-flex"
+          >
+            <Search className="h-4 w-4" />
+            Поиск
+            <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] text-slate-400">
+              <Command className="h-3 w-3" />K
+            </span>
+          </button>
+
+          <div className="relative" ref={dropdownRef}>
+            <button
+              onClick={handleToggle}
+              className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-600"
             >
+              <Bell className="w-4 h-4" />
+              {totalBadge > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                  {totalBadge > 99 ? '99+' : totalBadge}
+                </span>
+              )}
+            </button>
+
+            <AnimatePresence>
+            {open && (
+              <motion.div
+                className="absolute right-0 top-full z-50 mt-2 w-96 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl"
+                initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 6, scale: 0.98 }}
+                transition={{ duration: 0.14, ease: 'easeOut' }}
+              >
               {/* Header */}
               <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50">
                 <div className="flex items-center gap-2">
@@ -228,23 +268,32 @@ export function Header({ user, isSidebarCollapsed = false, onToggleSidebar }: He
                   ))
                 )}
               </div>
-            </motion.div>
-          )}
-          </AnimatePresence>
-        </div>
+              </motion.div>
+            )}
+            </AnimatePresence>
+          </div>
 
-        <Link href="/profile" className="flex items-center gap-2 pl-3 border-l border-slate-100 rounded-lg px-2 py-1.5 transition hover:bg-slate-50">
-          <UserAvatar user={user} size="sm" />
-          <span className="text-sm font-medium text-slate-700">{getUserDisplayName(user)}</span>
-        </Link>
+          <Link
+            href="/profile"
+            className="flex min-w-[220px] items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3.5 py-2.5 transition hover:border-slate-300 hover:bg-slate-50"
+          >
+            <UserAvatar user={user} size="sm" className="shrink-0" />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-slate-800">{getUserDisplayName(user)}</p>
+              <p className="truncate text-xs text-slate-500">{getRoleLabel(user.role)}</p>
+            </div>
+            <ChevronRight className="h-4 w-4 text-slate-300" />
+          </Link>
 
         <button
           onClick={() => signOut({ callbackUrl: '/login' })}
-          className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-600 transition-colors px-2 py-1 rounded hover:bg-slate-50"
+          className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-transparent px-3 text-sm text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-600"
         >
           <LogOut className="w-3.5 h-3.5" />
           Выйти
         </button>
+        </div>
+      </div>
       </div>
     </header>
   )

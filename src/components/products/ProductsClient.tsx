@@ -488,12 +488,12 @@ export function ProductsClient({ products: initialProducts, users, currentUserRo
   }
 
   return (
-    <div className="space-y-5 animate-fade-in">
+    <div className="space-y-6 animate-fade-in">
       {!embedded && (
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Продукты</h1>
-            <p className="text-slate-500 text-sm mt-0.5">
+            <h1 className="page-heading">Продукты</h1>
+            <p className="subtle-copy mt-1">
               {visibleProducts.length} из {products.length} продуктов
             </p>
           </div>
@@ -503,7 +503,7 @@ export function ProductsClient({ products: initialProducts, users, currentUserRo
         </div>
       )}
 
-      <div className="card p-4 space-y-4">
+      <div className="surface-panel space-y-4 p-5">
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative flex-1 min-w-[240px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -556,7 +556,7 @@ export function ProductsClient({ products: initialProducts, users, currentUserRo
               key={option.value}
               onClick={() => setQuickView(option.value)}
               className={cn(
-                'px-3 py-1.5 rounded-full text-sm font-medium transition-colors border',
+                'rounded-xl border px-3.5 py-2 text-sm font-medium transition-colors',
                 quickView === option.value
                   ? 'bg-brand-600 text-white border-brand-600'
                   : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:text-slate-800'
@@ -576,7 +576,7 @@ export function ProductsClient({ products: initialProducts, users, currentUserRo
               transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
               className="overflow-hidden"
             >
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 pt-1">
+              <div className="surface-subtle grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4">
             <label className="space-y-1.5">
               <span className="label mb-0">Статус</span>
               <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="input">
@@ -637,7 +637,7 @@ export function ProductsClient({ products: initialProducts, users, currentUserRo
           )}
         </AnimatePresence>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50/80 px-3.5 py-3">
+        <div className="surface-subtle flex flex-wrap items-center justify-between gap-3 px-4 py-3.5">
           <div className="text-sm text-slate-600">
             {canReorder
               ? 'Ручной порядок активен: продукты можно перетаскивать за маркер слева. Закреплённые элементы всегда остаются выше остальных.'
@@ -649,11 +649,11 @@ export function ProductsClient({ products: initialProducts, users, currentUserRo
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-100 shadow-card overflow-hidden">
+      <div className="surface-panel overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-slate-100">
+              <tr className="border-b border-slate-200/80">
                 <th className="table-header w-12 text-center">#</th>
                 <th className="table-header w-14 text-center">Порядок</th>
                 <th className="table-header min-w-[280px]">Продукт</th>
@@ -666,7 +666,7 @@ export function ProductsClient({ products: initialProducts, users, currentUserRo
                 <th className="table-header w-20">Риск</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody className="divide-y divide-slate-100">
               {visibleProducts.map((product, index) => {
                 const isOverdue = Boolean(product.finalDate && new Date(product.finalDate) < now && product.status !== 'COMPLETED')
                 const { overlaps } = detectStageOverlaps(product.stages)

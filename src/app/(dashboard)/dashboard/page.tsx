@@ -177,19 +177,32 @@ export default async function DashboardPage() {
   const data = await getDashboardData()
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center gap-3">
-        <h1 className="text-2xl font-bold text-slate-900">Дашборд</h1>
-        <InfoPopover title="Что на этом экране">
-          <p>Сводка по всем продуктам: статусы, риски, сроки и узкие места.</p>
-          <p>Карточки сверху показывают ключевые метрики, а ниже идут графики и список самых проблемных продуктов.</p>
-          <p>Если продукт попал в блок риска, значит у него просрочены этапы, есть пересечения дат или горит финальный срок.</p>
-        </InfoPopover>
+    <div className="page-section animate-fade-in">
+      <div className="surface-panel flex flex-col gap-4 p-5 lg:flex-row lg:items-start lg:justify-between">
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            <h1 className="page-heading">Обзор системы</h1>
+            <InfoPopover title="Что на этом экране">
+              <p>Сводка по всем продуктам: статусы, риски, сроки и узкие места.</p>
+              <p>Карточки сверху показывают ключевые метрики, а ниже идут графики и список самых проблемных продуктов.</p>
+              <p>Если продукт попал в блок риска, значит у него просрочены этапы, есть пересечения дат или горит финальный срок.</p>
+            </InfoPopover>
+          </div>
+          <p className="subtle-copy max-w-3xl">
+            Единая сводка по срокам, проблемным этапам и критичным продуктам, чтобы команде было проще быстро принять решение и перейти к деталям.
+          </p>
+        </div>
+        <div className="surface-subtle px-4 py-3 lg:max-w-sm">
+          <div className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-400">Фокус дня</div>
+          <div className="mt-2 text-sm text-slate-600">
+            Проверьте блок риска и продукты с ближайшими дедлайнами: здесь чаще всего появляются задержки и пересечения дат.
+          </div>
+        </div>
       </div>
 
       <DashboardMetricsCards metrics={data.metrics} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <DashboardCharts statusData={data.statusData} topBottlenecks={data.topBottlenecks} />
         </div>
