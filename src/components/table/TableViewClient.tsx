@@ -141,6 +141,9 @@ export function TableViewClient({ products: initial, stages: initialStages }: Ta
         body: JSON.stringify({ name: newStageName, durationText: newStageDuration || null }),
       })
       if (res.ok) {
+        const createdStage = await res.json()
+        setStages((prev) => [...prev, createdStage].sort((a, b) => a.order - b.order))
+        setColumnWidths((prev) => ({ ...prev, [createdStage.id]: 130 }))
         setNewStageName('')
         setNewStageDuration('')
         setShowNewStageForm(false)
