@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Search, CheckCircle2, AlertTriangle, Plus, ChevronLeft, ChevronRight, Pencil, X } from 'lucide-react'
+import { Search, CheckCircle2, AlertTriangle, Plus, ChevronLeft, ChevronRight, Pencil, X, Trash2 } from 'lucide-react'
 import { cn, formatDate, detectStageOverlaps } from '@/lib/utils'
 
 interface Stage {
@@ -150,6 +150,30 @@ export function TableViewClient({ products: initial, stages: initialStages }: Ta
         router.refresh()
       }
     } catch {}
+  }
+
+  const handleDeleteStage = async (stageId: string) => {
+    const confirmed = window.confirm('Удалить этот этап из таблицы и у всех продуктов?')
+    if (!confirmed) return
+
+    try {
+      const res = await fetch(`/api/stage-templates?id=${encodeURIComponent(stageId)}`, {
+        method: 'DELETE',
+      })
+
+      if (res.ok) {
+        const allStages = await res.json()
+        setStages(allStages)
+        setColumnWidths((prev) => {
+          const next = { ...prev }
+          delete next[stageId]
+          return next
+        })
+        router.refresh()
+      }
+    } finally {
+      setStageMenu(null)
+    }
   }
 
   const handleStageHeaderClick = (e: React.MouseEvent, stage: Stage) => {
@@ -498,6 +522,14 @@ export function TableViewClient({ products: initial, stages: initialStages }: Ta
                 >
                   <ChevronRight className="w-3.5 h-3.5" />
                   Переместить вправо
+                </button>
+                <div className="border-t border-slate-100 my-1" />
+                <button
+                  className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                  onClick={() => handleDeleteStage(stage.id)}
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                  Удалить этап
                 </button>
               </>
             )

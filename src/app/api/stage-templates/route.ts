@@ -122,3 +122,86 @@ export async function PATCH(req: NextRequest) {
 
   return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
 }
+
+export async function DELETE(req: NextRequest) {
+  const session = await auth()
+  if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const role = (session.user as any).role
+  if (!['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(role)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  try {
+    const { searchParams } = new URL(req.url)
+    const id = searchParams.get('id')
+
+    if (!id) {
+      return NextResponse.json({ error: 'id is required' }, { status: 400 })
+    }
+
+    const template = await prisma.stageTemplate.findUnique({
+      where: { id },
+      select: { id: true },
+    })
+
+    if (!template) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    }
+
+    await prisma.$transaction(async (tx) => {
+      const productStages = await tx.productStage.findMany({
+        where: { stageTemplateId: id },
+        select: { id: true },
+      })
+      const productStageIds = productStages.map((stage) => stage.id)
+
+      await tx.comment.deleteMany({
+        where: {
+          productStage: {
+            stageTemplateId: id,
+          },
+        },
+      })
+
+      if (productStageIds.length > 0) {
+        await tx.changeHistory.deleteMany({
+          where: {
+            productStageId: { in: productStageIds },
+          },
+        })
+      }
+
+      await tx.productStage.deleteMany({
+        where: { stageTemplateId: id },
+      })
+
+      await tx.stageTemplate.delete({
+        where: { id },
+      })
+
+      const remainingTemplates = await tx.stageTemplate.findMany({
+        orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+        select: { id: true },
+      })
+
+      for (const [index, remainingTemplate] of remainingTemplates.entries()) {
+        await tx.stageTemplate.update({
+          where: { id: remainingTemplate.id },
+          data: { order: index },
+        })
+
+        await tx.productStage.updateMany({
+          where: { stageTemplateId: remainingTemplate.id },
+          data: { stageOrder: index },
+        })
+      }
+    })
+
+    const all = await prisma.stageTemplate.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] })
+    return NextResponse.json(all)
+  } catch (error) {
+    console.error('[stage-templates:delete] Failed to delete stage template', error)
+    return NextResponse.json({ error: 'Не удалось удалить этап' }, { status: 500 })
+  }
+}
