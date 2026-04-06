@@ -55,7 +55,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 })
     }
 
-    const stageTemplates = await prisma.stageTemplate.findMany({ orderBy: { order: 'asc' } })
+    const stageTemplates = await prisma.stageTemplate.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] })
+    const normalizedStageTemplates = stageTemplates.map((template, index) => ({
+      ...template,
+      normalizedOrder: index,
+    }))
 
     const product = await prisma.product.create({
       data: {
@@ -67,9 +71,9 @@ export async function POST(req: NextRequest) {
         responsibleId,
         notes,
         stages: {
-          create: stageTemplates.map((t) => ({
+          create: normalizedStageTemplates.map((t) => ({
             stageTemplateId: t.id,
-            stageOrder: t.order,
+            stageOrder: t.normalizedOrder,
             stageName: t.name,
             isCritical: t.isCritical,
             affectsFinalDate: t.affectsFinalDate,
