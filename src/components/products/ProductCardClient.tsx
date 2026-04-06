@@ -139,15 +139,15 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
   }
 
   const getStageCellStyle = (stage: any) => {
-    if (stage.isCompleted) return 'text-emerald-700 bg-emerald-50 border-emerald-200'
+    if (stage.isCompleted) return 'text-emerald-700 bg-emerald-50'
     if (stage.dateValue) {
       const d = new Date(stage.dateValue)
-      if (d < now) return 'text-red-700 bg-red-50 border-red-200'
+      if (d < now) return 'text-red-700 bg-red-50'
       const daysLeft = Math.round((d.getTime() - now.getTime()) / 86400000)
-      if (daysLeft <= 7) return 'text-amber-700 bg-amber-50 border-amber-200'
+      if (daysLeft <= 7) return 'text-amber-700 bg-amber-50'
     }
-    if (stage.dateRaw) return 'text-blue-700 bg-blue-50 border-blue-200'
-    return 'text-slate-400 bg-slate-50 border-slate-100'
+    if (stage.dateRaw) return 'text-blue-700 bg-blue-50'
+    return 'text-slate-400 bg-slate-50'
   }
 
   // Right-click context menu handler
@@ -408,7 +408,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
       </div>
 
       {/* Tabs */}
-      <div className="bg-white rounded-xl border border-slate-100 shadow-card overflow-hidden">
+      <div className="surface-panel overflow-hidden">
         <div className="flex border-b border-slate-100 px-1 pt-1">
           {TABS.map((t) => {
             const Icon = t.icon
@@ -417,7 +417,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                 key={t.id}
                 onClick={() => setTab(t.id)}
                 className={cn(
-                  'relative flex items-center gap-2 px-4 py-3 text-sm font-medium rounded-t-lg transition-colors',
+                      'relative flex items-center gap-2 rounded-t-[20px] px-4 py-3 text-sm font-medium transition-colors',
                   tab === t.id
                     ? 'text-brand-700 bg-brand-50/50'
                     : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
@@ -450,10 +450,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
           {tab === 'stages' && (
             <div className="space-y-2">
               {canEdit && (
-                <div className="flex items-center justify-between gap-3 mb-3">
-                  <div className="text-sm text-slate-500">
-                    Добавляй и удаляй этапы прямо в карточке продукта.
-                  </div>
+                <div className="mb-3 flex items-center justify-end gap-3">
                   <button
                     onClick={() => setShowAddStageForm((prev) => !prev)}
                     className="btn-primary text-sm"
@@ -465,7 +462,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                 </div>
               )}
               {canEdit && showAddStageForm && (
-                <div className="flex items-center gap-2 p-3 bg-slate-50 border border-slate-200 rounded-lg mb-3">
+                <div className="mb-3 flex items-center gap-2 rounded-[24px] bg-slate-50 p-3">
                   <input
                     type="text"
                     value={newStageName}
@@ -507,7 +504,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                 </div>
               )}
               {overlaps.length > 0 && (
-                <div className="flex items-start gap-2 p-3 bg-orange-50 border border-orange-200 rounded-lg mb-3">
+                <div className="mb-3 flex items-start gap-2 rounded-[24px] bg-orange-50 p-3">
                   <AlertTriangle className="w-4 h-4 text-orange-500 mt-0.5 flex-shrink-0" />
                   <div>
                     <p className="text-sm font-medium text-orange-800">Обнаружены пересечения дат</p>
@@ -532,9 +529,9 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                     key={stage.id}
                     onContextMenu={(e) => handleStageContextMenu(e, stage)}
                     className={cn(
-                      'flex items-center gap-3 p-3 rounded-lg border transition-all',
-                      hasOverlap ? 'bg-orange-50/60 border-orange-200 ring-1 ring-orange-200' :
-                      stage.isCompleted ? 'bg-emerald-50/40 border-emerald-100' : 'bg-white border-slate-100 hover:border-slate-200'
+                      'flex items-center gap-3 rounded-[24px] p-3 transition-all',
+                      hasOverlap ? 'bg-orange-50/60 ring-1 ring-orange-200' :
+                      stage.isCompleted ? 'bg-emerald-50/40' : 'bg-slate-50/70 hover:bg-slate-100/80'
                     )}
                   >
                     {/* Checkbox */}
@@ -597,7 +594,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                           panelClassName="w-[360px]"
                         />
                       ) : (
-                        <div className={cn('text-xs px-2 py-1 rounded border font-medium', cellStyle)}>
+                        <div className={cn('rounded-[16px] px-2.5 py-1.5 text-xs font-medium', cellStyle)}>
                           {stage.dateValue
                             ? formatDate(stage.dateValue)
                             : stage.dateRaw || '—'}

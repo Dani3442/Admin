@@ -161,7 +161,7 @@ export function Header({ user }: HeaderProps) {
   const totalBadge = counts.overdue + counts.risk
 
   return (
-    <header className="flex-shrink-0 px-4 pb-2 pt-5 sm:px-6 lg:px-8">
+    <header className="relative z-[60] flex-shrink-0 px-4 pb-2 pt-5 sm:px-6 lg:px-8">
       <div className="page-shell flex justify-center">
         <motion.div
           layout
@@ -225,7 +225,7 @@ export function Header({ user }: HeaderProps) {
               <AnimatePresence>
                 {notificationsOpen && (
                   <motion.div
-                    className="absolute right-0 top-[calc(100%+10px)] z-50 w-[min(92vw,24rem)] overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-2xl"
+                    className="absolute right-0 top-[calc(100%+10px)] z-[90] w-[min(92vw,24rem)] overflow-hidden rounded-[30px] border border-slate-100 bg-white shadow-2xl"
                     initial={{ opacity: 0, y: 8, scale: 0.98 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 6, scale: 0.98 }}
@@ -325,13 +325,13 @@ export function Header({ user }: HeaderProps) {
               <AnimatePresence>
                 {profileOpen && (
                   <motion.div
-                    className="absolute right-0 top-[calc(100%+10px)] z-50 w-[min(92vw,21rem)] overflow-hidden rounded-[26px] border border-slate-200 bg-white p-2 shadow-2xl"
+                    className="absolute right-0 top-[calc(100%+10px)] z-[90] w-[min(92vw,20rem)] overflow-hidden rounded-[30px] border border-slate-100 bg-white p-2 shadow-2xl"
                     initial={{ opacity: 0, y: 8, scale: 0.98 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 6, scale: 0.98 }}
                     transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
                   >
-                    <div className="mb-2 flex items-center gap-3 rounded-[22px] bg-slate-50 px-3 py-3">
+                    <div className="mb-2 flex items-center gap-3 rounded-[24px] bg-slate-50 px-3 py-3">
                       <UserAvatar user={user} size="md" />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-semibold text-slate-900">{getUserDisplayName(user)}</p>
@@ -344,7 +344,7 @@ export function Header({ user }: HeaderProps) {
                       <Link
                         href="/profile"
                         onClick={() => setProfileOpen(false)}
-                        className="flex items-center justify-between rounded-2xl px-3 py-2.5 text-sm text-slate-700 transition hover:bg-slate-50 hover:text-slate-900"
+                        className="flex items-center justify-between rounded-[22px] px-3 py-2.5 text-sm text-slate-700 transition hover:bg-slate-50 hover:text-slate-900"
                       >
                         <span className="flex items-center gap-2">
                           <UserCircle2 className="h-4 w-4 text-slate-400" />
@@ -355,7 +355,7 @@ export function Header({ user }: HeaderProps) {
                       <Link
                         href="/settings"
                         onClick={() => setProfileOpen(false)}
-                        className="flex items-center justify-between rounded-2xl px-3 py-2.5 text-sm text-slate-700 transition hover:bg-slate-50 hover:text-slate-900"
+                        className="flex items-center justify-between rounded-[22px] px-3 py-2.5 text-sm text-slate-700 transition hover:bg-slate-50 hover:text-slate-900"
                       >
                         <span className="flex items-center gap-2">
                           <Settings className="h-4 w-4 text-slate-400" />
@@ -368,7 +368,7 @@ export function Header({ user }: HeaderProps) {
                     <div className="mt-2 border-t border-slate-100 pt-2">
                       <button
                         onClick={() => signOut({ callbackUrl: '/login' })}
-                        className="flex w-full items-center justify-between rounded-2xl px-3 py-2.5 text-sm text-red-600 transition hover:bg-red-50"
+                        className="flex w-full items-center justify-between rounded-[22px] px-3 py-2.5 text-sm text-red-600 transition hover:bg-red-50"
                       >
                         <span className="flex items-center gap-2">
                           <LogOut className="h-4 w-4" />

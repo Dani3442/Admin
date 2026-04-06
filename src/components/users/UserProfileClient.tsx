@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { BadgeCheck, Briefcase, Building2, Camera, CheckCircle2, Mail, Save, ShieldCheck, Sparkles, UserCircle2, UserCog, X } from 'lucide-react'
+import { Briefcase, Building2, Camera, Mail, Save, Settings, ShieldCheck, Sparkles, UserCircle2, UserCog, X } from 'lucide-react'
 import { UserAvatar } from '@/components/users/UserAvatar'
 import {
   cn,
@@ -46,6 +46,8 @@ type ProfileFormState = {
   isActive: boolean
 }
 
+type ActivePanel = 'none' | 'edit' | 'settings'
+
 function mapProfileToForm(profile: UserProfileData): ProfileFormState {
   return {
     name: profile.name,
@@ -65,13 +67,16 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [profile, setProfile] = useState(initialProfile)
   const [form, setForm] = useState(() => mapProfileToForm(initialProfile))
-  const [isEditing, setIsEditing] = useState(false)
+  const [activePanel, setActivePanel] = useState<ActivePanel>('none')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
   const isSelf = profile.id === viewer.id
   const endpoint = isSelf ? '/api/profile' : `/api/users/${profile.id}`
+  const canEditAnything = permissions.canEditPersonal || permissions.canEditOperational || permissions.canEditSensitive
+  const canOpenSettingsPanel = true
+  const canSaveSettings = permissions.canEditOperational || permissions.canEditSensitive
 
   useEffect(() => {
     setProfile(initialProfile)
@@ -82,11 +87,11 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
     setForm((current) => ({ ...current, [field]: value }))
   }
 
-  const resetForm = () => {
+  const closePanel = () => {
     setForm(mapProfileToForm(profile))
     setError('')
     setSuccess('')
-    setIsEditing(false)
+    setActivePanel('none')
   }
 
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -126,7 +131,7 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
       avatar: form.avatar,
     }
 
-    if (!isSelf && permissions.canEditOperational) {
+    if (permissions.canEditOperational) {
       payload.department = form.department || null
       payload.employeeType = form.employeeType
       payload.verificationStatus = form.verificationStatus
@@ -152,7 +157,7 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
       setProfile(data)
       setForm(mapProfileToForm(data))
       setSuccess('Профиль успешно обновлён')
-      setIsEditing(false)
+      setActivePanel('none')
       router.refresh()
     } catch (saveError: any) {
       setError(saveError.message || 'Не удалось сохранить профиль')
@@ -161,7 +166,20 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
     }
   }
 
-  const canEditAnything = permissions.canEditPersonal || permissions.canEditOperational || permissions.canEditSensitive
+  const renderPanelActions = (canSave: boolean) => (
+    <div className="flex flex-wrap items-center gap-2">
+      {canSave && (
+        <button onClick={handleSave} disabled={saving} className="btn-primary">
+          <Save className="h-4 w-4" />
+          {saving ? 'Сохранение...' : 'Сохранить'}
+        </button>
+      )}
+      <button onClick={closePanel} disabled={saving} className="btn-secondary">
+        <X className="h-4 w-4" />
+        Закрыть
+      </button>
+    </div>
+  )
 
   return (
     <div className="page-section animate-fade-in">
@@ -170,28 +188,13 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
           <div className="flex items-start gap-4">
             <div className="relative shrink-0">
               <UserAvatar user={{ name: form.name, lastName: form.lastName, avatar: form.avatar }} size="xl" />
-              {isEditing && permissions.canEditPersonal && (
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="absolute -bottom-1 -right-1 flex h-9 w-9 items-center justify-center rounded-full border border-white bg-white text-brand-600 shadow-md transition hover:scale-105 hover:text-brand-700"
-                >
-                  <Camera className="h-4 w-4" />
-                </button>
-              )}
-              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
             </div>
 
             <div className="min-w-0 space-y-4">
               <div>
-                <h1 className="page-heading">{isSelf ? 'Мой профиль' : 'Профиль сотрудника'}</h1>
-                <p className="subtle-copy">
-                  {isSelf ? 'Личные данные и системный статус вашего аккаунта' : 'Карточка сотрудника и его статус в многопользовательской системе'}
-                </p>
-              </div>
-
-              <div>
-                <h2 className="text-[26px] font-semibold tracking-[-0.03em] text-slate-900">{getUserDisplayName({ name: form.name, lastName: form.lastName })}</h2>
+                <h1 className="text-[30px] font-semibold tracking-[-0.04em] text-slate-900">
+                  {getUserDisplayName({ name: form.name, lastName: form.lastName })}
+                </h1>
                 <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-slate-500">
                   <span className="inline-flex items-center gap-1.5">
                     <Mail className="h-3.5 w-3.5" />
@@ -217,103 +220,118 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {canEditAnything && !isEditing && (
-              <button onClick={() => setIsEditing(true)} className="btn-primary">
+            {permissions.canEditPersonal && (
+              <button onClick={() => { setError(''); setSuccess(''); setActivePanel('edit') }} className="btn-primary">
                 <UserCog className="h-4 w-4" />
                 Редактировать профиль
               </button>
             )}
-            {isEditing && (
-              <>
-                <button onClick={handleSave} disabled={saving} className="btn-primary">
-                  <Save className="h-4 w-4" />
-                  {saving ? 'Сохранение...' : 'Сохранить'}
-                </button>
-                <button onClick={resetForm} disabled={saving} className="btn-secondary">
-                  <X className="h-4 w-4" />
-                  Отмена
-                </button>
-              </>
+            {canOpenSettingsPanel && (
+              <button onClick={() => { setError(''); setSuccess(''); setActivePanel('settings') }} className="btn-secondary px-3.5 py-2">
+                <Settings className="h-4 w-4" />
+                Настройки профиля
+              </button>
             )}
           </div>
         </div>
 
-        <div className="grid gap-3 border-t border-slate-200/80 bg-slate-50/70 p-6 md:grid-cols-3">
-          <div className="surface-subtle px-4 py-4">
-            <div className="text-xs uppercase tracking-[0.08em] text-slate-400">Уровень доступа</div>
-            <div className="mt-2 text-sm font-semibold text-slate-800">{getAccessLevelLabel(profile.role)}</div>
-          </div>
-          <div className="surface-subtle px-4 py-4">
-            <div className="text-xs uppercase tracking-[0.08em] text-slate-400">Тип сотрудника</div>
-            <div className="mt-2 text-sm font-semibold text-slate-800">{getEmployeeTypeLabel(profile.employeeType)}</div>
-          </div>
-          <div className="surface-subtle px-4 py-4">
-            <div className="text-xs uppercase tracking-[0.08em] text-slate-400">Отдел</div>
-            <div className="mt-2 text-sm font-semibold text-slate-800">{profile.department || 'Не назначен'}</div>
-          </div>
-        </div>
       </div>
 
       {(error || success) && (
-        <div className={cn('rounded-2xl border px-4 py-3 text-sm', error ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700')}>
+        <div className={cn('rounded-[24px] px-4 py-3 text-sm', error ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700')}>
           {error || success}
         </div>
       )}
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="space-y-6">
-          <div className="grid gap-6 lg:grid-cols-2">
-            <div className="card space-y-4">
-              <div className="flex items-center gap-2">
-                <UserCircle2 className="h-4 w-4 text-brand-600" />
-                <h3 className="text-sm font-semibold text-slate-800">Личные данные</h3>
-              </div>
+      {activePanel === 'edit' && (
+        <div className="surface-panel space-y-5 p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <UserCircle2 className="h-4 w-4 text-brand-600" />
+              <h3 className="text-sm font-semibold text-slate-800">Редактирование профиля</h3>
+            </div>
+            {renderPanelActions(true)}
+          </div>
 
-              <div className="grid gap-4">
-                <label className="space-y-1.5">
-                  <span className="label mb-0">Имя</span>
-                  <input
-                    value={form.name}
-                    onChange={(event) => updateField('name', event.target.value)}
-                    disabled={!isEditing || !permissions.canEditPersonal}
-                    className="input"
-                  />
-                </label>
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
+            <div className="grid gap-4">
+              <label className="space-y-1.5">
+                <span className="label mb-0">Имя</span>
+                <input
+                  value={form.name}
+                  onChange={(event) => updateField('name', event.target.value)}
+                  disabled={!permissions.canEditPersonal}
+                  className="input"
+                />
+              </label>
 
-                <label className="space-y-1.5">
-                  <span className="label mb-0">Фамилия</span>
-                  <input
-                    value={form.lastName}
-                    onChange={(event) => updateField('lastName', event.target.value)}
-                    disabled={!isEditing || !permissions.canEditPersonal}
-                    className="input"
-                    placeholder="Не указана"
-                  />
-                </label>
+              <label className="space-y-1.5">
+                <span className="label mb-0">Фамилия</span>
+                <input
+                  value={form.lastName}
+                  onChange={(event) => updateField('lastName', event.target.value)}
+                  disabled={!permissions.canEditPersonal}
+                  className="input"
+                  placeholder="Не указана"
+                />
+              </label>
 
-                <label className="space-y-1.5">
-                  <span className="label mb-0">Должность</span>
-                  <input
-                    value={form.jobTitle}
-                    onChange={(event) => updateField('jobTitle', event.target.value)}
-                    disabled={!isEditing || !permissions.canEditPersonal}
-                    className="input"
-                    placeholder="Например, Менеджер продукта"
-                  />
-                </label>
+              <label className="space-y-1.5">
+                <span className="label mb-0">Должность</span>
+                <input
+                  value={form.jobTitle}
+                  onChange={(event) => updateField('jobTitle', event.target.value)}
+                  disabled={!permissions.canEditPersonal}
+                  className="input"
+                  placeholder="Например, Менеджер продукта"
+                />
+              </label>
 
-                <label className="space-y-1.5">
-                  <span className="label mb-0">Email</span>
-                  <input value={profile.email} disabled className="input bg-slate-50 text-slate-500" />
-                  <span className="text-xs text-slate-400">Email используется как логин и меняется только через администратора.</span>
-                </label>
-              </div>
+              <label className="space-y-1.5">
+                <span className="label mb-0">Email</span>
+                <input value={profile.email} disabled className="input bg-slate-50 text-slate-500" />
+                <span className="text-xs text-slate-400">Email используется как логин и меняется только через администратора.</span>
+              </label>
             </div>
 
-            <div className="card space-y-4">
+            <div className="surface-subtle space-y-3 px-4 py-4">
+              <div className="text-sm font-semibold text-slate-800">Аватар</div>
+              <div className="flex justify-center">
+                <UserAvatar user={{ name: form.name, lastName: form.lastName, avatar: form.avatar }} size="xl" />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className="btn-secondary" onClick={() => fileInputRef.current?.click()}>
+                  <Camera className="h-4 w-4" />
+                  Загрузить
+                </button>
+                {form.avatar && (
+                  <button type="button" className="btn-secondary" onClick={() => updateField('avatar', null)}>
+                    <X className="h-4 w-4" />
+                    Удалить
+                  </button>
+                )}
+              </div>
+              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activePanel === 'settings' && (
+        <div className="surface-panel space-y-5 p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-brand-600" />
+              <h3 className="text-sm font-semibold text-slate-800">Настройки профиля</h3>
+            </div>
+            {renderPanelActions(canSaveSettings)}
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-2">
+            <div className="space-y-4">
               <div className="flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4 text-brand-600" />
-                <h3 className="text-sm font-semibold text-slate-800">Организационный статус</h3>
+                <Building2 className="h-4 w-4 text-brand-600" />
+                <h4 className="text-sm font-semibold text-slate-800">Организационный статус</h4>
               </div>
 
               <div className="grid gap-4">
@@ -322,13 +340,10 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
                   <input
                     value={form.department}
                     onChange={(event) => updateField('department', event.target.value)}
-                    disabled={!isEditing || !permissions.canEditOperational}
+                    disabled={!permissions.canEditOperational}
                     className="input"
                     placeholder="Например, Разработка продукта"
                   />
-                  {!permissions.canEditOperational && (
-                    <span className="text-xs text-slate-400">Поле назначается руководителем или администратором.</span>
-                  )}
                 </label>
 
                 <label className="space-y-1.5">
@@ -336,7 +351,7 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
                   <select
                     value={form.employeeType}
                     onChange={(event) => updateField('employeeType', event.target.value as EmployeeType)}
-                    disabled={!isEditing || !permissions.canEditOperational}
+                    disabled={!permissions.canEditOperational}
                     className="input"
                   >
                     {EMPLOYEE_TYPE_OPTIONS.map((option) => (
@@ -352,7 +367,7 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
                   <select
                     value={form.verificationStatus}
                     onChange={(event) => updateField('verificationStatus', event.target.value as VerificationStatus)}
-                    disabled={!isEditing || !permissions.canEditOperational}
+                    disabled={!permissions.canEditOperational}
                     className="input"
                   >
                     {VERIFICATION_STATUS_OPTIONS.map((option) => (
@@ -368,7 +383,7 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
                   <select
                     value={form.role}
                     onChange={(event) => updateField('role', event.target.value as UserRole)}
-                    disabled={!isEditing || !permissions.canEditSensitive}
+                    disabled={!permissions.canEditSensitive}
                     className="input"
                   >
                     {ROLE_OPTIONS.map((option) => (
@@ -377,12 +392,9 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
                       </option>
                     ))}
                   </select>
-                  {!permissions.canEditSensitive && (
-                    <span className="text-xs text-slate-400">Критичные права доступа меняет только администратор.</span>
-                  )}
                 </label>
 
-                <label className="flex items-center justify-between rounded-2xl border border-slate-200 px-4 py-3.5">
+                <label className="flex items-center justify-between rounded-[24px] bg-slate-50 px-4 py-3.5">
                   <div>
                     <div className="text-sm font-medium text-slate-700">Активность аккаунта</div>
                     <div className="text-xs text-slate-400">Отключённый пользователь не сможет войти в систему.</div>
@@ -391,98 +403,88 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
                     type="checkbox"
                     checked={form.isActive}
                     onChange={(event) => updateField('isActive', event.target.checked)}
-                    disabled={!isEditing || !permissions.canEditSensitive}
+                    disabled={!permissions.canEditSensitive}
                     className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
                   />
                 </label>
               </div>
             </div>
-          </div>
 
-          {isEditing && permissions.canEditPersonal && (
-            <div className="surface-panel flex flex-wrap gap-2 p-4">
-              <button type="button" className="btn-secondary" onClick={() => fileInputRef.current?.click()}>
-                <Camera className="h-4 w-4" />
-                Загрузить аватар
-              </button>
-              {form.avatar && (
-                <button type="button" className="btn-secondary" onClick={() => updateField('avatar', null)}>
-                  <X className="h-4 w-4" />
-                  Удалить аватар
-                </button>
-              )}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Settings className="h-4 w-4 text-brand-600" />
+                <h4 className="text-sm font-semibold text-slate-800">Системная информация</h4>
+              </div>
+
+              <div className="surface-subtle space-y-3 px-4 py-4 text-sm text-slate-600">
+                <div className="flex justify-between gap-3 border-b border-slate-200/70 pb-2">
+                  <span className="text-slate-400">Профиль создан</span>
+                  <span className="font-medium text-slate-700">{formatDate(profile.createdAt)}</span>
+                </div>
+                <div className="flex justify-between gap-3 border-b border-slate-200/70 pb-2">
+                  <span className="text-slate-400">Последнее обновление</span>
+                  <span className="font-medium text-slate-700">{formatDate(profile.updatedAt)}</span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-slate-400">Уровень доступа</span>
+                  <span className="max-w-[220px] text-right font-medium text-slate-700">{getAccessLevelLabel(profile.role)}</span>
+                </div>
+              </div>
             </div>
-          )}
+          </div>
+        </div>
+      )}
+
+      <div className="grid gap-6 xl:grid-cols-[300px_minmax(0,1fr)]">
+        <div className="card">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-brand-600" />
+            <h3 className="text-sm font-semibold text-slate-800">Сводка</h3>
+          </div>
+          <div className="mt-4 grid gap-3">
+            <div className="surface-subtle px-4 py-4">
+              <div className="text-xs text-slate-400">Назначено продуктов</div>
+              <div className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-slate-900">{profile._count.assignedProducts}</div>
+            </div>
+            <div className="surface-subtle px-4 py-4">
+              <div className="text-xs text-slate-400">Комментариев оставлено</div>
+              <div className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-slate-900">{profile._count.comments}</div>
+            </div>
+            <div className="surface-subtle px-4 py-4">
+              <div className="text-xs text-slate-400">Назначений по этапам</div>
+              <div className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-slate-900">{profile._count.stageAssignments}</div>
+            </div>
+          </div>
         </div>
 
-        <div className="space-y-6">
-          <div className="card">
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-brand-600" />
-              <h3 className="text-sm font-semibold text-slate-800">Сводка</h3>
-            </div>
-            <div className="mt-4 grid gap-3">
-              <div className="surface-subtle px-4 py-4">
-                <div className="text-xs text-slate-400">Назначено продуктов</div>
-                <div className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-slate-900">{profile._count.assignedProducts}</div>
-              </div>
-              <div className="surface-subtle px-4 py-4">
-                <div className="text-xs text-slate-400">Комментариев оставлено</div>
-                <div className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-slate-900">{profile._count.comments}</div>
-              </div>
-              <div className="surface-subtle px-4 py-4">
-                <div className="text-xs text-slate-400">Назначений по этапам</div>
-                <div className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-slate-900">{profile._count.stageAssignments}</div>
-              </div>
-            </div>
+        <div className="card">
+          <div className="flex items-center gap-2">
+            <Building2 className="h-4 w-4 text-brand-600" />
+            <h3 className="text-sm font-semibold text-slate-800">Назначенные продукты</h3>
           </div>
 
-          <div className="card">
-            <div className="flex items-center gap-2">
-              <Building2 className="h-4 w-4 text-brand-600" />
-              <h3 className="text-sm font-semibold text-slate-800">Системная информация</h3>
-            </div>
-            <div className="mt-4 space-y-3 text-sm text-slate-600">
-              <div className="flex justify-between gap-3 border-b border-slate-100 pb-2">
-                <span className="text-slate-400">Профиль создан</span>
-                <span className="font-medium text-slate-700">{formatDate(profile.createdAt)}</span>
+          <div className="mt-4 space-y-2">
+            {profile.assignedProducts && profile.assignedProducts.length > 0 ? (
+              profile.assignedProducts.map((assignedProduct) => (
+                <Link
+                  key={assignedProduct.id}
+                  href={`/products/${assignedProduct.id}`}
+                  className="flex items-center justify-between rounded-[24px] bg-slate-50 px-4 py-3 transition hover:bg-slate-100"
+                >
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium text-slate-800">{assignedProduct.name}</div>
+                    <div className="mt-0.5 text-xs text-slate-400">{formatDate(assignedProduct.finalDate)}</div>
+                  </div>
+                  <span className="badge bg-slate-100 text-slate-600 text-[11px]">
+                    {assignedProduct.status}
+                  </span>
+                </Link>
+              ))
+            ) : (
+              <div className="rounded-[24px] bg-slate-50 px-4 py-5 text-sm text-slate-400">
+                Для этого сотрудника пока не назначено продуктов.
               </div>
-              <div className="flex justify-between gap-3">
-                <span className="text-slate-400">Последнее обновление</span>
-                <span className="font-medium text-slate-700">{formatDate(profile.updatedAt)}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="card">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-brand-600" />
-              <h3 className="text-sm font-semibold text-slate-800">Назначенные продукты</h3>
-            </div>
-
-            <div className="mt-4 space-y-2">
-              {profile.assignedProducts && profile.assignedProducts.length > 0 ? (
-                profile.assignedProducts.map((assignedProduct) => (
-                  <Link
-                    key={assignedProduct.id}
-                    href={`/products/${assignedProduct.id}`}
-                    className="flex items-center justify-between rounded-2xl border border-slate-100 px-4 py-3 transition hover:border-brand-200 hover:bg-brand-50/40"
-                  >
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-medium text-slate-800">{assignedProduct.name}</div>
-                      <div className="mt-0.5 text-xs text-slate-400">{formatDate(assignedProduct.finalDate)}</div>
-                    </div>
-                    <span className="badge bg-slate-100 text-slate-600 text-[11px]">
-                      {assignedProduct.status}
-                    </span>
-                  </Link>
-                ))
-              ) : (
-                <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-5 text-sm text-slate-400">
-                  Для этого сотрудника пока не назначено продуктов.
-                </div>
-              )}
-            </div>
+            )}
           </div>
         </div>
       </div>
