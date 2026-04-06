@@ -56,6 +56,7 @@ export async function POST(
     const body = await req.json()
     const stageName = String(body.stageName || '').trim()
     const dateValue = body.dateValue ? new Date(body.dateValue) : null
+    const participatesInAutoshift = body.participatesInAutoshift !== false
 
     if (!stageName) {
       return NextResponse.json({ error: 'Укажите название этапа' }, { status: 400 })
@@ -91,7 +92,7 @@ export async function POST(
         stageName,
         isCritical: false,
         affectsFinalDate: false,
-        participatesInAutoshift: false,
+        participatesInAutoshift,
         status: 'NOT_STARTED',
         dateValue,
       },

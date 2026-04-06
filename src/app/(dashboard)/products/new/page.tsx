@@ -20,6 +20,7 @@ async function getProductTemplates() {
           stageOrder: true,
           stageName: true,
           plannedDate: true,
+          participatesInAutoshift: true,
         },
       },
     },

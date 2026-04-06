@@ -165,18 +165,18 @@ export function Header({ user }: HeaderProps) {
       <div className="page-shell flex justify-center">
         <motion.div
           layout
-          className="floating-island flex w-full max-w-full items-center gap-2 px-2 py-2 sm:w-auto sm:min-w-[720px]"
+          className="floating-island flex w-full max-w-[1180px] items-center gap-3 px-3 py-3"
           transition={{ type: 'spring', stiffness: 360, damping: 32 }}
         >
           <Link
             href="/dashboard"
-            className="hidden h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-slate-950 text-white shadow-sm transition hover:scale-[1.03] sm:inline-flex"
+            className="hidden h-14 w-14 flex-shrink-0 items-center justify-center rounded-full bg-slate-950 text-white shadow-sm transition hover:scale-[1.03] sm:inline-flex"
             aria-label="Перейти на дашборд"
           >
-            <Package2 className="h-5 w-5" />
+            <Package2 className="h-5.5 w-5.5" />
           </Link>
 
-          <div className="no-scrollbar flex min-w-0 flex-1 items-center gap-1 overflow-x-auto px-1">
+          <div className="no-scrollbar flex min-w-0 flex-1 items-center justify-center gap-2 overflow-x-auto px-2">
             {NAV_ITEMS.map((item) => {
               if (item.adminOnly && !isAdmin) return null
 
@@ -188,7 +188,8 @@ export function Header({ user }: HeaderProps) {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    'relative inline-flex h-11 flex-shrink-0 items-center gap-2 rounded-full px-4 text-sm font-medium transition-colors',
+                    'relative inline-flex flex-shrink-0 items-center gap-2 rounded-full font-medium transition-all',
+                    active ? 'h-12 px-6 text-[15px]' : 'h-11 px-4 text-sm',
                     active ? 'text-white' : 'text-slate-600 hover:text-slate-900'
                   )}
                 >
@@ -199,7 +200,7 @@ export function Header({ user }: HeaderProps) {
                       transition={{ type: 'spring', stiffness: 390, damping: 34 }}
                     />
                   )}
-                  <Icon className="relative z-10 h-4 w-4" />
+                  <Icon className={cn('relative z-10', active ? 'h-[18px] w-[18px]' : 'h-4 w-4')} />
                   <span className="relative z-10 whitespace-nowrap">{item.label}</span>
                 </Link>
               )

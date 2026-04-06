@@ -20,6 +20,7 @@ export async function GET() {
           stageOrder: true,
           stageName: true,
           plannedDate: true,
+          participatesInAutoshift: true,
         },
       },
     },
@@ -47,6 +48,7 @@ export async function POST(req: NextRequest) {
         stageOrder: index,
         stageName: normalizeStageName(String(stage?.stageName || '')),
         plannedDate: stage?.plannedDate ? new Date(stage.plannedDate) : null,
+        participatesInAutoshift: stage?.participatesInAutoshift !== false,
       }))
       .filter((stage: { stageName: string }) => stage.stageName)
 
@@ -85,6 +87,7 @@ export async function POST(req: NextRequest) {
         stageOrder: number
         stageName: string
         plannedDate: Date | null
+        participatesInAutoshift: boolean
       }> = []
 
       for (const stage of stages) {
@@ -101,7 +104,7 @@ export async function POST(req: NextRequest) {
               durationDays: null,
               isCritical: false,
               affectsFinalDate: true,
-              participatesInAutoshift: true,
+              participatesInAutoshift: stage.participatesInAutoshift,
             },
           })
           existingStageTemplates.push(stageTemplate)
@@ -113,6 +116,7 @@ export async function POST(req: NextRequest) {
           stageOrder: stage.stageOrder,
           stageName: stage.stageName,
           plannedDate: stage.plannedDate,
+          participatesInAutoshift: stage.participatesInAutoshift,
         })
       }
 
@@ -133,6 +137,7 @@ export async function POST(req: NextRequest) {
               stageOrder: true,
               stageName: true,
               plannedDate: true,
+              participatesInAutoshift: true,
             },
           },
         },

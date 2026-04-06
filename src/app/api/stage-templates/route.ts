@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const { name, durationText, isCritical = false } = body
+    const participatesInAutoshift = body?.participatesInAutoshift !== false
 
     if (!name?.trim()) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 })
@@ -46,6 +47,7 @@ export async function POST(req: NextRequest) {
           order: newOrder,
           durationText: durationText || null,
           isCritical,
+          participatesInAutoshift,
         },
       })
 
@@ -89,6 +91,7 @@ export async function POST(req: NextRequest) {
             isCompleted: true,
             isCritical: true,
             status: true,
+            participatesInAutoshift: true,
           },
         })
 
@@ -114,7 +117,7 @@ export async function PATCH(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { id, action, name } = body
+  const { id, action, name, participatesInAutoshift } = body
 
   if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
 
@@ -132,6 +135,24 @@ export async function PATCH(req: NextRequest) {
     await prisma.productStage.updateMany({
       where: { stageTemplateId: id },
       data: { stageName: name.trim() },
+    })
+
+    return NextResponse.json(updated)
+  }
+
+  if (action === 'toggle-autoshift') {
+    const nextValue = typeof participatesInAutoshift === 'boolean'
+      ? participatesInAutoshift
+      : !template.participatesInAutoshift
+
+    const updated = await prisma.stageTemplate.update({
+      where: { id },
+      data: { participatesInAutoshift: nextValue },
+    })
+
+    await prisma.productStage.updateMany({
+      where: { stageTemplateId: id },
+      data: { participatesInAutoshift: nextValue },
     })
 
     return NextResponse.json(updated)

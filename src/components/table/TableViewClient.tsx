@@ -13,12 +13,14 @@ import type { ProductQuickView } from '@/lib/product-list'
 interface Stage {
   id: string; order: number; name: string; durationText: string | null
   isCritical: boolean
+  participatesInAutoshift?: boolean
 }
 
 interface ProductStage {
   id: string; stageTemplateId: string; stageOrder: number; stageName: string;
   dateValue: Date | null; dateRaw: string | null;
   isCompleted: boolean; isCritical: boolean; status: string
+  participatesInAutoshift?: boolean
   overlapAccepted?: boolean
 }
 
@@ -45,6 +47,10 @@ interface EditingCellState {
   stageOrder: number
   stageName: string
 }
+
+type StageMenuState =
+  | { kind: 'header'; stageId: string; x: number; y: number }
+  | { kind: 'cell'; stageId: string; productId: string; x: number; y: number }
 
 const ALL_STATUSES = ['PLANNED', 'IN_PROGRESS', 'AT_RISK', 'DELAYED', 'COMPLETED', 'CANCELLED'] as const
 const ALL_PRIORITIES = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] as const
@@ -144,12 +150,13 @@ export function TableViewClient({
   const currentRoute = getRouteWithSearch(pathname, searchParams.toString())
 
   // Stage management state
-  const [stageMenu, setStageMenu] = useState<{ stageId: string; x: number; y: number } | null>(null)
+  const [stageMenu, setStageMenu] = useState<StageMenuState | null>(null)
   const [renamingStage, setRenamingStage] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [showNewStageForm, setShowNewStageForm] = useState(false)
   const [newStageName, setNewStageName] = useState('')
   const [newStageDuration, setNewStageDuration] = useState('')
+  const [newStageAutoshift, setNewStageAutoshift] = useState(true)
   const menuRef = useRef<HTMLDivElement>(null)
   const canEditTable = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUserRole)
   const userOptions = Array.from(
@@ -264,7 +271,11 @@ export function TableViewClient({
       const res = await fetch('/api/stage-templates', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newStageName, durationText: newStageDuration || null }),
+        body: JSON.stringify({
+          name: newStageName,
+          durationText: newStageDuration || null,
+          participatesInAutoshift: newStageAutoshift,
+        }),
       })
       if (res.ok) {
         const { template: createdStage, productStages } = await res.json()
@@ -287,6 +298,7 @@ export function TableViewClient({
         setColumnWidths((prev) => ({ ...prev, [createdStage.id]: prev[createdStage.id] ?? 130 }))
         setNewStageName('')
         setNewStageDuration('')
+        setNewStageAutoshift(true)
         setShowNewStageForm(false)
         router.refresh()
       } else {
@@ -329,7 +341,20 @@ export function TableViewClient({
     if (!canEditTable) return
     e.preventDefault()
     e.stopPropagation()
-    setStageMenu({ stageId: stage.id, x: e.clientX, y: e.clientY })
+    setStageMenu({ kind: 'header', stageId: stage.id, x: e.clientX, y: e.clientY })
+  }
+
+  const handleStageCellContextMenu = (e: React.MouseEvent, productId: string, stage: ProductStage | undefined) => {
+    if (!canEditTable || !stage) return
+    e.preventDefault()
+    e.stopPropagation()
+    setStageMenu({
+      kind: 'cell',
+      stageId: stage.id,
+      productId,
+      x: e.clientX,
+      y: e.clientY,
+    })
   }
 
   const startRename = (stage: Stage) => {
@@ -337,6 +362,73 @@ export function TableViewClient({
     setRenamingStage(stage.id)
     setRenameValue(stage.name)
     setStageMenu(null)
+  }
+
+  const handleToggleStageTemplateAutoshift = async (stage: Stage, nextValue: boolean) => {
+    try {
+      const res = await fetch('/api/stage-templates', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: stage.id, action: 'toggle-autoshift', participatesInAutoshift: nextValue }),
+      })
+      const updated = await res.json().catch(() => null)
+      if (!res.ok) {
+        throw new Error(updated?.error || 'Не удалось обновить автосдвиг этапа')
+      }
+
+      setStages((prev) => prev.map((item) => item.id === stage.id ? { ...item, participatesInAutoshift: updated.participatesInAutoshift } : item))
+      setProducts((prev) =>
+        prev.map((product) => ({
+          ...product,
+          stages: product.stages.map((productStage) =>
+            productStage.stageTemplateId === stage.id
+              ? { ...productStage, participatesInAutoshift: updated.participatesInAutoshift }
+              : productStage
+          ),
+        }))
+      )
+    } catch (error: any) {
+      window.alert(error.message || 'Не удалось обновить автосдвиг этапа')
+    } finally {
+      setStageMenu(null)
+    }
+  }
+
+  const handleToggleProductStageAutoshift = async (stageId: string, productId: string, nextValue: boolean) => {
+    try {
+      const res = await fetch('/api/stages', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          stageId,
+          updates: { participatesInAutoshift: nextValue },
+          applyAutomations: false,
+        }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        throw new Error(data?.error || 'Не удалось обновить автосдвиг этапа')
+      }
+
+      setProducts((prev) =>
+        prev.map((product) =>
+          product.id !== productId
+            ? product
+            : {
+                ...product,
+                stages: data?.stages || product.stages,
+                finalDate: data?.product?.finalDate ?? product.finalDate,
+                progressPercent: data?.product?.progressPercent ?? product.progressPercent,
+                riskScore: data?.product?.riskScore ?? product.riskScore,
+                status: data?.product?.status ?? product.status,
+              }
+        )
+      )
+    } catch (error: any) {
+      window.alert(error.message || 'Не удалось обновить автосдвиг этапа')
+    } finally {
+      setStageMenu(null)
+    }
   }
 
   const filteredProducts = products.filter((product) => {
@@ -585,7 +677,7 @@ export function TableViewClient({
             <thead className="sticky top-0 z-10">
               <tr>
                 <th
-                  className="sticky left-0 z-20 bg-brand-950 text-blue-50 text-xs px-4 py-2 text-left border-r border-brand-900 relative"
+                  className="sticky left-0 z-20 bg-brand-900 text-slate-100 text-xs px-4 py-2 text-left border-r border-brand-800 relative"
                   style={{ width: columnWidths.__product, minWidth: 120 }}
                 >
                   Продукт
@@ -595,7 +687,7 @@ export function TableViewClient({
                   />
                 </th>
                 <th
-                  className="bg-brand-900 text-blue-100 text-xs px-2 py-2 text-center border-r border-brand-800 relative"
+                  className="bg-brand-900 text-slate-100 text-xs px-2 py-2 text-center border-r border-brand-800 relative"
                   style={{ width: columnWidths.__progress, minWidth: 60 }}
                 >
                   Прогресс
@@ -607,12 +699,7 @@ export function TableViewClient({
                 {stages.map((stage, idx) => (
                   <th
                     key={stage.id}
-                    className={cn(
-                      'text-xs py-2 px-1.5 text-center border-r relative group',
-                      stage.isCritical
-                        ? 'bg-[#2d4673] text-blue-50 border-brand-800'
-                        : 'bg-[#263b61] text-slate-100 border-brand-800'
-                    )}
+                    className="bg-brand-900 text-slate-100 text-xs py-2 px-1.5 text-center border-r border-brand-800 relative group"
                     style={{ width: columnWidths[stage.id], minWidth: 60 }}
                     title={`ПКМ: управление этапом\n${stage.name}`}
                     onContextMenu={(e) => handleStageHeaderClick(e, stage)}
@@ -638,7 +725,7 @@ export function TableViewClient({
                       </div>
                     )}
                     {stage.durationText && !renamingStage && (
-                      <div className="text-blue-200/70 font-normal text-[10px] mt-0.5">{stage.durationText}</div>
+                      <div className="text-slate-300/80 font-normal text-[10px] mt-0.5">{stage.durationText}</div>
                     )}
                     <div
                       className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-brand-500/50 transition-colors"
@@ -746,6 +833,7 @@ export function TableViewClient({
                             <div
                               className={cn(cellClass, canEditTable && 'cursor-pointer hover:opacity-80 transition-opacity', 'mx-0.5 relative', hasOverlap && 'ring-2 ring-orange-400 ring-inset')}
                               onClick={() => canEditTable && startEdit(product.id, stageTemplate, stage)}
+                              onContextMenu={(e) => handleStageCellContextMenu(e, product.id, stage)}
                               title={stage ? `${stage.stageName}\n${stage.dateValue ? formatDate(stage.dateValue) : stage.dateRaw || 'Нет даты'}${stage.isCritical ? '\n⚠️ Критичный этап' : ''}${hasOverlap ? '\n⚠️ Пересечение дат' : ''}` : stageTemplate.name}
                             >
                               {stage?.isCompleted && <CheckCircle2 className="w-2.5 h-2.5 inline mr-0.5" />}
@@ -782,7 +870,7 @@ export function TableViewClient({
           className="fixed z-50 bg-white rounded-lg shadow-lg border border-slate-200 py-1 min-w-[180px]"
           style={{ left: stageMenu.x, top: stageMenu.y }}
         >
-          {(() => {
+          {stageMenu.kind === 'header' ? (() => {
             const stage = stages.find((s) => s.id === stageMenu.stageId)
             if (!stage) return null
             const isFirst = stages[0]?.id === stage.id
@@ -796,6 +884,13 @@ export function TableViewClient({
                 >
                   <Pencil className="w-3.5 h-3.5 text-slate-400" />
                   Переименовать
+                </button>
+                <button
+                  className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                  onClick={() => handleToggleStageTemplateAutoshift(stage, !stage.participatesInAutoshift)}
+                >
+                  <CheckCircle2 className={cn('w-3.5 h-3.5', stage.participatesInAutoshift ? 'text-emerald-500' : 'text-slate-400')} />
+                  {stage.participatesInAutoshift ? 'Отключить автосдвиг' : 'Включить автосдвиг'}
                 </button>
                 <button
                   className={cn('w-full px-3 py-2 text-left text-sm flex items-center gap-2', isFirst ? 'text-slate-300 cursor-not-allowed' : 'text-slate-700 hover:bg-slate-50')}
@@ -823,17 +918,43 @@ export function TableViewClient({
                 </button>
               </>
             )
+          })() : (() => {
+            const product = products.find((item) => item.id === stageMenu.productId)
+            const stage = product?.stages.find((item) => item.id === stageMenu.stageId)
+            if (!stage || !product) return null
+
+            return (
+              <button
+                className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                onClick={() => handleToggleProductStageAutoshift(stage.id, product.id, !stage.participatesInAutoshift)}
+              >
+                <CheckCircle2 className={cn('w-3.5 h-3.5', stage.participatesInAutoshift ? 'text-emerald-500' : 'text-slate-400')} />
+                {stage.participatesInAutoshift ? 'Отключить автосдвиг' : 'Включить автосдвиг'}
+              </button>
+            )
           })()}
         </div>
       )}
 
       {/* New stage modal */}
       {showNewStageForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setShowNewStageForm(false)}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+          onClick={() => {
+            setShowNewStageForm(false)
+            setNewStageAutoshift(true)
+          }}
+        >
           <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm space-y-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-slate-900">Новый этап</h3>
-              <button onClick={() => setShowNewStageForm(false)} className="text-slate-400 hover:text-slate-600">
+              <button
+                onClick={() => {
+                  setShowNewStageForm(false)
+                  setNewStageAutoshift(true)
+                }}
+                className="text-slate-400 hover:text-slate-600"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -859,8 +980,25 @@ export function TableViewClient({
                 placeholder="Например: 3 дня"
               />
             </div>
+            <label className="flex items-center justify-between rounded-[18px] bg-slate-50 px-3 py-3 text-sm text-slate-600">
+              <span>Автосдвиг по умолчанию</span>
+              <input
+                type="checkbox"
+                checked={newStageAutoshift}
+                onChange={(e) => setNewStageAutoshift(e.target.checked)}
+                className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+              />
+            </label>
             <div className="flex justify-end gap-2">
-              <button onClick={() => setShowNewStageForm(false)} className="btn-secondary text-sm">Отмена</button>
+              <button
+                onClick={() => {
+                  setShowNewStageForm(false)
+                  setNewStageAutoshift(true)
+                }}
+                className="btn-secondary text-sm"
+              >
+                Отмена
+              </button>
               <button onClick={handleCreateStage} className="btn-primary text-sm" disabled={!newStageName.trim()}>
                 <Plus className="w-4 h-4" /> Создать
               </button>

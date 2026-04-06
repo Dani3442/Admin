@@ -117,6 +117,7 @@ export interface ProductTemplateStageData {
   stageOrder: number
   stageName: string
   plannedDate: Date | null
+  participatesInAutoshift: boolean
 }
 
 export interface ProductTemplateData {

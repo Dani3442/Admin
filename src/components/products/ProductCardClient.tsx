@@ -44,6 +44,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
   const [showAddStageForm, setShowAddStageForm] = useState(false)
   const [newStageName, setNewStageName] = useState('')
   const [newStageDate, setNewStageDate] = useState<Date | null>(null)
+  const [newStageAutoshift, setNewStageAutoshift] = useState(true)
 
   // Context menu state
   const [stageMenu, setStageMenu] = useState<{ stageId: string; x: number; y: number } | null>(null)
@@ -268,6 +269,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
         body: JSON.stringify({
           stageName,
           dateValue: newStageDate || null,
+          participatesInAutoshift: newStageAutoshift,
         }),
       })
       const data = await res.json()
@@ -285,9 +287,44 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
       }))
       setNewStageName('')
       setNewStageDate(null)
+      setNewStageAutoshift(true)
       setShowAddStageForm(false)
     } catch (error: any) {
       alert(error.message || 'Не удалось добавить этап')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleToggleStageAutoshift = async (stage: any, nextValue: boolean) => {
+    setSaving(true)
+    try {
+      const res = await fetch('/api/stages', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          stageId: stage.id,
+          updates: { participatesInAutoshift: nextValue },
+          applyAutomations: false,
+        }),
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data?.error || 'Не удалось обновить автосдвиг этапа')
+      }
+
+      setProduct((prev: any) => ({
+        ...prev,
+        stages: data.stages || prev.stages,
+        finalDate: data.product?.finalDate ?? prev.finalDate,
+        progressPercent: data.product?.progressPercent ?? prev.progressPercent,
+        riskScore: data.product?.riskScore ?? prev.riskScore,
+        status: data.product?.status ?? prev.status,
+      }))
+      setStageMenu(null)
+    } catch (error: any) {
+      alert(error.message || 'Не удалось обновить автосдвиг этапа')
     } finally {
       setSaving(false)
     }
@@ -493,7 +530,17 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
               {canEdit && (
                 <div className="mb-3 flex items-center justify-end gap-3">
                   <button
-                    onClick={() => setShowAddStageForm((prev) => !prev)}
+                    onClick={() => {
+                      setShowAddStageForm((prev) => {
+                        const next = !prev
+                        if (!next) {
+                          setNewStageName('')
+                          setNewStageDate(null)
+                          setNewStageAutoshift(true)
+                        }
+                        return next
+                      })
+                    }}
                     className="btn-primary text-sm"
                     disabled={saving}
                   >
@@ -517,6 +564,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                         setShowAddStageForm(false)
                         setNewStageName('')
                         setNewStageDate(null)
+                        setNewStageAutoshift(true)
                       }
                     }}
                   />
@@ -527,6 +575,15 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                     panelClassName="w-[360px]"
                     placeholder="Дата этапа"
                   />
+                  <label className="flex h-11 items-center gap-2 rounded-[18px] bg-white px-3 text-sm text-slate-600">
+                    <span className="whitespace-nowrap">Автосдвиг</span>
+                    <input
+                      type="checkbox"
+                      checked={newStageAutoshift}
+                      onChange={(e) => setNewStageAutoshift(e.target.checked)}
+                      className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                    />
+                  </label>
                   <button onClick={handleAddStage} className="btn-primary text-sm" disabled={!newStageName.trim() || saving}>
                     <Save className="w-4 h-4" />
                     Сохранить
@@ -536,6 +593,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                       setShowAddStageForm(false)
                       setNewStageName('')
                       setNewStageDate(null)
+                      setNewStageAutoshift(true)
                     }}
                     className="btn-secondary text-sm"
                     disabled={saving}
@@ -624,6 +682,9 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                         <p className={cn('text-sm font-medium', stage.isCompleted ? 'line-through text-slate-400' : 'text-slate-700')}>
                           {stage.stageName}
                           {stage.isCritical && <span className="ml-1.5 text-xs text-red-500 font-semibold">КРИТИЧНЫЙ</span>}
+                          {!stage.participatesInAutoshift && (
+                            <span className="ml-1.5 text-xs text-slate-500 font-semibold">АВТОСДВИГ ВЫКЛ.</span>
+                          )}
                           {hasOverlap && <span className="ml-1.5 text-xs text-orange-600 font-semibold" title="Даты пересекаются с соседним этапом">⚠ ПЕРЕСЕЧЕНИЕ</span>}
                         </p>
                       )}
@@ -854,6 +915,13 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
             >
               <Zap className="w-3.5 h-3.5 text-amber-500" />
               Настроить автоматизацию
+            </button>
+            <button
+              className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+              onClick={() => handleToggleStageAutoshift(stage, !stage.participatesInAutoshift)}
+            >
+              <Zap className={cn('w-3.5 h-3.5', stage.participatesInAutoshift ? 'text-emerald-500' : 'text-slate-400')} />
+              {stage.participatesInAutoshift ? 'Отключить автосдвиг' : 'Включить автосдвиг'}
             </button>
             <div className="border-t border-slate-100 my-1" />
             <button

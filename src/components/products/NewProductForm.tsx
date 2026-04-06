@@ -19,6 +19,7 @@ interface TemplateDraftStage {
   id: string
   stageName: string
   plannedDate: Date | null
+  participatesInAutoshift: boolean
 }
 
 interface NewProductFormProps {
@@ -32,6 +33,7 @@ function createDraftStage(): TemplateDraftStage {
     id: `stage-${Math.random().toString(36).slice(2, 10)}`,
     stageName: '',
     plannedDate: null,
+    participatesInAutoshift: true,
   }
 }
 
@@ -80,7 +82,7 @@ export function NewProductForm({ users, productTemplates, stageSuggestions }: Ne
   const removeTemplateStage = (stageId: string) => {
     setTemplateStages((prev) => {
       if (prev.length === 1) {
-        return [{ ...prev[0], stageName: '', plannedDate: null }]
+        return [{ ...prev[0], stageName: '', plannedDate: null, participatesInAutoshift: true }]
       }
       return prev.filter((stage) => stage.id !== stageId)
     })
@@ -100,6 +102,7 @@ export function NewProductForm({ users, productTemplates, stageSuggestions }: Ne
       .map((stage) => ({
         stageName: stage.stageName.trim(),
         plannedDate: stage.plannedDate,
+        participatesInAutoshift: stage.participatesInAutoshift,
       }))
       .filter((stage) => stage.stageName)
 
@@ -126,6 +129,7 @@ export function NewProductForm({ users, productTemplates, stageSuggestions }: Ne
           stages: normalizedStages.map((stage) => ({
             stageName: stage.stageName,
             plannedDate: stage.plannedDate ? stage.plannedDate.toISOString() : null,
+            participatesInAutoshift: stage.participatesInAutoshift,
           })),
         }),
       })
@@ -323,7 +327,7 @@ export function NewProductForm({ users, productTemplates, stageSuggestions }: Ne
 
               <div className="space-y-3">
                 {templateStages.map((stage, index) => (
-                  <div key={stage.id} className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3 md:grid-cols-[minmax(0,1fr)_220px_44px]">
+                  <div key={stage.id} className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3 md:grid-cols-[minmax(0,1fr)_220px_180px_44px]">
                     <div>
                       <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1.5">
                         Этап {index + 1}
@@ -349,6 +353,22 @@ export function NewProductForm({ users, productTemplates, stageSuggestions }: Ne
                         placeholder="Необязательно"
                       />
                     </div>
+                    <label className="flex items-end">
+                      <span className="w-full rounded-[18px] border border-slate-200 bg-white px-3 py-3 text-sm text-slate-600">
+                        <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-400">
+                          Автосдвиг
+                        </span>
+                        <span className="flex items-center justify-between gap-3">
+                          <span>{stage.participatesInAutoshift ? 'Включён' : 'Выключен'}</span>
+                          <input
+                            type="checkbox"
+                            checked={stage.participatesInAutoshift}
+                            onChange={(e) => updateTemplateStage(stage.id, { participatesInAutoshift: e.target.checked })}
+                            className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                          />
+                        </span>
+                      </span>
+                    </label>
                     <div className="flex items-end">
                       <button
                         type="button"
