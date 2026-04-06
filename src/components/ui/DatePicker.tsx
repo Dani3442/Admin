@@ -28,6 +28,7 @@ interface DatePickerProps {
   placeholder?: string
   inputClassName?: string
   panelClassName?: string
+  showTriggerButton?: boolean
 }
 
 const MONTH_OPTIONS = Array.from({ length: 12 }, (_, monthIndex) => ({
@@ -44,6 +45,7 @@ export function DatePicker({
   placeholder = 'ДД.ММ.ГГГГ',
   inputClassName,
   panelClassName,
+  showTriggerButton = true,
 }: DatePickerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -288,13 +290,15 @@ export function DatePicker({
               inputClassName
             )}
           />
-          <button
-            type="button"
-            onClick={() => (isOpen ? commitInput() : openCalendar())}
-            className="inline-flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700"
-          >
-            <CalendarDays className="h-4 w-4" />
-          </button>
+          {showTriggerButton && (
+            <button
+              type="button"
+              onClick={() => (isOpen ? commitInput() : openCalendar())}
+              className="inline-flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700"
+            >
+              <CalendarDays className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </div>
       {calendar}

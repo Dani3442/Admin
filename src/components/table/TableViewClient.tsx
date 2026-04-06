@@ -442,14 +442,15 @@ export function TableViewClient({ products: initial, stages: initialStages }: Ta
                           onClick={(e) => e.stopPropagation()}
                         >
                           {isEditing ? (
-                            <div className="p-1">
+                            <div className="w-full overflow-hidden p-1">
                               <DatePicker
                                 value={editValue}
                                 onChange={setEditValue}
                                 onCommit={saveEdit}
                                 onCancel={() => setEditingCell(null)}
-                                inputClassName="h-9 min-w-[140px] text-xs px-2"
-                                panelClassName="w-[308px]"
+                                inputClassName="h-8 w-full min-w-0 text-[11px] px-2"
+                                panelClassName="w-[292px]"
+                                showTriggerButton={false}
                                 autoFocus
                               />
                             </div>
