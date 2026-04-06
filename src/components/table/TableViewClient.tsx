@@ -13,7 +13,7 @@ interface Stage {
 }
 
 interface ProductStage {
-  id: string; stageOrder: number; stageName: string;
+  id: string; stageTemplateId: string; stageOrder: number; stageName: string;
   dateValue: Date | null; dateRaw: string | null;
   isCompleted: boolean; isCritical: boolean; status: string
 }
@@ -379,8 +379,6 @@ export function TableViewClient({ products: initial, stages: initialStages }: Ta
             </thead>
             <tbody>
               {filteredProducts.map((product, rowIdx) => {
-                const stageMap: Record<number, ProductStage> = {}
-                product.stages.forEach((s) => { stageMap[s.stageOrder] = s })
                 const { overlappingIds } = detectStageOverlaps(product.stages)
 
                 return (
@@ -428,7 +426,10 @@ export function TableViewClient({ products: initial, stages: initialStages }: Ta
 
                     {/* Stage cells */}
                     {stages.map((stageTemplate) => {
-                      const stage = stageMap[stageTemplate.order]
+                      const stage = product.stages.find((productStage) =>
+                        productStage.stageTemplateId === stageTemplate.id &&
+                        productStage.stageName === stageTemplate.name
+                      )
                       const isEditing = editingCell?.stageId === stage?.id && editingCell?.productId === product.id
                       const cellClass = getCellClass(stage, stageTemplate)
                       const cellText = getCellText(stage)

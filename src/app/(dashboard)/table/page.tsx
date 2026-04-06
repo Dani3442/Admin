@@ -1,11 +1,8 @@
 import { prisma } from '@/lib/prisma'
 import { TableViewClient } from '@/components/table/TableViewClient'
 import { recalculateAllRisks } from '@/lib/risk'
-import { syncProductsWithStageTemplates } from '@/lib/table-sync'
 
 async function getTableData() {
-  // Recalculate risks on every page load
-  await syncProductsWithStageTemplates()
   await recalculateAllRisks()
 
   const [products, stages] = await Promise.all([
