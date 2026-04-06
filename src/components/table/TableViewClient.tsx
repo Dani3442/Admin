@@ -170,6 +170,9 @@ export function TableViewClient({ products: initial, stages: initialStages }: Ta
           return next
         })
         router.refresh()
+      } else {
+        const data = await res.json().catch(() => null)
+        window.alert(data?.error || 'Не удалось удалить этап')
       }
     } finally {
       setStageMenu(null)

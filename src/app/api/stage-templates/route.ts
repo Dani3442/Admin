@@ -156,15 +156,13 @@ export async function DELETE(req: NextRequest) {
       })
       const productStageIds = productStages.map((stage) => stage.id)
 
-      await tx.comment.deleteMany({
-        where: {
-          productStage: {
-            stageTemplateId: id,
-          },
-        },
-      })
-
       if (productStageIds.length > 0) {
+        await tx.comment.deleteMany({
+          where: {
+            productStageId: { in: productStageIds },
+          },
+        })
+
         await tx.changeHistory.deleteMany({
           where: {
             productStageId: { in: productStageIds },
