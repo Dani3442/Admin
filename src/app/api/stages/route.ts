@@ -21,7 +21,48 @@ export async function PATCH(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { stageId, updates, applyAutomations = true, swapWithStageId, productId, stageTemplateId, stageOrder, stageName } = body
+  const { stageId, stageIds, updates, applyAutomations = true, swapWithStageId, productId, stageTemplateId, stageOrder, stageName } = body
+
+  if (Array.isArray(stageIds) && stageIds.length > 0) {
+    const stagesToUpdate = await prisma.productStage.findMany({
+      where: { id: { in: stageIds } },
+      select: { id: true, productId: true },
+    })
+
+    if (stagesToUpdate.length !== stageIds.length) {
+      return NextResponse.json({ error: 'One or more stages not found' }, { status: 404 })
+    }
+
+    const targetProductId = stagesToUpdate[0]?.productId
+    if (!targetProductId || stagesToUpdate.some((stage) => stage.productId !== targetProductId)) {
+      return NextResponse.json({ error: 'Stages must belong to the same product' }, { status: 400 })
+    }
+
+    await prisma.productStage.updateMany({
+      where: { id: { in: stageIds } },
+      data: updates,
+    })
+
+    await recalculateProductRisk(targetProductId)
+
+    const updatedProduct = await prisma.product.findUnique({
+      where: { id: targetProductId },
+      select: {
+        id: true,
+        finalDate: true,
+        progressPercent: true,
+        riskScore: true,
+        status: true,
+      },
+    })
+
+    const stages = await prisma.productStage.findMany({
+      where: { productId: targetProductId },
+      orderBy: { stageOrder: 'asc' },
+    })
+
+    return NextResponse.json({ stages, product: updatedProduct })
+  }
 
   let existingStage = stageId ? await prisma.productStage.findUnique({ where: { id: stageId } }) : null
 
@@ -132,9 +173,14 @@ export async function PATCH(req: NextRequest) {
     })
   }
 
+  const normalizedUpdates = {
+    ...updates,
+    ...(Object.prototype.hasOwnProperty.call(updates, 'dateValue') ? { overlapAccepted: false } : {}),
+  }
+
   const updatedStage = await prisma.productStage.update({
     where: { id: existingStage.id },
-    data: updates,
+    data: normalizedUpdates,
   })
 
   // Apply automation if date changed

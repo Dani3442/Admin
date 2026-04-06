@@ -5,7 +5,7 @@ import { usePathname, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval, differenceInDays, isSameDay } from 'date-fns'
 import { ru } from 'date-fns/locale'
-import { cn, formatDate, detectStageOverlaps } from '@/lib/utils'
+import { cn, formatDate, detectStageOverlaps, formatStageOverlap } from '@/lib/utils'
 import { ChevronLeft, ChevronRight, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { buildProductHref, getRouteWithSearch } from '@/lib/navigation'
 
@@ -156,7 +156,7 @@ export function TimelineClient({ products }: { products: Product[] }) {
                     <span className="text-[9px] text-slate-400">{product.progressPercent}%</span>
                     {product.riskScore >= 40 && <AlertTriangle className="w-2.5 h-2.5 text-amber-500" />}
                     {productOverlaps.length > 0 && (
-                      <span className="text-[9px] text-orange-600 font-medium" title={productOverlaps.map(o => `${o.fromName} → ${o.toName}`).join(', ')}>
+                      <span className="text-[9px] text-orange-600 font-medium" title={productOverlaps.map((overlap) => formatStageOverlap(overlap)).join(', ')}>
                         ⚠{productOverlaps.length}
                       </span>
                     )}

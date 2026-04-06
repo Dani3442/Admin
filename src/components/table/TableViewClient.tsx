@@ -19,6 +19,7 @@ interface ProductStage {
   id: string; stageTemplateId: string; stageOrder: number; stageName: string;
   dateValue: Date | null; dateRaw: string | null;
   isCompleted: boolean; isCritical: boolean; status: string
+  overlapAccepted?: boolean
 }
 
 interface Product {
@@ -745,7 +746,7 @@ export function TableViewClient({
                             <div
                               className={cn(cellClass, canEditTable && 'cursor-pointer hover:opacity-80 transition-opacity', 'mx-0.5 relative', hasOverlap && 'ring-2 ring-orange-400 ring-inset')}
                               onClick={() => canEditTable && startEdit(product.id, stageTemplate, stage)}
-                              title={stage ? `${stage.stageName}\n${stage.dateValue ? formatDate(stage.dateValue) : stage.dateRaw || 'Нет даты'}${stage.isCritical ? '\n⚠️ Критичный этап' : ''}${hasOverlap ? '\n⚠️ Пересечение дат с соседним этапом' : ''}` : stageTemplate.name}
+                              title={stage ? `${stage.stageName}\n${stage.dateValue ? formatDate(stage.dateValue) : stage.dateRaw || 'Нет даты'}${stage.isCritical ? '\n⚠️ Критичный этап' : ''}${hasOverlap ? '\n⚠️ Пересечение дат' : ''}` : stageTemplate.name}
                             >
                               {stage?.isCompleted && <CheckCircle2 className="w-2.5 h-2.5 inline mr-0.5" />}
                               {hasOverlap && <AlertTriangle className="w-2.5 h-2.5 inline mr-0.5 text-orange-500" />}

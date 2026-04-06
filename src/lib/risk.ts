@@ -1,4 +1,4 @@
-import { startOfDay } from 'date-fns'
+import { detectStageOverlaps } from './utils'
 import { prisma } from './prisma'
 
 /**
@@ -59,19 +59,10 @@ export async function recalculateAllRisks() {
       }
     }
 
-    // 3. Check date overlaps (stage N dateValue > stage N+1 dateValue)
-    const stagesWithDates = product.stages.filter((s) => s.dateValue && !s.isCompleted)
-    for (let i = 0; i < stagesWithDates.length - 1; i++) {
-      const curr = stagesWithDates[i]
-      const next = stagesWithDates[i + 1]
-      if (curr.dateValue && next.dateValue) {
-        const currDate = startOfDay(new Date(curr.dateValue))
-        const nextDate = startOfDay(new Date(next.dateValue))
-        if (currDate > nextDate) {
-          riskScore += 15
-          issues.push(`overlap:${curr.stageName}->${next.stageName}`)
-        }
-      }
+    const { overlaps } = detectStageOverlaps(product.stages)
+    for (const overlap of overlaps) {
+      riskScore += 15
+      issues.push(`overlap:${overlap.names.join('->')}`)
     }
 
     riskScore = Math.min(riskScore, 100)
@@ -130,18 +121,9 @@ export async function recalculateProductRisk(productId: string) {
     }
   }
 
-  // Date overlaps
-  const stagesWithDates = product.stages.filter((s) => s.dateValue && !s.isCompleted)
-  for (let i = 0; i < stagesWithDates.length - 1; i++) {
-    const curr = stagesWithDates[i]
-    const next = stagesWithDates[i + 1]
-    if (
-      curr.dateValue &&
-      next.dateValue &&
-      startOfDay(new Date(curr.dateValue)) > startOfDay(new Date(next.dateValue))
-    ) {
-      riskScore += 15
-    }
+  const { overlaps } = detectStageOverlaps(product.stages)
+  for (const overlap of overlaps) {
+    riskScore += 15
   }
 
   riskScore = Math.min(riskScore, 100)

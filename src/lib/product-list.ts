@@ -12,6 +12,7 @@ export interface ProductListStage {
   isCritical: boolean
   status: string
   stageName: string
+  overlapAccepted?: boolean
 }
 
 export interface ProductListItem {

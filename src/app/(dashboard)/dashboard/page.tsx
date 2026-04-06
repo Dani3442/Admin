@@ -7,7 +7,7 @@ import { Recommendations } from '@/components/dashboard/Recommendations'
 import { AnalyticsClient } from '@/components/dashboard/AnalyticsClient'
 import { recalculateAllRisks } from '@/lib/risk'
 import { addDays } from 'date-fns'
-import { detectStageOverlaps } from '@/lib/utils'
+import { detectStageOverlaps, formatStageOverlap } from '@/lib/utils'
 
 async function getDashboardData() {
   // Recalculate risks on every page load
@@ -91,7 +91,7 @@ async function getDashboardData() {
     }
     const { overlaps } = detectStageOverlaps(product.stages)
     for (const overlap of overlaps) {
-      riskReasons.push(`Пересечение: ${overlap.fromName?.slice(0, 20)} → ${overlap.toName?.slice(0, 20)}`)
+      riskReasons.push(formatStageOverlap(overlap).slice(0, 48))
     }
     const overdueStages = product.stages.filter((s) => s.dateValue && !s.isCompleted && s.dateValue < now)
     if (overdueStages.length > 0) {

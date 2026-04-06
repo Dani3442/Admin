@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeft, CheckCircle2, Circle, AlertTriangle, MessageCircle, Clock, History, Zap, ExternalLink, Edit2, Save, Pencil, ChevronUp, ChevronDown, X, Plus, Trash2 } from 'lucide-react'
-import { cn, getStatusColor, getStatusLabel, getPriorityColor, getPriorityLabel, formatDate, detectStageOverlaps } from '@/lib/utils'
+import { cn, getStatusColor, getStatusLabel, getPriorityColor, getPriorityLabel, formatDate, detectStageOverlaps, formatStageOverlap } from '@/lib/utils'
 import { DatePicker } from '@/components/ui/DatePicker'
 import { resolveBackNavigation } from '@/lib/navigation'
 // Types are string-based (no Prisma enums needed)
@@ -348,6 +348,37 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
 
   const { overlappingIds, overlaps } = detectStageOverlaps(product.stages)
 
+  const handleAcceptOverlap = async (stageIds: string[]) => {
+    setSaving(true)
+    try {
+      const res = await fetch('/api/stages', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          stageIds,
+          updates: { overlapAccepted: true },
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data?.error || 'Не удалось принять пересечение')
+      }
+
+      setProduct((p: any) => ({
+        ...p,
+        stages: data.stages || p.stages,
+        finalDate: data.product?.finalDate ?? p.finalDate,
+        progressPercent: data.product?.progressPercent ?? p.progressPercent,
+        riskScore: data.product?.riskScore ?? p.riskScore,
+        status: data.product?.status ?? p.status,
+      }))
+    } catch (error: any) {
+      alert(error.message || 'Не удалось принять пересечение')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div className="space-y-5 animate-fade-in">
       {/* Back */}
@@ -516,12 +547,22 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
               {overlaps.length > 0 && (
                 <div className="mb-3 flex items-start gap-2 rounded-[24px] bg-orange-50 p-3">
                   <AlertTriangle className="w-4 h-4 text-orange-500 mt-0.5 flex-shrink-0" />
-                  <div>
+                  <div className="flex-1">
                     <p className="text-sm font-medium text-orange-800">Обнаружены пересечения дат</p>
-                    <ul className="mt-1 space-y-0.5">
+                    <ul className="mt-2 space-y-2">
                       {overlaps.map((o, i) => (
-                        <li key={i} className="text-xs text-orange-700">
-                          «{o.fromName}» → «{o.toName}»: дата предыдущего этапа позже следующего
+                        <li key={i} className="flex items-start justify-between gap-3 rounded-[16px] bg-white/70 px-3 py-2 text-xs text-orange-700">
+                          <span>{formatStageOverlap(o)}{o.dateLabel ? ` (${o.dateLabel})` : ''}</span>
+                          {canEdit && (
+                            <button
+                              type="button"
+                              onClick={() => handleAcceptOverlap(o.stageIds)}
+                              className="flex-shrink-0 rounded-[14px] px-2.5 py-1 font-medium text-orange-700 transition hover:bg-orange-100"
+                              disabled={saving}
+                            >
+                              Принять
+                            </button>
+                          )}
                         </li>
                       ))}
                     </ul>

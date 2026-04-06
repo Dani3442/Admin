@@ -180,20 +180,34 @@ export function abbreviate(name: string, maxLen = 30): string {
   return name.length > maxLen ? name.slice(0, maxLen) + '…' : name
 }
 
-/**
- * Detects date overlaps between consecutive stages.
- * Returns a Set of stage IDs that participate in overlaps.
- * An overlap occurs when stage N's dateValue > stage N+1's dateValue (by stageOrder).
- */
+export interface StageOverlapIssue {
+  kind: 'out_of_order' | 'same_day_cluster'
+  stageIds: string[]
+  fromId?: string
+  toId?: string
+  fromName?: string
+  toName?: string
+  names: string[]
+  dateLabel?: string
+}
+
+export function formatStageOverlap(overlap: StageOverlapIssue) {
+  if (overlap.kind === 'same_day_cluster') {
+    return `Одинаковая дата у этапов: ${overlap.names.map((name) => `«${name}»`).join(', ')}`
+  }
+
+  return `Пересечение: «${overlap.fromName || 'Этап'}» → «${overlap.toName || 'Этап'}»`
+}
+
 export function detectStageOverlaps(
-  stages: Array<{ id: string; stageOrder: number; dateValue: Date | null; isCompleted: boolean }>
-): { overlappingIds: Set<string>; overlaps: Array<{ fromId: string; toId: string; fromName?: string; toName?: string }> } {
+  stages: Array<{ id: string; stageOrder: number; dateValue: Date | null; isCompleted: boolean; stageName?: string; overlapAccepted?: boolean }>
+): { overlappingIds: Set<string>; overlaps: StageOverlapIssue[] } {
   const sorted = [...stages]
     .filter((s) => s.dateValue && !s.isCompleted)
     .sort((a, b) => a.stageOrder - b.stageOrder)
 
   const overlappingIds = new Set<string>()
-  const overlaps: Array<{ fromId: string; toId: string; fromName?: string; toName?: string }> = []
+  const overlaps: StageOverlapIssue[] = []
 
   for (let i = 0; i < sorted.length - 1; i++) {
     const curr = sorted[i]
@@ -202,16 +216,47 @@ export function detectStageOverlaps(
       const currDate = startOfDay(new Date(curr.dateValue))
       const nextDate = startOfDay(new Date(next.dateValue))
       if (currDate > nextDate) {
+        const isAccepted = Boolean(curr.overlapAccepted && next.overlapAccepted)
+        if (isAccepted) continue
+
         overlappingIds.add(curr.id)
         overlappingIds.add(next.id)
         overlaps.push({
+          kind: 'out_of_order',
+          stageIds: [curr.id, next.id],
           fromId: curr.id,
           toId: next.id,
-          fromName: (curr as any).stageName,
-          toName: (next as any).stageName,
+          fromName: curr.stageName,
+          toName: next.stageName,
+          names: [curr.stageName || 'Этап', next.stageName || 'Этап'],
         })
       }
     }
+  }
+
+  const dateGroups = new Map<string, typeof sorted>()
+  for (const stage of sorted) {
+    if (!stage.dateValue) continue
+    const dateKey = format(new Date(stage.dateValue), 'yyyy-MM-dd')
+    const bucket = dateGroups.get(dateKey) || []
+    bucket.push(stage)
+    dateGroups.set(dateKey, bucket)
+  }
+
+  for (const [dateKey, group] of dateGroups.entries()) {
+    if (group.length < 3) continue
+    if (group.every((stage) => stage.overlapAccepted)) continue
+
+    for (const stage of group) {
+      overlappingIds.add(stage.id)
+    }
+
+    overlaps.push({
+      kind: 'same_day_cluster',
+      stageIds: group.map((stage) => stage.id),
+      names: group.map((stage) => stage.stageName || 'Этап'),
+      dateLabel: format(new Date(dateKey), 'dd.MM.yyyy'),
+    })
   }
 
   return { overlappingIds, overlaps }

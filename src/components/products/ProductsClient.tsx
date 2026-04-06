@@ -15,7 +15,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-import { cn, detectStageOverlaps, formatDate, getPriorityColor, getPriorityLabel, getStatusColor, getStatusLabel } from '@/lib/utils'
+import { cn, detectStageOverlaps, formatDate, formatStageOverlap, getPriorityColor, getPriorityLabel, getStatusColor, getStatusLabel } from '@/lib/utils'
 import { buildProductHref, getRouteWithSearch } from '@/lib/navigation'
 import { FilterSelect } from '@/components/ui/FilterSelect'
 import {
@@ -753,7 +753,7 @@ export function ProductsClient({
                           <Star className={cn('w-3.5 h-3.5', product.isFavorite ? 'text-slate-700 fill-slate-200' : 'text-slate-300')} />
                         </div>
                         <div className="min-w-0">
-                          <Link href={buildProductHref(product.id, currentRoute)} className="text-[21px] font-semibold leading-tight tracking-[-0.02em] text-slate-800 hover:text-brand-700 transition-colors">
+                          <Link href={buildProductHref(product.id, currentRoute)} className="text-[18px] font-bold leading-tight tracking-[-0.01em] text-slate-800 hover:text-brand-700 transition-colors">
                             {product.name.length > 70 ? `${product.name.slice(0, 70)}…` : product.name}
                           </Link>
                           <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-400">
@@ -765,7 +765,7 @@ export function ProductsClient({
                             {overlaps.length > 0 && (
                               <span
                                 className="text-orange-600 font-medium"
-                                title={overlaps.map((overlap: { fromName?: string; toName?: string }) => `${overlap.fromName} → ${overlap.toName}`).join(', ')}
+                                title={overlaps.map((overlap) => formatStageOverlap(overlap)).join(', ')}
                               >
                                 • ⚠ {overlaps.length} пересеч.
                               </span>
