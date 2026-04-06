@@ -374,7 +374,8 @@ export function TableViewClient({ products: initial, stages: initialStages, curr
         )
       )
     } catch (error: any) {
-      window.alert(error.message || 'Не удалось сохранить дату этапа')
+      console.error('[table:save-date] Failed to save stage date', error)
+      window.alert('Не удалось сохранить дату этапа')
     } finally {
       setSaving(false)
       setEditingCell((current) => (isSameEditingCell(current, activeCell) ? null : current))

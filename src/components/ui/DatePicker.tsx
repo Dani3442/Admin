@@ -107,7 +107,7 @@ export function DatePicker({
       ) {
         return
       }
-      commitInput()
+      setIsOpen(false)
     }
 
     window.addEventListener('resize', handleWindowChange)
