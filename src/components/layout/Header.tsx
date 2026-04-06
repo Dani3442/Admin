@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { LogOut, Bell, AlertTriangle, Clock, History, X } from 'lucide-react'
+import { LogOut, Bell, AlertTriangle, Clock, History, X, ChevronsLeft, ChevronsRight } from 'lucide-react'
 import { UserAvatar } from '@/components/users/UserAvatar'
 import { cn, getUserDisplayName } from '@/lib/utils'
 import { buildProductHref, getRouteWithSearch } from '@/lib/navigation'
@@ -21,9 +21,11 @@ interface Notification {
 
 interface HeaderProps {
   user: { name?: string; lastName?: string | null; email?: string; role: string; avatar?: string | null }
+  isSidebarCollapsed?: boolean
+  onToggleSidebar?: () => void
 }
 
-export function Header({ user }: HeaderProps) {
+export function Header({ user, isSidebarCollapsed = false, onToggleSidebar }: HeaderProps) {
   const [open, setOpen] = useState(false)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [counts, setCounts] = useState({ overdue: 0, risk: 0, changes: 0, total: 0 })
@@ -116,6 +118,15 @@ export function Header({ user }: HeaderProps) {
   return (
     <header className="h-14 bg-white border-b border-slate-100 flex items-center justify-between px-6 flex-shrink-0">
       <div className="flex items-center gap-2 text-sm text-slate-400">
+        <button
+          type="button"
+          onClick={onToggleSidebar}
+          className="mr-1 inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700"
+          aria-label={isSidebarCollapsed ? 'Показать боковую панель' : 'Скрыть боковую панель'}
+          title={isSidebarCollapsed ? 'Показать меню' : 'Скрыть меню'}
+        >
+          {isSidebarCollapsed ? <ChevronsRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}
+        </button>
         <span>Product Admin</span>
       </div>
 
