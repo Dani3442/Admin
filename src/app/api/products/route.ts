@@ -52,25 +52,66 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json()
-    const { name, country, category, sku, priority, responsibleId, notes } = body
+    const { name, country, category, sku, priority, responsibleId, notes, productTemplateId } = body
 
     if (!name?.trim()) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 })
     }
 
     const product = await prisma.$transaction(async (tx) => {
-      const [stageTemplates, sortOrderAggregate] = await Promise.all([
+      const [stageTemplates, sortOrderAggregate, selectedTemplate] = await Promise.all([
         tx.stageTemplate.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] }),
         tx.product.aggregate({
           where: { isArchived: false },
           _max: { sortOrder: true },
         }),
+        productTemplateId
+          ? tx.productTemplate.findUnique({
+              where: { id: String(productTemplateId) },
+              include: {
+                stages: {
+                  orderBy: { stageOrder: 'asc' },
+                  include: { stageTemplate: true },
+                },
+              },
+            })
+          : Promise.resolve(null),
       ])
+
+      if (productTemplateId && !selectedTemplate) {
+        throw new Error('Выбранный шаблон этапов не найден')
+      }
 
       const normalizedStageTemplates = stageTemplates.map((template, index) => ({
         ...template,
         normalizedOrder: index,
       }))
+
+      const templateStages = selectedTemplate
+        ? selectedTemplate.stages.map((stage, index) => ({
+            stageTemplateId: stage.stageTemplateId,
+            stageOrder: index,
+            stageName: stage.stageName,
+            dateValue: stage.plannedDate,
+            isCritical: stage.stageTemplate.isCritical,
+            affectsFinalDate: stage.stageTemplate.affectsFinalDate,
+            participatesInAutoshift: stage.stageTemplate.participatesInAutoshift,
+          }))
+        : normalizedStageTemplates.map((template) => ({
+            stageTemplateId: template.id,
+            stageOrder: template.normalizedOrder,
+            stageName: template.name,
+            dateValue: null,
+            isCritical: template.isCritical,
+            affectsFinalDate: template.affectsFinalDate,
+            participatesInAutoshift: template.participatesInAutoshift,
+          }))
+
+      const finalDateFromTemplate = templateStages
+        .map((stage) => stage.dateValue)
+        .filter((date): date is Date => Boolean(date))
+        .sort((left, right) => left.getTime() - right.getTime())
+        .at(-1) ?? null
 
       return tx.product.create({
         data: {
@@ -81,16 +122,11 @@ export async function POST(req: NextRequest) {
           priority: priority || 'MEDIUM',
           responsibleId,
           notes,
+          productTemplateId: selectedTemplate?.id ?? null,
           sortOrder: (sortOrderAggregate._max.sortOrder ?? -1) + 1,
+          finalDate: finalDateFromTemplate,
           stages: {
-            create: normalizedStageTemplates.map((t) => ({
-              stageTemplateId: t.id,
-              stageOrder: t.normalizedOrder,
-              stageName: t.name,
-              isCritical: t.isCritical,
-              affectsFinalDate: t.affectsFinalDate,
-              participatesInAutoshift: t.participatesInAutoshift,
-            })),
+            create: templateStages,
           },
         },
         select: { id: true },
@@ -100,6 +136,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ id: product.id }, { status: 201 })
   } catch (error) {
     console.error('[products:create] Failed to create product', error)
-    return NextResponse.json({ error: 'Не удалось создать продукт' }, { status: 500 })
+    const message = error instanceof Error ? error.message : 'Не удалось создать продукт'
+    const status = message === 'Выбранный шаблон этапов не найден' ? 400 : 500
+    return NextResponse.json({ error: message }, { status })
   }
 }

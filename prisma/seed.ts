@@ -18,6 +18,8 @@ async function main() {
   await prisma.automation.deleteMany()
   await prisma.productStage.deleteMany()
   await prisma.product.deleteMany()
+  await prisma.productTemplateStage.deleteMany()
+  await prisma.productTemplate.deleteMany()
   await prisma.stageTemplate.deleteMany()
   // await prisma.session.deleteMany() // removed in SQLite version
   await prisma.user.deleteMany()
@@ -94,6 +96,22 @@ async function main() {
   )
   const stageMap = Object.fromEntries(stageTemplates.map(s => [s.order, s.id]))
   console.log('✅ Stage templates created')
+
+  await prisma.productTemplate.create({
+    data: {
+      name: 'Полный стандартный запуск',
+      description: 'Базовый шаблон со всеми текущими этапами без предзаполненных дат',
+      stages: {
+        create: stageTemplates.map((stage) => ({
+          stageTemplateId: stage.id,
+          stageOrder: stage.order,
+          stageName: stage.name,
+          plannedDate: null,
+        })),
+      },
+    },
+  })
+  console.log('✅ Product templates created')
 
   // ========== PRODUCTS ==========
   const productsData = [

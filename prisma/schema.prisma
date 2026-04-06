@@ -42,6 +42,7 @@ model StageTemplate {
   createdAt               DateTime @default(now())
 
   productStages ProductStage[]
+  productTemplateStages ProductTemplateStage[]
 
   @@map("stage_templates")
 }
@@ -59,6 +60,7 @@ model Product {
   priority        String    @default("MEDIUM")
   finalDate       DateTime?
   responsibleId   String?
+  productTemplateId String?
   riskScore       Int       @default(0)
   progressPercent Int       @default(0)
   notes           String?
@@ -69,14 +71,46 @@ model Product {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  responsible   User?          @relation("ProductResponsible", fields: [responsibleId], references: [id])
-  stages        ProductStage[]
-  comments      Comment[]
-  automations   Automation[]
-  changeHistory ChangeHistory[]
+  responsible     User?             @relation("ProductResponsible", fields: [responsibleId], references: [id])
+  productTemplate ProductTemplate?  @relation(fields: [productTemplateId], references: [id], onDelete: SetNull)
+  stages          ProductStage[]
+  comments        Comment[]
+  automations     Automation[]
+  changeHistory   ChangeHistory[]
 
   @@index([isArchived, isPinned, sortOrder])
   @@map("products")
+}
+
+model ProductTemplate {
+  id          String                @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  stages   ProductTemplateStage[]
+  products Product[]
+
+  @@map("product_templates")
+}
+
+model ProductTemplateStage {
+  id                String          @id @default(cuid())
+  productTemplateId String
+  stageTemplateId   String
+  stageOrder        Int
+  stageName         String
+  plannedDate       DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  productTemplate ProductTemplate @relation(fields: [productTemplateId], references: [id], onDelete: Cascade)
+  stageTemplate   StageTemplate   @relation(fields: [stageTemplateId], references: [id], onDelete: Cascade)
+
+  @@unique([productTemplateId, stageOrder])
+  @@index([productTemplateId, stageOrder])
+  @@map("product_template_stages")
 }
 
 // ========== PRODUCT STAGES ==========

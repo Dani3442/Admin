@@ -29,6 +29,7 @@ export interface ProductWithStages {
   priority: Priority
   finalDate: Date | null
   responsibleId: string | null
+  productTemplateId: string | null
   riskScore: number
   progressPercent: number
   notes: string | null
@@ -76,6 +77,23 @@ export interface StageTemplateData {
   id: string; name: string; order: number
   durationText: string | null; durationDays: number | null
   isCritical: boolean; affectsFinalDate: boolean; participatesInAutoshift: boolean
+}
+
+export interface ProductTemplateStageData {
+  id: string
+  stageTemplateId: string
+  stageOrder: number
+  stageName: string
+  plannedDate: Date | null
+}
+
+export interface ProductTemplateData {
+  id: string
+  name: string
+  description: string | null
+  createdAt: Date
+  updatedAt: Date
+  stages: ProductTemplateStageData[]
 }
 
 export interface DashboardMetrics {
