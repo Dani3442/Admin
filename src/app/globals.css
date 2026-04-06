@@ -180,7 +180,7 @@
 
 /* Stage date cell */
 .stage-cell {
-  @apply cursor-pointer select-none rounded-[18px] px-2 py-2 text-center text-xs transition-colors;
+  @apply cursor-pointer select-none rounded-[12px] px-2 py-2 text-center text-xs transition-colors;
   min-width: 90px;
 }
 
