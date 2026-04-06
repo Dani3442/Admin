@@ -29,7 +29,22 @@ export async function GET(req: NextRequest) {
       include: {
         responsible: { select: { id: true, name: true, email: true } },
         stages: includeStages
-          ? { orderBy: { stageOrder: 'asc' }, include: { stageTemplate: true } }
+          ? {
+              orderBy: { stageOrder: 'asc' },
+              include: {
+                stageTemplate: {
+                  select: {
+                    id: true,
+                    name: true,
+                    order: true,
+                    durationText: true,
+                    durationDays: true,
+                    isCritical: true,
+                    affectsFinalDate: true,
+                  },
+                },
+              },
+            }
           : false,
         _count: { select: { comments: true } },
       },
@@ -60,7 +75,19 @@ export async function POST(req: NextRequest) {
 
     const product = await prisma.$transaction(async (tx) => {
       const [stageTemplates, sortOrderAggregate, selectedTemplate] = await Promise.all([
-        tx.stageTemplate.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] }),
+        tx.stageTemplate.findMany({
+          select: {
+            id: true,
+            name: true,
+            order: true,
+            durationText: true,
+            durationDays: true,
+            isCritical: true,
+            affectsFinalDate: true,
+            createdAt: true,
+          },
+          orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+        }),
         tx.product.aggregate({
           where: { isArchived: false },
           _max: { sortOrder: true },
@@ -71,7 +98,15 @@ export async function POST(req: NextRequest) {
               include: {
                 stages: {
                   orderBy: { stageOrder: 'asc' },
-                  include: { stageTemplate: true },
+                  include: {
+                    stageTemplate: {
+                      select: {
+                        id: true,
+                        isCritical: true,
+                        affectsFinalDate: true,
+                      },
+                    },
+                  },
                 },
               },
             })
@@ -95,7 +130,7 @@ export async function POST(req: NextRequest) {
             dateValue: stage.plannedDate,
             isCritical: stage.stageTemplate.isCritical,
             affectsFinalDate: stage.stageTemplate.affectsFinalDate,
-            participatesInAutoshift: stage.stageTemplate.participatesInAutoshift,
+            participatesInAutoshift: true,
           }))
         : normalizedStageTemplates.map((template) => ({
             stageTemplateId: template.id,
@@ -104,7 +139,7 @@ export async function POST(req: NextRequest) {
             dateValue: null,
             isCritical: template.isCritical,
             affectsFinalDate: template.affectsFinalDate,
-            participatesInAutoshift: template.participatesInAutoshift,
+            participatesInAutoshift: true,
           }))
 
       const finalDateFromTemplate = templateStages

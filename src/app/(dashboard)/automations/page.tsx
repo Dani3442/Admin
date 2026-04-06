@@ -8,7 +8,18 @@ async function getData() {
   await ensureDefaultShiftFollowingAutomation()
   const [automations, stages] = await Promise.all([
     prisma.automation.findMany({ orderBy: { createdAt: 'asc' } }),
-    prisma.stageTemplate.findMany({ orderBy: { order: 'asc' } }),
+    prisma.stageTemplate.findMany({
+      select: {
+        id: true,
+        name: true,
+        order: true,
+        durationText: true,
+        durationDays: true,
+        isCritical: true,
+        affectsFinalDate: true,
+      },
+      orderBy: { order: 'asc' },
+    }),
   ])
   return { automations, stages }
 }

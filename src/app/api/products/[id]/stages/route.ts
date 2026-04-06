@@ -28,7 +28,19 @@ async function getProductStageSnapshot(productId: string) {
     select: {
       stages: {
         orderBy: { stageOrder: 'asc' },
-        include: { stageTemplate: true },
+        include: {
+          stageTemplate: {
+            select: {
+              id: true,
+              name: true,
+              order: true,
+              durationText: true,
+              durationDays: true,
+              isCritical: true,
+              affectsFinalDate: true,
+            },
+          },
+        },
       },
       progressPercent: true,
       riskScore: true,
@@ -67,7 +79,19 @@ export async function POST(
       include: {
         stages: {
           orderBy: { stageOrder: 'asc' },
-          include: { stageTemplate: true },
+          include: {
+            stageTemplate: {
+              select: {
+                id: true,
+                name: true,
+                order: true,
+                durationText: true,
+                durationDays: true,
+                isCritical: true,
+                affectsFinalDate: true,
+              },
+            },
+          },
         },
       },
     })
@@ -78,7 +102,12 @@ export async function POST(
 
     const fallbackTemplateId =
       product.stages[0]?.stageTemplateId ||
-      (await prisma.stageTemplate.findFirst({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] }))?.id
+      (
+        await prisma.stageTemplate.findFirst({
+          select: { id: true },
+          orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+        })
+      )?.id
 
     if (!fallbackTemplateId) {
       return NextResponse.json({ error: 'Не найден базовый шаблон этапа' }, { status: 400 })
@@ -103,7 +132,10 @@ export async function POST(
     const snapshot = await getProductStageSnapshot(productId)
 
     return NextResponse.json({
-      stages: snapshot?.stages || [],
+      stages: (snapshot?.stages || []).map((stage) => ({
+        ...stage,
+        participatesInAutoshift: stage.participatesInAutoshift ?? true,
+      })),
       progressPercent,
       riskScore: snapshot?.riskScore || 0,
       status: snapshot?.status || 'PLANNED',
@@ -176,7 +208,10 @@ export async function DELETE(
     const snapshot = await getProductStageSnapshot(productId)
 
     return NextResponse.json({
-      stages: snapshot?.stages || [],
+      stages: (snapshot?.stages || []).map((stage) => ({
+        ...stage,
+        participatesInAutoshift: stage.participatesInAutoshift ?? true,
+      })),
       progressPercent,
       riskScore: snapshot?.riskScore || 0,
       status: snapshot?.status || 'PLANNED',

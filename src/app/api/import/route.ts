@@ -40,7 +40,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No products to import' }, { status: 400 })
     }
 
-    const stageTemplates = await prisma.stageTemplate.findMany({ orderBy: { order: 'asc' } })
+    const stageTemplates = await prisma.stageTemplate.findMany({
+      select: {
+        id: true,
+        name: true,
+        order: true,
+        durationDays: true,
+        isCritical: true,
+        affectsFinalDate: true,
+      },
+      orderBy: { order: 'asc' },
+    })
     const templateMap = new Map(stageTemplates.map((t) => [t.name.toLowerCase(), t]))
 
     const results = {
@@ -81,7 +91,7 @@ export async function POST(req: NextRequest) {
             isCritical: s.isCritical ?? template?.isCritical ?? false,
             isCompleted: s.isCompleted ?? false,
             affectsFinalDate: template?.affectsFinalDate ?? true,
-            participatesInAutoshift: template?.participatesInAutoshift ?? true,
+            participatesInAutoshift: true,
           }
         })
 
@@ -99,7 +109,7 @@ export async function POST(req: NextRequest) {
                 isCritical: t.isCritical,
                 isCompleted: false,
                 affectsFinalDate: t.affectsFinalDate,
-                participatesInAutoshift: t.participatesInAutoshift,
+                participatesInAutoshift: true,
               }))
 
         // Calculate final date from last stage with date

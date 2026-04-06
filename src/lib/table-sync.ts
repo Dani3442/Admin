@@ -7,6 +7,14 @@ export async function syncProductsWithStageTemplates() {
       select: { id: true },
     }),
     prisma.stageTemplate.findMany({
+      select: {
+        id: true,
+        name: true,
+        order: true,
+        isCritical: true,
+        affectsFinalDate: true,
+        createdAt: true,
+      },
       orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
     }),
   ])
@@ -46,7 +54,6 @@ export async function syncProductsWithStageTemplates() {
               stageName: template.name,
               isCritical: template.isCritical,
               affectsFinalDate: template.affectsFinalDate,
-              participatesInAutoshift: template.participatesInAutoshift,
             },
           })
         } else {
@@ -58,7 +65,7 @@ export async function syncProductsWithStageTemplates() {
               stageName: template.name,
               isCritical: template.isCritical,
               affectsFinalDate: template.affectsFinalDate,
-              participatesInAutoshift: template.participatesInAutoshift,
+              participatesInAutoshift: true,
               status: 'NOT_STARTED',
             },
           })

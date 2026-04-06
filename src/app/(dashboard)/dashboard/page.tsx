@@ -36,7 +36,14 @@ async function getDashboardData() {
       },
       orderBy: [{ riskScore: 'desc' }, { finalDate: 'asc' }],
     }),
-    prisma.stageTemplate.findMany({ orderBy: { order: 'asc' } }),
+    prisma.stageTemplate.findMany({
+      select: {
+        id: true,
+        name: true,
+        order: true,
+      },
+      orderBy: { order: 'asc' },
+    }),
   ])
 
   // Stage bottleneck analysis

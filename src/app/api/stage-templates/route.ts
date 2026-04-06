@@ -31,14 +31,16 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const { name, durationText, isCritical = false } = body
-    const participatesInAutoshift = body?.participatesInAutoshift !== false
 
     if (!name?.trim()) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 })
     }
 
     const result = await prisma.$transaction(async (tx) => {
-      const last = await tx.stageTemplate.findFirst({ orderBy: { order: 'desc' } })
+      const last = await tx.stageTemplate.findFirst({
+        select: { order: true },
+        orderBy: { order: 'desc' },
+      })
       const newOrder = (last?.order ?? -1) + 1
 
       const template = await tx.stageTemplate.create({
@@ -47,7 +49,16 @@ export async function POST(req: NextRequest) {
           order: newOrder,
           durationText: durationText || null,
           isCritical,
-          participatesInAutoshift,
+        },
+        select: {
+          id: true,
+          name: true,
+          order: true,
+          durationText: true,
+          durationDays: true,
+          isCritical: true,
+          affectsFinalDate: true,
+          createdAt: true,
         },
       })
 
@@ -77,7 +88,7 @@ export async function POST(req: NextRequest) {
             stageName: template.name,
             isCritical: template.isCritical,
             affectsFinalDate: template.affectsFinalDate,
-            participatesInAutoshift: template.participatesInAutoshift,
+            participatesInAutoshift: body?.participatesInAutoshift !== false,
             status: 'NOT_STARTED',
           },
           select: {
@@ -121,14 +132,22 @@ export async function PATCH(req: NextRequest) {
 
   if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
 
-  const template = await prisma.stageTemplate.findUnique({ where: { id } })
+  const template = await prisma.stageTemplate.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      name: true,
+      order: true,
+    },
+  })
   if (!template) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   // Rename
   if (action === 'rename' && name?.trim()) {
-    const updated = await prisma.stageTemplate.update({
+    await prisma.stageTemplate.update({
       where: { id },
       data: { name: name.trim() },
+      select: { id: true },
     })
 
     // Update name in all product stages
@@ -137,25 +156,20 @@ export async function PATCH(req: NextRequest) {
       data: { stageName: name.trim() },
     })
 
-    return NextResponse.json(updated)
+    return NextResponse.json({ ...template, name: name.trim(), participatesInAutoshift: true })
   }
 
   if (action === 'toggle-autoshift') {
     const nextValue = typeof participatesInAutoshift === 'boolean'
       ? participatesInAutoshift
-      : !template.participatesInAutoshift
-
-    const updated = await prisma.stageTemplate.update({
-      where: { id },
-      data: { participatesInAutoshift: nextValue },
-    })
+      : true
 
     await prisma.productStage.updateMany({
       where: { stageTemplateId: id },
       data: { participatesInAutoshift: nextValue },
     })
 
-    return NextResponse.json(updated)
+    return NextResponse.json({ ...template, participatesInAutoshift: nextValue })
   }
 
   // Move left or right
@@ -167,6 +181,7 @@ export async function PATCH(req: NextRequest) {
 
     const neighbor = await prisma.stageTemplate.findFirst({
       where: comparison,
+      select: { id: true, order: true },
       orderBy: { order: action === 'move-left' ? 'desc' : 'asc' },
     })
 
@@ -179,10 +194,12 @@ export async function PATCH(req: NextRequest) {
       prisma.stageTemplate.update({
         where: { id: template.id },
         data: { order: neighbor.order },
+        select: { id: true },
       }),
       prisma.stageTemplate.update({
         where: { id: neighbor.id },
         data: { order: template.order },
+        select: { id: true },
       }),
       // Update product stages orders too
       prisma.productStage.updateMany({
@@ -195,8 +212,20 @@ export async function PATCH(req: NextRequest) {
       }),
     ])
 
-    const all = await prisma.stageTemplate.findMany({ orderBy: { order: 'asc' } })
-    return NextResponse.json(all)
+    const all = await prisma.stageTemplate.findMany({
+      select: {
+        id: true,
+        name: true,
+        order: true,
+        durationText: true,
+        durationDays: true,
+        isCritical: true,
+        affectsFinalDate: true,
+        createdAt: true,
+      },
+      orderBy: { order: 'asc' },
+    })
+    return NextResponse.json(all.map((stage) => ({ ...stage, participatesInAutoshift: true })))
   }
 
   return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
@@ -281,6 +310,7 @@ export async function DELETE(req: NextRequest) {
 
       await tx.stageTemplate.delete({
         where: { id },
+        select: { id: true },
       })
 
       const remainingTemplates = await tx.stageTemplate.findMany({
@@ -292,6 +322,7 @@ export async function DELETE(req: NextRequest) {
         await tx.stageTemplate.update({
           where: { id: remainingTemplate.id },
           data: { order: index },
+          select: { id: true },
         })
       }
     })
@@ -303,8 +334,20 @@ export async function DELETE(req: NextRequest) {
       })
     )
 
-    const all = await prisma.stageTemplate.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] })
-    return NextResponse.json(all)
+    const all = await prisma.stageTemplate.findMany({
+      select: {
+        id: true,
+        name: true,
+        order: true,
+        durationText: true,
+        durationDays: true,
+        isCritical: true,
+        affectsFinalDate: true,
+        createdAt: true,
+      },
+      orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+    })
+    return NextResponse.json(all.map((stage) => ({ ...stage, participatesInAutoshift: true })))
   } catch (error) {
     console.error('[stage-templates:delete] Failed to delete stage template', error)
     return NextResponse.json({ error: 'Не удалось удалить этап' }, { status: 500 })

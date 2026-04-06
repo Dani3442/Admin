@@ -17,7 +17,17 @@ export async function GET(
       stages: {
         orderBy: { stageOrder: 'asc' },
         include: {
-          stageTemplate: true,
+          stageTemplate: {
+            select: {
+              id: true,
+              name: true,
+              order: true,
+              durationText: true,
+              durationDays: true,
+              isCritical: true,
+              affectsFinalDate: true,
+            },
+          },
           responsible: { select: { id: true, name: true } },
           comments: {
             include: { author: { select: { id: true, name: true } } },

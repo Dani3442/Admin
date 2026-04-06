@@ -42,7 +42,16 @@ async function getProductsWorkspaceData() {
       select: { id: true, name: true },
       orderBy: { name: 'asc' },
     }),
-    prisma.stageTemplate.findMany({ orderBy: { order: 'asc' } }),
+    prisma.stageTemplate.findMany({
+      select: {
+        id: true,
+        name: true,
+        order: true,
+        durationText: true,
+        isCritical: true,
+      },
+      orderBy: { order: 'asc' },
+    }),
   ])
 
   return { listProducts, tableProducts, users, stages }

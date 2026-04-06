@@ -14,12 +14,12 @@ export async function GET() {
     include: {
       stages: {
         orderBy: { stageOrder: 'asc' },
-        include: {
-          stageTemplate: {
-            select: {
-              participatesInAutoshift: true,
-            },
-          },
+        select: {
+          id: true,
+          stageTemplateId: true,
+          stageOrder: true,
+          stageName: true,
+          plannedDate: true,
         },
       },
     },
@@ -35,7 +35,7 @@ export async function GET() {
         stageOrder: stage.stageOrder,
         stageName: stage.stageName,
         plannedDate: stage.plannedDate,
-        participatesInAutoshift: stage.stageTemplate.participatesInAutoshift,
+        participatesInAutoshift: true,
       })),
     }))
   )
@@ -88,6 +88,16 @@ export async function POST(req: NextRequest) {
 
     const template = await prisma.$transaction(async (tx) => {
       const existingStageTemplates = await tx.stageTemplate.findMany({
+        select: {
+          id: true,
+          name: true,
+          order: true,
+          durationText: true,
+          durationDays: true,
+          isCritical: true,
+          affectsFinalDate: true,
+          createdAt: true,
+        },
         orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
       })
 
@@ -114,7 +124,16 @@ export async function POST(req: NextRequest) {
               durationDays: null,
               isCritical: false,
               affectsFinalDate: true,
-              participatesInAutoshift: stage.participatesInAutoshift,
+            },
+            select: {
+              id: true,
+              name: true,
+              order: true,
+              durationText: true,
+              durationDays: true,
+              isCritical: true,
+              affectsFinalDate: true,
+              createdAt: true,
             },
           })
           existingStageTemplates.push(stageTemplate)
@@ -144,12 +163,12 @@ export async function POST(req: NextRequest) {
         include: {
           stages: {
             orderBy: { stageOrder: 'asc' },
-            include: {
-              stageTemplate: {
-                select: {
-                  participatesInAutoshift: true,
-                },
-              },
+            select: {
+              id: true,
+              stageTemplateId: true,
+              stageOrder: true,
+              stageName: true,
+              plannedDate: true,
             },
           },
         },
@@ -164,7 +183,7 @@ export async function POST(req: NextRequest) {
         stageOrder: stage.stageOrder,
         stageName: stage.stageName,
         plannedDate: stage.plannedDate,
-        participatesInAutoshift: stage.stageTemplate.participatesInAutoshift,
+        participatesInAutoshift: true,
       })),
     }, { status: 201 })
   } catch (error) {

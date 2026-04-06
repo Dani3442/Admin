@@ -172,6 +172,7 @@ export async function applyAutomation(
         if (excludeOrders.includes(stage.stageOrder)) continue
         const template = await prisma.stageTemplate.findFirst({
           where: { order: stage.stageOrder },
+          select: { durationDays: true },
         })
         const durationDays = template?.durationDays || 1
         currentDate = addDays(currentDate, durationDays)

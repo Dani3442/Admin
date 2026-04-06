@@ -34,7 +34,14 @@ export async function GET(req: NextRequest) {
     prisma.product.count({ where: { isArchived: false, finalDate: { gte: now, lte: in7 } } }),
     prisma.product.count({ where: { isArchived: false, finalDate: { gte: now, lte: in14 } } }),
     prisma.product.count({ where: { isArchived: false, finalDate: { gte: now, lte: in30 } } }),
-    prisma.stageTemplate.findMany({ orderBy: { order: 'asc' } }),
+    prisma.stageTemplate.findMany({
+      select: {
+        id: true,
+        name: true,
+        order: true,
+      },
+      orderBy: { order: 'asc' },
+    }),
     prisma.product.findMany({
       where: { isArchived: false },
       include: {

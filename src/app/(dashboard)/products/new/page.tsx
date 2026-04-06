@@ -14,12 +14,12 @@ async function getProductTemplates() {
     include: {
       stages: {
         orderBy: { stageOrder: 'asc' },
-        include: {
-          stageTemplate: {
-            select: {
-              participatesInAutoshift: true,
-            },
-          },
+        select: {
+          id: true,
+          stageTemplateId: true,
+          stageOrder: true,
+          stageName: true,
+          plannedDate: true,
         },
       },
     },
@@ -57,7 +57,7 @@ export default async function NewProductPage() {
             stageOrder: stage.stageOrder,
             stageName: stage.stageName,
             plannedDate: stage.plannedDate,
-            participatesInAutoshift: stage.stageTemplate.participatesInAutoshift,
+            participatesInAutoshift: true,
           })),
         })) as any}
         stageSuggestions={stageSuggestions}

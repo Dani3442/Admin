@@ -9,8 +9,19 @@ export async function GET(req: NextRequest) {
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   await ensureDefaultShiftFollowingAutomation()
-  const stages = await prisma.stageTemplate.findMany({ orderBy: { order: 'asc' } })
-  return NextResponse.json(stages)
+  const stages = await prisma.stageTemplate.findMany({
+    select: {
+      id: true,
+      name: true,
+      order: true,
+      durationText: true,
+      durationDays: true,
+      isCritical: true,
+      affectsFinalDate: true,
+    },
+    orderBy: { order: 'asc' },
+  })
+  return NextResponse.json(stages.map((stage) => ({ ...stage, participatesInAutoshift: true })))
 }
 
 export async function PATCH(req: NextRequest) {
@@ -100,6 +111,12 @@ export async function PATCH(req: NextRequest) {
     if (!existingStage) {
       const template = await prisma.stageTemplate.findUnique({
         where: { id: stageTemplateId },
+        select: {
+          id: true,
+          name: true,
+          isCritical: true,
+          affectsFinalDate: true,
+        },
       })
       if (!template) {
         return NextResponse.json({ error: 'Stage template not found' }, { status: 404 })
@@ -124,7 +141,7 @@ export async function PATCH(req: NextRequest) {
             stageName: typeof stageName === 'string' && stageName.trim() ? stageName.trim() : template.name,
             isCritical: template.isCritical,
             affectsFinalDate: template.affectsFinalDate,
-            participatesInAutoshift: template.participatesInAutoshift,
+            participatesInAutoshift: true,
             status: 'NOT_STARTED',
           },
         })
