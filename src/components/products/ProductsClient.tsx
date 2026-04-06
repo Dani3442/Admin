@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { cn, detectStageOverlaps, formatDate, getPriorityColor, getPriorityLabel, getStatusColor, getStatusLabel } from '@/lib/utils'
 import { buildProductHref, getRouteWithSearch } from '@/lib/navigation'
+import { FilterSelect } from '@/components/ui/FilterSelect'
 import {
   filterProducts,
   hasActiveProductFilters,
@@ -45,6 +46,21 @@ const QUICK_VIEW_OPTIONS: Array<{ value: ProductQuickView; label: string }> = [
   { value: 'favorite', label: 'Избранное' },
   { value: 'overdue', label: 'Просроченные' },
   { value: 'atRisk', label: 'Под риском' },
+]
+
+const STATUS_OPTIONS = [
+  { value: '', label: 'Все статусы' },
+  ...ALL_STATUSES.map((status) => ({ value: status, label: getStatusLabel(status) })),
+]
+
+const PRIORITY_OPTIONS = [
+  { value: '', label: 'Все приоритеты' },
+  ...ALL_PRIORITIES.map((priority) => ({ value: priority, label: getPriorityLabel(priority) })),
+]
+
+const SORT_DIRECTION_OPTIONS = [
+  { value: 'asc', label: 'По возрастанию' },
+  { value: 'desc', label: 'По убыванию' },
 ]
 
 interface ProductsClientProps {
@@ -523,23 +539,22 @@ export function ProductsClient({
               />
             </div>
 
-            <select value={sortField} onChange={(event) => setSortField(event.target.value as ProductListSortField)} className="input w-[210px]">
-              {SORT_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+            <FilterSelect
+              value={sortField}
+              onChange={(nextValue) => setSortField(nextValue as ProductListSortField)}
+              options={SORT_OPTIONS}
+              placeholder="Сортировка"
+              className="w-[210px]"
+            />
 
             {sortField !== 'manual' && (
-              <select
+              <FilterSelect
                 value={sortDirection}
-                onChange={(event) => setSortDirection(event.target.value as ProductListSortDirection)}
-                className="input w-[170px]"
-              >
-                <option value="asc">По возрастанию</option>
-                <option value="desc">По убыванию</option>
-              </select>
+                onChange={(nextValue) => setSortDirection(nextValue as ProductListSortDirection)}
+                options={SORT_DIRECTION_OPTIONS}
+                placeholder="Направление"
+                className="w-[170px]"
+              />
             )}
 
             <button
@@ -587,38 +602,35 @@ export function ProductsClient({
                 <div className="surface-subtle grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4">
                   <label className="space-y-1.5">
                     <span className="label mb-0">Статус</span>
-                    <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="input">
-                      <option value="">Все статусы</option>
-                      {ALL_STATUSES.map((status) => (
-                        <option key={status} value={status}>
-                          {getStatusLabel(status)}
-                        </option>
-                      ))}
-                    </select>
+                    <FilterSelect
+                      value={statusFilter}
+                      onChange={setStatusFilter}
+                      options={STATUS_OPTIONS}
+                      placeholder="Все статусы"
+                    />
                   </label>
 
                   <label className="space-y-1.5">
                     <span className="label mb-0">Приоритет</span>
-                    <select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)} className="input">
-                      <option value="">Все приоритеты</option>
-                      {ALL_PRIORITIES.map((priority) => (
-                        <option key={priority} value={priority}>
-                          {getPriorityLabel(priority)}
-                        </option>
-                      ))}
-                    </select>
+                    <FilterSelect
+                      value={priorityFilter}
+                      onChange={setPriorityFilter}
+                      options={PRIORITY_OPTIONS}
+                      placeholder="Все приоритеты"
+                    />
                   </label>
 
                   <label className="space-y-1.5">
                     <span className="label mb-0">Ответственный</span>
-                    <select value={responsibleFilter} onChange={(event) => setResponsibleFilter(event.target.value)} className="input">
-                      <option value="">Все ответственные</option>
-                      {users.map((user) => (
-                        <option key={user.id} value={user.id}>
-                          {user.name}
-                        </option>
-                      ))}
-                    </select>
+                    <FilterSelect
+                      value={responsibleFilter}
+                      onChange={setResponsibleFilter}
+                      options={[
+                        { value: '', label: 'Все ответственные' },
+                        ...users.map((user) => ({ value: user.id, label: user.name })),
+                      ]}
+                      placeholder="Все ответственные"
+                    />
                   </label>
 
                   <label className="space-y-1.5">
@@ -741,7 +753,7 @@ export function ProductsClient({
                           <Star className={cn('w-3.5 h-3.5', product.isFavorite ? 'text-slate-700 fill-slate-200' : 'text-slate-300')} />
                         </div>
                         <div className="min-w-0">
-                          <Link href={buildProductHref(product.id, currentRoute)} className="font-medium text-slate-800 hover:text-brand-700 transition-colors">
+                          <Link href={buildProductHref(product.id, currentRoute)} className="text-[21px] font-semibold leading-tight tracking-[-0.02em] text-slate-800 hover:text-brand-700 transition-colors">
                             {product.name.length > 70 ? `${product.name.slice(0, 70)}…` : product.name}
                           </Link>
                           <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-400">

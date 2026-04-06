@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { Search, CheckCircle2, AlertTriangle, Plus, ChevronLeft, ChevronRight, Pencil, X, Trash2, Filter } from 'lucide-react'
 import { cn, formatDate, detectStageOverlaps, getPriorityLabel, getStatusLabel } from '@/lib/utils'
 import { DatePicker } from '@/components/ui/DatePicker'
+import { FilterSelect } from '@/components/ui/FilterSelect'
 import { buildProductHref, getRouteWithSearch } from '@/lib/navigation'
 import type { ProductQuickView } from '@/lib/product-list'
 
@@ -52,6 +53,16 @@ const QUICK_VIEW_OPTIONS: Array<{ value: ProductQuickView; label: string }> = [
   { value: 'favorite', label: 'Избранное' },
   { value: 'overdue', label: 'Просроченные' },
   { value: 'atRisk', label: 'Под риском' },
+]
+
+const STATUS_OPTIONS = [
+  { value: '', label: 'Все статусы' },
+  ...ALL_STATUSES.map((status) => ({ value: status, label: getStatusLabel(status) })),
+]
+
+const PRIORITY_OPTIONS = [
+  { value: '', label: 'Все приоритеты' },
+  ...ALL_PRIORITIES.map((priority) => ({ value: priority, label: getPriorityLabel(priority) })),
 ]
 
 function scoreStageMatch(productStage: ProductStage, stageTemplate: Stage) {
@@ -509,38 +520,35 @@ export function TableViewClient({
             <div className="surface-subtle grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4">
               <label className="space-y-1.5">
                 <span className="label mb-0">Статус</span>
-                <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="input">
-                  <option value="">Все статусы</option>
-                  {ALL_STATUSES.map((status) => (
-                  <option key={status} value={status}>
-                      {getStatusLabel(status)}
-                  </option>
-                  ))}
-                </select>
+                <FilterSelect
+                  value={statusFilter}
+                  onChange={setStatusFilter}
+                  options={STATUS_OPTIONS}
+                  placeholder="Все статусы"
+                />
               </label>
 
               <label className="space-y-1.5">
                 <span className="label mb-0">Приоритет</span>
-                <select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)} className="input">
-                  <option value="">Все приоритеты</option>
-                  {ALL_PRIORITIES.map((priority) => (
-                  <option key={priority} value={priority}>
-                      {getPriorityLabel(priority)}
-                  </option>
-                  ))}
-                </select>
+                <FilterSelect
+                  value={priorityFilter}
+                  onChange={setPriorityFilter}
+                  options={PRIORITY_OPTIONS}
+                  placeholder="Все приоритеты"
+                />
               </label>
 
               <label className="space-y-1.5">
                 <span className="label mb-0">Ответственный</span>
-                <select value={responsibleFilter} onChange={(event) => setResponsibleFilter(event.target.value)} className="input">
-                  <option value="">Все ответственные</option>
-                  {userOptions.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {user.name}
-                    </option>
-                  ))}
-                </select>
+                <FilterSelect
+                  value={responsibleFilter}
+                  onChange={setResponsibleFilter}
+                  options={[
+                    { value: '', label: 'Все ответственные' },
+                    ...userOptions.map((user) => ({ value: user.id, label: user.name })),
+                  ]}
+                  placeholder="Все ответственные"
+                />
               </label>
 
               <label className="space-y-1.5">
