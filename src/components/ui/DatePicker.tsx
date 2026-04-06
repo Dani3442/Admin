@@ -50,6 +50,7 @@ export function DatePicker({
   const containerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
+  const openedAtRef = useRef(0)
 
   const initialDate = value ? new Date(value) : new Date()
   const today = new Date()
@@ -87,6 +88,7 @@ export function DatePicker({
   }, [])
 
   const openCalendar = useCallback(() => {
+    openedAtRef.current = Date.now()
     syncPosition()
     setIsOpen(true)
   }, [syncPosition])
@@ -95,7 +97,9 @@ export function DatePicker({
     if (!isOpen) return
 
     const handleWindowChange = () => syncPosition()
-    const handlePointerDown = (event: MouseEvent) => {
+    const handlePointerDown = (event: PointerEvent) => {
+      if (Date.now() - openedAtRef.current < 120) return
+
       const target = event.target as Node
       if (
         containerRef.current?.contains(target) ||
@@ -108,12 +112,12 @@ export function DatePicker({
 
     window.addEventListener('resize', handleWindowChange)
     window.addEventListener('scroll', handleWindowChange, true)
-    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('pointerdown', handlePointerDown)
 
     return () => {
       window.removeEventListener('resize', handleWindowChange)
       window.removeEventListener('scroll', handleWindowChange, true)
-      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('pointerdown', handlePointerDown)
     }
   }, [isOpen, syncPosition])
 
@@ -158,6 +162,7 @@ export function DatePicker({
   const calendar = isOpen ? createPortal(
     <div
       ref={panelRef}
+      onPointerDown={(event) => event.stopPropagation()}
       className={cn(
         'fixed z-[80] rounded-xl border border-slate-200 bg-white p-3 shadow-[0_20px_60px_-30px_rgba(15,23,42,0.45)]',
         panelClassName
@@ -272,6 +277,7 @@ export function DatePicker({
             type="text"
             value={displayValue}
             placeholder={placeholder}
+            onPointerDown={(event) => event.stopPropagation()}
             onFocus={openCalendar}
             onClick={openCalendar}
             onChange={(event) => setDisplayValue(event.target.value)}

@@ -33,8 +33,29 @@ interface TableViewClientProps {
 }
 
 function resolveStageForColumn(productStages: ProductStage[], stageTemplate: Stage) {
-  const directMatch = productStages.find((productStage) => productStage.stageTemplateId === stageTemplate.id)
-  if (directMatch) return directMatch
+  const templateMatches = productStages.filter((productStage) => productStage.stageTemplateId === stageTemplate.id)
+  if (templateMatches.length > 0) {
+    const exactNameAndOrderMatch = templateMatches.find((productStage) =>
+      productStage.stageName === stageTemplate.name && productStage.stageOrder === stageTemplate.order
+    )
+    if (exactNameAndOrderMatch) return exactNameAndOrderMatch
+
+    const exactNameMatch = templateMatches.find((productStage) => productStage.stageName === stageTemplate.name)
+    if (exactNameMatch) return exactNameMatch
+
+    const exactOrderMatch = templateMatches.find((productStage) => productStage.stageOrder === stageTemplate.order)
+    if (exactOrderMatch) return exactOrderMatch
+
+    return templateMatches[0]
+  }
+
+  const sameNameAndOrderMatch = productStages.find((productStage) =>
+    productStage.stageName === stageTemplate.name && productStage.stageOrder === stageTemplate.order
+  )
+  if (sameNameAndOrderMatch) return sameNameAndOrderMatch
+
+  const sameNameMatch = productStages.find((productStage) => productStage.stageName === stageTemplate.name)
+  if (sameNameMatch) return sameNameMatch
 
   // Fallback for legacy/corrupted rows where template linkage drifted but the visual order remained.
   return productStages.find((productStage) => productStage.stageOrder === stageTemplate.order)
@@ -180,7 +201,11 @@ export function TableViewClient({ products: initial, stages: initialStages, curr
 
             return {
               ...product,
-              stages: [...product.stages, createdProductStage].sort((a, b) => a.stageOrder - b.stageOrder),
+              stages: [...product.stages.map((stage) => (
+                stage.stageOrder >= createdProductStage.stageOrder
+                  ? { ...stage, stageOrder: stage.stageOrder + 1 }
+                  : stage
+              )), createdProductStage].sort((a, b) => a.stageOrder - b.stageOrder),
             }
           })
         )

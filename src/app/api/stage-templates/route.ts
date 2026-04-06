@@ -57,17 +57,21 @@ export async function POST(req: NextRequest) {
       const productStages = []
 
       for (const product of products) {
-        const lastStage = await tx.productStage.findFirst({
-          where: { productId: product.id },
-          orderBy: [{ stageOrder: 'desc' }, { createdAt: 'desc' }],
-          select: { stageOrder: true },
+        await tx.productStage.updateMany({
+          where: {
+            productId: product.id,
+            stageOrder: { gte: newOrder },
+          },
+          data: {
+            stageOrder: { increment: 1 },
+          },
         })
 
         const createdStage = await tx.productStage.create({
           data: {
             productId: product.id,
             stageTemplateId: template.id,
-            stageOrder: (lastStage?.stageOrder ?? -1) + 1,
+            stageOrder: newOrder,
             stageName: template.name,
             isCritical: template.isCritical,
             affectsFinalDate: template.affectsFinalDate,
