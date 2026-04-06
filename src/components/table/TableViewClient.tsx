@@ -32,33 +32,55 @@ interface TableViewClientProps {
   currentUserRole: string
 }
 
-function resolveStageForColumn(productStages: ProductStage[], stageTemplate: Stage) {
-  const templateMatches = productStages.filter((productStage) => productStage.stageTemplateId === stageTemplate.id)
-  if (templateMatches.length > 0) {
-    const exactNameAndOrderMatch = templateMatches.find((productStage) =>
-      productStage.stageName === stageTemplate.name && productStage.stageOrder === stageTemplate.order
-    )
-    if (exactNameAndOrderMatch) return exactNameAndOrderMatch
+function scoreStageMatch(productStage: ProductStage, stageTemplate: Stage) {
+  const sameTemplate = productStage.stageTemplateId === stageTemplate.id
+  const sameOrder = productStage.stageOrder === stageTemplate.order
+  const sameName = productStage.stageName === stageTemplate.name
 
-    const exactNameMatch = templateMatches.find((productStage) => productStage.stageName === stageTemplate.name)
-    if (exactNameMatch) return exactNameMatch
+  if (sameTemplate && sameOrder) return 0
+  if (sameOrder && sameName) return 1
+  if (sameOrder) return 2
+  if (sameTemplate && sameName) return 3
+  if (sameTemplate) return 4
+  if (sameName) return 5
 
-    const exactOrderMatch = templateMatches.find((productStage) => productStage.stageOrder === stageTemplate.order)
-    if (exactOrderMatch) return exactOrderMatch
+  return 99
+}
 
-    return templateMatches[0]
+function resolveStageMapForProduct(productStages: ProductStage[], stageTemplates: Stage[]) {
+  const remainingStages = [...productStages]
+  const resolvedMap = new Map<string, ProductStage>()
+
+  for (const stageTemplate of [...stageTemplates].sort((left, right) => left.order - right.order)) {
+    let bestIndex = -1
+    let bestScore = Number.POSITIVE_INFINITY
+
+    for (const [index, productStage] of remainingStages.entries()) {
+      const score = scoreStageMatch(productStage, stageTemplate)
+      if (score > 5) continue
+
+      if (score < bestScore) {
+        bestScore = score
+        bestIndex = index
+        continue
+      }
+
+      if (score === bestScore && bestIndex >= 0) {
+        const currentDistance = Math.abs(remainingStages[bestIndex].stageOrder - stageTemplate.order)
+        const nextDistance = Math.abs(productStage.stageOrder - stageTemplate.order)
+        if (nextDistance < currentDistance) {
+          bestIndex = index
+        }
+      }
+    }
+
+    if (bestIndex >= 0) {
+      const [matchedStage] = remainingStages.splice(bestIndex, 1)
+      resolvedMap.set(stageTemplate.id, matchedStage)
+    }
   }
 
-  const sameNameAndOrderMatch = productStages.find((productStage) =>
-    productStage.stageName === stageTemplate.name && productStage.stageOrder === stageTemplate.order
-  )
-  if (sameNameAndOrderMatch) return sameNameAndOrderMatch
-
-  const sameNameMatch = productStages.find((productStage) => productStage.stageName === stageTemplate.name)
-  if (sameNameMatch) return sameNameMatch
-
-  // Fallback for legacy/corrupted rows where template linkage drifted but the visual order remained.
-  return productStages.find((productStage) => productStage.stageOrder === stageTemplate.order)
+  return resolvedMap
 }
 
 export function TableViewClient({ products: initial, stages: initialStages, currentUserRole }: TableViewClientProps) {
@@ -455,6 +477,7 @@ export function TableViewClient({ products: initial, stages: initialStages, curr
             <tbody>
               {filteredProducts.map((product, rowIdx) => {
                 const { overlappingIds } = detectStageOverlaps(product.stages)
+                const resolvedStageMap = resolveStageMapForProduct(product.stages, stages)
 
                 return (
                   <tr
@@ -501,7 +524,7 @@ export function TableViewClient({ products: initial, stages: initialStages, curr
 
                     {/* Stage cells */}
                     {stages.map((stageTemplate) => {
-                      const stage = resolveStageForColumn(product.stages, stageTemplate)
+                      const stage = resolvedStageMap.get(stageTemplate.id)
                       const isEditing = editingCell?.stageId === stage?.id && editingCell?.productId === product.id
                       const cellClass = getCellClass(stage, stageTemplate)
                       const cellText = getCellText(stage)
