@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { auth } from '@/lib/auth'
 import { ProductsClient } from '@/components/products/ProductsClient'
 import { recalculateAllRisks } from '@/lib/risk'
 
@@ -32,7 +33,10 @@ async function getProducts() {
 }
 
 export default async function ProductsPage() {
-  const { products, users } = await getProducts()
+  const [data, session] = await Promise.all([
+    getProducts(),
+    auth(),
+  ])
 
-  return <ProductsClient products={products as any} users={users} />
+  return <ProductsClient products={data.products as any} users={data.users} currentUserRole={(session?.user as any)?.role || 'VIEWER'} />
 }

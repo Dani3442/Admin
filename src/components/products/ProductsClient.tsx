@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Search, Plus, ArrowUpDown, AlertTriangle, CheckCircle2, Clock, XCircle } from 'lucide-react'
+import { Search, Plus, ArrowUpDown, AlertTriangle, Trash2 } from 'lucide-react'
 import { cn, getStatusColor, getStatusLabel, getPriorityColor, getPriorityLabel, formatDate, detectStageOverlaps } from '@/lib/utils'
 
 const ALL_STATUSES = ['PLANNED', 'IN_PROGRESS', 'AT_RISK', 'DELAYED', 'COMPLETED', 'CANCELLED'] as const
@@ -27,15 +27,23 @@ interface Product {
 interface ProductsClientProps {
   products: Product[]
   users: Array<{ id: string; name: string }>
+  currentUserRole: string
 }
 
-export function ProductsClient({ products, users }: ProductsClientProps) {
+export function ProductsClient({ products: initialProducts, users, currentUserRole }: ProductsClientProps) {
+  const [products, setProducts] = useState(initialProducts)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [priorityFilter, setPriorityFilter] = useState('')
   const [responsibleFilter, setResponsibleFilter] = useState('')
   const [sortField, setSortField] = useState<'name' | 'finalDate' | 'riskScore' | 'progressPercent'>('riskScore')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const [deletingProductId, setDeletingProductId] = useState<string | null>(null)
+  const canDeleteProducts = ['ADMIN', 'DIRECTOR'].includes(currentUserRole)
+
+  useEffect(() => {
+    setProducts(initialProducts)
+  }, [initialProducts])
 
   const filtered = useMemo(() => {
     let list = products.filter((p) => {
@@ -65,6 +73,30 @@ export function ProductsClient({ products, users }: ProductsClientProps) {
 
   const router = useRouter()
   const now = new Date()
+
+  const handleDeleteProduct = async (productId: string, productName: string) => {
+    const confirmed = window.confirm(`Удалить продукт «${productName}»?`)
+    if (!confirmed) return
+
+    setDeletingProductId(productId)
+    try {
+      const res = await fetch(`/api/products/${productId}`, {
+        method: 'DELETE',
+      })
+      const data = await res.json().catch(() => null)
+
+      if (!res.ok) {
+        throw new Error(data?.error || 'Не удалось удалить продукт')
+      }
+
+      setProducts((prev) => prev.filter((product) => product.id !== productId))
+      router.refresh()
+    } catch (error: any) {
+      window.alert(error.message || 'Не удалось удалить продукт')
+    } finally {
+      setDeletingProductId(null)
+    }
+  }
 
   return (
     <div className="space-y-5 animate-fade-in">
@@ -134,6 +166,7 @@ export function ProductsClient({ products, users }: ProductsClientProps) {
                     Риск <ArrowUpDown className="w-3 h-3" />
                   </button>
                 </th>
+                {canDeleteProducts && <th className="table-header w-24 text-center">Действия</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
@@ -185,6 +218,18 @@ export function ProductsClient({ products, users }: ProductsClientProps) {
                         {product.riskScore}
                       </div>
                     </td>
+                    {canDeleteProducts && (
+                      <td className="table-cell text-center" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={() => handleDeleteProduct(product.id, product.name)}
+                          disabled={deletingProductId === product.id}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          {deletingProductId === product.id ? 'Удаление...' : 'Удалить'}
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 )
               })}

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { ArrowLeft, CheckCircle2, Circle, AlertTriangle, MessageCircle, Clock, History, Zap, ExternalLink, Edit2, Save, Pencil, ChevronUp, ChevronDown, X, Plus, Trash2 } from 'lucide-react'
 import { cn, getStatusColor, getStatusLabel, getPriorityColor, getPriorityLabel, formatDate, detectStageOverlaps } from '@/lib/utils'
 import { DatePicker } from '@/components/ui/DatePicker'
@@ -29,6 +30,7 @@ const TABS = [
 ]
 
 export function ProductCardClient({ product: initial, users, currentUser }: ProductCardClientProps) {
+  const router = useRouter()
   const [product, setProduct] = useState(initial)
   const [tab, setTab] = useState('stages')
   const [newComment, setNewComment] = useState('')
@@ -52,6 +54,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
   const [automationAction, setAutomationAction] = useState('SHIFT_ALL_FOLLOWING')
   const [automationDesc, setAutomationDesc] = useState('')
   const [savingAutomation, setSavingAutomation] = useState(false)
+  const [deletingProduct, setDeletingProduct] = useState(false)
 
   // Close context menu on outside click
   useEffect(() => {
@@ -65,6 +68,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
   }, [stageMenu])
 
   const canEdit = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUser?.role)
+  const canDeleteProduct = ['ADMIN', 'DIRECTOR'].includes(currentUser?.role)
 
   const now = new Date()
   const completedStages = product.stages.filter((s: any) => s.isCompleted).length
@@ -305,14 +309,49 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
     }
   }
 
+  const handleDeleteProduct = async () => {
+    const confirmed = window.confirm(`Удалить продукт «${product.name}»?`)
+    if (!confirmed) return
+
+    setDeletingProduct(true)
+    try {
+      const res = await fetch(`/api/products/${product.id}`, {
+        method: 'DELETE',
+      })
+      const data = await res.json().catch(() => null)
+
+      if (!res.ok) {
+        throw new Error(data?.error || 'Не удалось удалить продукт')
+      }
+
+      router.push('/products')
+      router.refresh()
+    } catch (error: any) {
+      alert(error.message || 'Не удалось удалить продукт')
+      setDeletingProduct(false)
+    }
+  }
+
   const { overlappingIds, overlaps } = detectStageOverlaps(product.stages)
 
   return (
     <div className="space-y-5 animate-fade-in">
       {/* Back */}
-      <Link href="/products" className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 transition-colors">
-        <ArrowLeft className="w-4 h-4" /> Назад к продуктам
-      </Link>
+      <div className="flex items-center justify-between gap-3">
+        <Link href="/products" className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 transition-colors">
+          <ArrowLeft className="w-4 h-4" /> Назад к продуктам
+        </Link>
+        {canDeleteProduct && (
+          <button
+            onClick={handleDeleteProduct}
+            disabled={deletingProduct}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+          >
+            <Trash2 className="w-4 h-4" />
+            {deletingProduct ? 'Удаление...' : 'Удалить продукт'}
+          </button>
+        )}
+      </div>
 
       {/* Header Card */}
       <div className="card">
