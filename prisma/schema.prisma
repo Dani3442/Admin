@@ -1,0 +1,168 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ========== USERS & AUTH ==========
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String
+  password      String
+  role          String    @default("EMPLOYEE")
+  avatar        String?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  assignedProducts  Product[]        @relation("ProductResponsible")
+  comments          Comment[]
+  stageAssignments  ProductStage[]   @relation("StageResponsible")
+  changeHistory     ChangeHistory[]
+
+  @@map("users")
+}
+
+// ========== STAGES TEMPLATE ==========
+
+model StageTemplate {
+  id                      String   @id @default(cuid())
+  name                    String
+  order                   Int
+  durationText            String?
+  durationDays            Int?
+  isCritical              Boolean  @default(false)
+  affectsFinalDate        Boolean  @default(true)
+  participatesInAutoshift Boolean  @default(true)
+  createdAt               DateTime @default(now())
+
+  productStages ProductStage[]
+
+  @@map("stage_templates")
+}
+
+// ========== PRODUCTS ==========
+
+model Product {
+  id              String    @id @default(cuid())
+  name            String
+  category        String?
+  sku             String?
+  country         String?
+  competitorUrl   String?
+  status          String    @default("PLANNED")
+  priority        String    @default("MEDIUM")
+  finalDate       DateTime?
+  responsibleId   String?
+  riskScore       Int       @default(0)
+  progressPercent Int       @default(0)
+  notes           String?
+  isArchived      Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  responsible   User?          @relation("ProductResponsible", fields: [responsibleId], references: [id])
+  stages        ProductStage[]
+  comments      Comment[]
+  automations   Automation[]
+  changeHistory ChangeHistory[]
+
+  @@map("products")
+}
+
+// ========== PRODUCT STAGES ==========
+
+model ProductStage {
+  id                      String    @id @default(cuid())
+  productId               String
+  stageTemplateId         String
+  stageOrder              Int
+  stageName               String
+  dateValue               DateTime?
+  dateRaw                 String?
+  dateEnd                 DateTime?
+  status                  String    @default("NOT_STARTED")
+  isCompleted             Boolean   @default(false)
+  isCritical              Boolean   @default(false)
+  participatesInAutoshift Boolean   @default(true)
+  affectsFinalDate        Boolean   @default(true)
+  responsibleId           String?
+  comment                 String?
+  priority                String    @default("MEDIUM")
+  plannedDate             DateTime?
+  actualDate              DateTime?
+  daysDeviation           Int?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  product       Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  stageTemplate StageTemplate @relation(fields: [stageTemplateId], references: [id])
+  responsible   User?         @relation("StageResponsible", fields: [responsibleId], references: [id])
+  comments      Comment[]
+
+  @@unique([productId, stageOrder])
+  @@map("product_stages")
+}
+
+// ========== COMMENTS ==========
+
+model Comment {
+  id             String    @id @default(cuid())
+  content        String
+  authorId       String
+  productId      String
+  productStageId String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  author       User          @relation(fields: [authorId], references: [id])
+  product      Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productStage ProductStage? @relation(fields: [productStageId], references: [id])
+
+  @@map("comments")
+}
+
+// ========== AUTOMATIONS ==========
+
+model Automation {
+  id                  String    @id @default(cuid())
+  productId           String?
+  name                String
+  description         String?
+  isActive            Boolean   @default(true)
+  isTemplate          Boolean   @default(false)
+  triggerStageOrder   Int?
+  actionType          String
+  excludeStageOrders  String    @default("[]")
+  config              String    @default("{}")
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  product Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("automations")
+}
+
+// ========== CHANGE HISTORY ==========
+
+model ChangeHistory {
+  id             String   @id @default(cuid())
+  productId      String
+  productStageId String?
+  field          String
+  oldValue       String?
+  newValue       String?
+  changedById    String
+  reason         String?
+  createdAt      DateTime @default(now())
+
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  changedBy User    @relation(fields: [changedById], references: [id])
+
+  @@map("change_history")
+}

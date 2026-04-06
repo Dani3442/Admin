@@ -1,0 +1,13 @@
+---
+meta:
+  environment: nodejs
+  toolchain:
+    name: node
+    version: "20"
+
+build:
+  dockerfile: Dockerfile
+
+run:
+  persistenceMount: /app/data
+  containerPort: 3000

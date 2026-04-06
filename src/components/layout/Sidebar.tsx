@@ -1,0 +1,83 @@
+'use client'
+
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import {
+  LayoutDashboard, Package, Table2, Zap, Users, Settings,
+  ChevronRight, Package2
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { getRoleLabel } from '@/lib/utils'
+
+interface SidebarProps {
+  user: { name?: string; email?: string; role: string }
+}
+
+const nav = [
+  { label: 'Дашборд', href: '/dashboard', icon: LayoutDashboard },
+  { label: 'Продукты', href: '/products', icon: Package },
+  { label: 'Таблица', href: '/table', icon: Table2 },
+  { label: 'Автоматизации', href: '/automations', icon: Zap },
+  { label: 'Пользователи', href: '/users', icon: Users, adminOnly: true },
+  { label: 'Настройки', href: '/settings', icon: Settings },
+]
+
+export function Sidebar({ user }: SidebarProps) {
+  const pathname = usePathname()
+  const isAdmin = ['ADMIN', 'DIRECTOR'].includes(user.role)
+
+  return (
+    <aside className="w-60 flex-shrink-0 bg-sidebar flex flex-col h-full">
+      {/* Logo */}
+      <div className="px-5 py-5 border-b border-slate-800">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center flex-shrink-0">
+            <Package2 className="w-4.5 h-4.5 text-white" style={{ width: 18, height: 18 }} />
+          </div>
+          <div>
+            <p className="text-white font-semibold text-sm leading-tight">Product Admin</p>
+            <p className="text-slate-500 text-xs">v1.0</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Navigation */}
+      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+        {nav.map((item) => {
+          if (item.adminOnly && !isAdmin) return null
+          const Icon = item.icon
+          const active = pathname === item.href || pathname.startsWith(item.href + '/')
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150 group',
+                active
+                  ? 'bg-brand-600 text-white shadow-sm'
+                  : 'text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-text-active'
+              )}
+            >
+              <Icon className={cn('w-4 h-4 flex-shrink-0', active ? 'text-white' : 'text-slate-500 group-hover:text-slate-300')} />
+              <span className="flex-1 font-medium">{item.label}</span>
+              {active && <ChevronRight className="w-3 h-3 text-white/60" />}
+            </Link>
+          )
+        })}
+      </nav>
+
+      {/* User Info */}
+      <div className="px-3 py-4 border-t border-slate-800">
+        <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg">
+          <div className="w-8 h-8 rounded-full bg-brand-600 flex items-center justify-center flex-shrink-0 text-white text-sm font-semibold">
+            {user.name?.charAt(0).toUpperCase() || 'U'}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-white text-sm font-medium truncate">{user.name}</p>
+            <p className="text-slate-400 text-xs truncate">{getRoleLabel(user.role)}</p>
+          </div>
+        </div>
+      </div>
+    </aside>
+  )
+}
