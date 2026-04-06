@@ -1,6 +1,6 @@
 import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
-import { format, differenceInDays, isAfter, isBefore, addDays } from 'date-fns'
+import { format, differenceInDays, isAfter, isBefore, addDays, parse, isValid } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import type { ProductStatus, Priority } from '@/types'
 
@@ -15,6 +15,30 @@ export function formatDate(date: Date | string | null | undefined): string {
   } catch {
     return '—'
   }
+}
+
+export function formatDateInputValue(date: Date | string | null | undefined): string {
+  if (!date) return ''
+  try {
+    return format(new Date(date), 'dd.MM.yyyy', { locale: ru })
+  } catch {
+    return ''
+  }
+}
+
+export function parseDateInputValue(value: string): Date | null {
+  const trimmed = value.trim()
+  if (!trimmed) return null
+
+  const normalized = trimmed.replace(/\//g, '.').replace(/-/g, '.')
+  const formats = ['dd.MM.yyyy', 'd.M.yyyy', 'yyyy.MM.dd']
+
+  for (const pattern of formats) {
+    const parsed = parse(normalized, pattern, new Date())
+    if (isValid(parsed)) return parsed
+  }
+
+  return null
 }
 
 export function formatDateShort(date: Date | string | null | undefined): string {

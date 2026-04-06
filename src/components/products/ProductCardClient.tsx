@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, CheckCircle2, Circle, AlertTriangle, MessageCircle, Clock, History, Zap, ExternalLink, Edit2, Save, Pencil, ChevronUp, ChevronDown, X, Plus, Trash2 } from 'lucide-react'
 import { cn, getStatusColor, getStatusLabel, getPriorityColor, getPriorityLabel, formatDate, detectStageOverlaps } from '@/lib/utils'
+import { DatePicker } from '@/components/ui/DatePicker'
 // Types are string-based (no Prisma enums needed)
 
 const AUTOMATION_ACTIONS = [
@@ -37,7 +38,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
   const [saving, setSaving] = useState(false)
   const [showAddStageForm, setShowAddStageForm] = useState(false)
   const [newStageName, setNewStageName] = useState('')
-  const [newStageDate, setNewStageDate] = useState('')
+  const [newStageDate, setNewStageDate] = useState<Date | null>(null)
 
   // Context menu state
   const [stageMenu, setStageMenu] = useState<{ stageId: string; x: number; y: number } | null>(null)
@@ -265,7 +266,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
         status: data.status,
       }))
       setNewStageName('')
-      setNewStageDate('')
+      setNewStageDate(null)
       setShowAddStageForm(false)
     } catch (error: any) {
       alert(error.message || 'Не удалось добавить этап')
@@ -419,16 +420,16 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                       if (e.key === 'Escape') {
                         setShowAddStageForm(false)
                         setNewStageName('')
-                        setNewStageDate('')
+                        setNewStageDate(null)
                       }
                     }}
                   />
-                  <input
-                    type="date"
+                  <DatePicker
                     value={newStageDate}
-                    onChange={(e) => setNewStageDate(e.target.value)}
-                    className="input text-sm w-44"
-                    title="Дата этапа (необязательно)"
+                    onChange={setNewStageDate}
+                    inputClassName="h-11 w-56 text-sm"
+                    panelClassName="w-[360px]"
+                    placeholder="Дата этапа"
                   />
                   <button onClick={handleAddStage} className="btn-primary text-sm" disabled={!newStageName.trim() || saving}>
                     <Save className="w-4 h-4" />
@@ -438,7 +439,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                     onClick={() => {
                       setShowAddStageForm(false)
                       setNewStageName('')
-                      setNewStageDate('')
+                      setNewStageDate(null)
                     }}
                     className="btn-secondary text-sm"
                     disabled={saving}
@@ -528,14 +529,14 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                     {/* Date */}
                     <div className="flex-shrink-0">
                       {isEditing ? (
-                        <input
-                          type="date"
-                          defaultValue={stage.dateValue ? new Date(stage.dateValue).toISOString().slice(0, 10) : ''}
-                          onChange={(e) => setStageEditValues((prev) => ({
+                        <DatePicker
+                          value={stageEditValues[stage.id]?.dateValue ?? (stage.dateValue ? new Date(stage.dateValue) : null)}
+                          onChange={(nextDate) => setStageEditValues((prev) => ({
                             ...prev,
-                            [stage.id]: { ...prev[stage.id], dateValue: e.target.value ? new Date(e.target.value) : null }
+                            [stage.id]: { ...prev[stage.id], dateValue: nextDate }
                           }))}
-                          className="input text-xs w-36"
+                          inputClassName="h-10 w-48 text-xs"
+                          panelClassName="w-[360px]"
                         />
                       ) : (
                         <div className={cn('text-xs px-2 py-1 rounded border font-medium', cellStyle)}>

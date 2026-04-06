@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Search, CheckCircle2, AlertTriangle, Plus, ChevronLeft, ChevronRight, Pencil, X, Trash2 } from 'lucide-react'
 import { cn, formatDate, detectStageOverlaps } from '@/lib/utils'
+import { DatePicker } from '@/components/ui/DatePicker'
 
 interface Stage {
   id: string; order: number; name: string; durationText: string | null
@@ -35,7 +36,7 @@ export function TableViewClient({ products: initial, stages: initialStages }: Ta
   const [search, setSearch] = useState('')
   const [showOnlyRisk, setShowOnlyRisk] = useState(false)
   const [editingCell, setEditingCell] = useState<{ productId: string; stageId: string } | null>(null)
-  const [editValue, setEditValue] = useState('')
+  const [editValue, setEditValue] = useState<Date | null>(null)
   const [saving, setSaving] = useState(false)
   const router = useRouter()
   const now = new Date()
@@ -220,10 +221,10 @@ export function TableViewClient({ products: initial, stages: initialStages }: Ta
 
   const startEdit = (productId: string, stageId: string, currentDate: Date | null) => {
     setEditingCell({ productId, stageId })
-    setEditValue(currentDate ? new Date(currentDate).toISOString().slice(0, 10) : '')
+    setEditValue(currentDate ? new Date(currentDate) : null)
   }
 
-  const saveEdit = async () => {
+  const saveEdit = async (nextDate = editValue) => {
     if (!editingCell) return
     setSaving(true)
     try {
@@ -232,7 +233,7 @@ export function TableViewClient({ products: initial, stages: initialStages }: Ta
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           stageId: editingCell.stageId,
-          updates: { dateValue: editValue ? new Date(editValue) : null },
+          updates: { dateValue: nextDate },
           applyAutomations: true,
         }),
       })
@@ -442,17 +443,14 @@ export function TableViewClient({ products: initial, stages: initialStages }: Ta
                         >
                           {isEditing ? (
                             <div className="p-1">
-                              <input
-                                type="date"
+                              <DatePicker
                                 value={editValue}
-                                onChange={(e) => setEditValue(e.target.value)}
-                                className="w-full text-xs border border-brand-400 rounded px-1 py-1 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                                onChange={setEditValue}
+                                onCommit={saveEdit}
+                                onCancel={() => setEditingCell(null)}
+                                inputClassName="h-10 min-w-[180px] text-sm"
+                                panelClassName="w-[360px]"
                                 autoFocus
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') saveEdit()
-                                  if (e.key === 'Escape') setEditingCell(null)
-                                }}
-                                onBlur={saveEdit}
                               />
                             </div>
                           ) : (
