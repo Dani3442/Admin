@@ -109,9 +109,9 @@ export function hasPermission(role: string, permission: Permission): boolean {
     ],
     PRODUCT_MANAGER: [
       Permission.VIEW_ALL_PRODUCTS, Permission.EDIT_STAGES, Permission.EDIT_DATES,
-      Permission.ADD_COMMENTS, Permission.VIEW_ANALYTICS,
+      Permission.ADD_COMMENTS, Permission.VIEW_ANALYTICS, Permission.MANAGE_AUTOMATIONS,
     ],
-    EMPLOYEE: [Permission.VIEW_ALL_PRODUCTS, Permission.ADD_COMMENTS, Permission.EDIT_STAGES],
+    EMPLOYEE: [Permission.VIEW_ALL_PRODUCTS, Permission.ADD_COMMENTS],
     VIEWER: [Permission.VIEW_ALL_PRODUCTS, Permission.VIEW_ANALYTICS],
   }
   return permissions[role]?.includes(permission) ?? false

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
+import { auth, hasPermission, Permission } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 export async function GET(
@@ -51,20 +51,46 @@ export async function PATCH(
   const { id } = await params
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasPermission((session.user as any).role, Permission.EDIT_STAGES)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
   const body = await req.json()
+  const allowedFields = new Set([
+    'name',
+    'country',
+    'category',
+    'sku',
+    'competitorUrl',
+    'status',
+    'priority',
+    'finalDate',
+    'responsibleId',
+    'notes',
+  ])
+  const data = Object.fromEntries(
+    Object.entries(body).filter(([key]) => allowedFields.has(key))
+  )
+
+  if ('responsibleId' in data && data.responsibleId === '') {
+    data.responsibleId = null
+  }
+
+  if ('finalDate' in data && data.finalDate) {
+    data.finalDate = new Date(data.finalDate as string)
+  }
 
   const product = await prisma.product.update({
     where: { id },
-    data: body,
+    data,
     include: { responsible: true, _count: { select: { comments: true } } },
   })
 
   await prisma.changeHistory.create({
     data: {
       productId: id,
-      field: Object.keys(body).join(', '),
-      newValue: JSON.stringify(body),
+      field: Object.keys(data).join(', '),
+      newValue: JSON.stringify(data),
       changedById: (session.user as any).id,
     },
   })

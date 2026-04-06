@@ -28,9 +28,10 @@ interface Product {
 interface TableViewClientProps {
   products: Product[]
   stages: Stage[]
+  currentUserRole: string
 }
 
-export function TableViewClient({ products: initial, stages: initialStages }: TableViewClientProps) {
+export function TableViewClient({ products: initial, stages: initialStages, currentUserRole }: TableViewClientProps) {
   const [products, setProducts] = useState(initial)
   const [stages, setStages] = useState(initialStages)
   const [search, setSearch] = useState('')
@@ -49,6 +50,7 @@ export function TableViewClient({ products: initial, stages: initialStages }: Ta
   const [newStageName, setNewStageName] = useState('')
   const [newStageDuration, setNewStageDuration] = useState('')
   const menuRef = useRef<HTMLDivElement>(null)
+  const canEditTable = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUserRole)
 
   useEffect(() => {
     setProducts(initial)
@@ -212,12 +214,14 @@ export function TableViewClient({ products: initial, stages: initialStages }: Ta
   }
 
   const handleStageHeaderClick = (e: React.MouseEvent, stage: Stage) => {
+    if (!canEditTable) return
     e.preventDefault()
     e.stopPropagation()
     setStageMenu({ stageId: stage.id, x: e.clientX, y: e.clientY })
   }
 
   const startRename = (stage: Stage) => {
+    if (!canEditTable) return
     setRenamingStage(stage.id)
     setRenameValue(stage.name)
     setStageMenu(null)
@@ -251,6 +255,7 @@ export function TableViewClient({ products: initial, stages: initialStages }: Ta
   }
 
   const startEdit = (productId: string, stageId: string, currentDate: Date | null) => {
+    if (!canEditTable) return
     setEditingCell({ productId, stageId })
     setEditValue(currentDate ? new Date(currentDate) : null)
   }
@@ -398,13 +403,15 @@ export function TableViewClient({ products: initial, stages: initialStages }: Ta
                   className="bg-slate-800 border-r border-slate-700 text-center align-middle"
                   style={{ width: addColumnWidth, minWidth: addColumnWidth }}
                 >
-                  <button
-                    onClick={() => setShowNewStageForm(true)}
-                    className="w-7 h-7 mx-auto rounded-md bg-slate-700 hover:bg-brand-600 text-slate-300 hover:text-white transition-colors flex items-center justify-center"
-                    title="Добавить новый этап"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
+                  {canEditTable && (
+                    <button
+                      onClick={() => setShowNewStageForm(true)}
+                      className="w-7 h-7 mx-auto rounded-md bg-slate-700 hover:bg-brand-600 text-slate-300 hover:text-white transition-colors flex items-center justify-center"
+                      title="Добавить новый этап"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  )}
                 </th>
               </tr>
             </thead>
@@ -489,7 +496,7 @@ export function TableViewClient({ products: initial, stages: initialStages }: Ta
                           ) : (
                             <div
                               className={cn(cellClass, 'cursor-pointer hover:opacity-80 transition-opacity mx-0.5 relative', hasOverlap && 'ring-2 ring-orange-400 ring-inset')}
-                              onClick={() => stage && startEdit(product.id, stage.id, stage.dateValue)}
+                              onClick={() => stage && canEditTable && startEdit(product.id, stage.id, stage.dateValue)}
                               title={stage ? `${stage.stageName}\n${stage.dateValue ? formatDate(stage.dateValue) : stage.dateRaw || 'Нет даты'}${stage.isCritical ? '\n⚠️ Критичный этап' : ''}${hasOverlap ? '\n⚠️ Пересечение дат с соседним этапом' : ''}` : stageTemplate.name}
                             >
                               {stage?.isCompleted && <CheckCircle2 className="w-2.5 h-2.5 inline mr-0.5" />}
@@ -520,7 +527,7 @@ export function TableViewClient({ products: initial, stages: initialStages }: Ta
       </div>
 
       {/* Context menu for stage management */}
-      {stageMenu && (
+      {canEditTable && stageMenu && (
         <div
           ref={menuRef}
           className="fixed z-50 bg-white rounded-lg shadow-lg border border-slate-200 py-1 min-w-[180px]"

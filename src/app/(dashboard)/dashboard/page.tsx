@@ -7,6 +7,7 @@ import { Recommendations } from '@/components/dashboard/Recommendations'
 import { AnalyticsClient } from '@/components/dashboard/AnalyticsClient'
 import { recalculateAllRisks } from '@/lib/risk'
 import { addDays } from 'date-fns'
+import { detectStageOverlaps } from '@/lib/utils'
 
 async function getDashboardData() {
   // Recalculate risks on every page load
@@ -82,19 +83,15 @@ async function getDashboardData() {
     }
 
     // Detect date overlaps for this product
-    const stagesWithDates = product.stages.filter((s) => s.dateValue && !s.isCompleted)
     const riskReasons: string[] = []
     if (product.finalDate) {
       const daysLeft = Math.round((product.finalDate.getTime() - now.getTime()) / 86400000)
       if (daysLeft < 0) riskReasons.push('Финальная дата просрочена')
       else if (daysLeft < 7) riskReasons.push('Финальная дата через ' + daysLeft + ' дн.')
     }
-    for (let i = 0; i < stagesWithDates.length - 1; i++) {
-      const curr = stagesWithDates[i]
-      const next = stagesWithDates[i + 1]
-      if (curr.dateValue && next.dateValue && curr.dateValue > next.dateValue) {
-        riskReasons.push(`Пересечение: ${curr.stageName.slice(0, 20)} → ${next.stageName.slice(0, 20)}`)
-      }
+    const { overlaps } = detectStageOverlaps(product.stages)
+    for (const overlap of overlaps) {
+      riskReasons.push(`Пересечение: ${overlap.fromName?.slice(0, 20)} → ${overlap.toName?.slice(0, 20)}`)
     }
     const overdueStages = product.stages.filter((s) => s.dateValue && !s.isCompleted && s.dateValue < now)
     if (overdueStages.length > 0) {
@@ -143,7 +140,7 @@ async function getDashboardData() {
     recommendations.push(`⚠️ ${atRiskProducts.length} продукт(ов) под риском — уделите им внимание в первую очередь`)
   }
   if (topBottlenecks[0]) {
-    recommendations.push(`🔴 «${topBottlenecks[0].name}» — самый частый узкое место (${topBottlenecks[0].count} задержек)`)
+    recommendations.push(`🔴 «${topBottlenecks[0].name}» — самое частое узкое место (${topBottlenecks[0].count} задержек)`)
   }
   if (avgDeviation > 3) {
     recommendations.push(`📅 Среднее отклонение от дат: ${avgDeviation} дней — пересмотрите нормативы`)

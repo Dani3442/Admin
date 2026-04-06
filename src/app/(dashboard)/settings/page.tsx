@@ -1,9 +1,14 @@
 import { auth } from '@/lib/auth'
 import { getRoleLabel } from '@/lib/utils'
+import { prisma } from '@/lib/prisma'
 
 export default async function SettingsPage() {
   const session = await auth()
   const user = session?.user as any
+  const [stageTemplatesCount, automationTemplatesCount] = await Promise.all([
+    prisma.stageTemplate.count(),
+    prisma.automation.count({ where: { isTemplate: true } }),
+  ])
 
   return (
     <div className="space-y-6 animate-fade-in max-w-2xl">
@@ -39,11 +44,11 @@ export default async function SettingsPage() {
           </div>
           <div className="flex justify-between py-2 border-b border-slate-50">
             <span className="text-slate-500">Этапов в шаблоне</span>
-            <span className="font-medium">30 этапов</span>
+            <span className="font-medium">{stageTemplatesCount} этапов</span>
           </div>
           <div className="flex justify-between py-2">
             <span className="text-slate-500">Автоматизации</span>
-            <span className="font-medium">4 шаблона</span>
+            <span className="font-medium">{automationTemplatesCount} шаблонов</span>
           </div>
         </div>
       </div>
@@ -52,7 +57,7 @@ export default async function SettingsPage() {
         <h2 className="text-sm font-semibold text-slate-300 mb-3">Документация</h2>
         <div className="space-y-2 text-sm text-slate-400">
           <p>• Для смены пароля обратитесь к администратору</p>
-          <p>• Импорт данных из Excel доступен через раздел «Продукты → Импорт»</p>
+          <p>• Импорт данных из Excel сейчас доступен только через API, UI для импорта ещё не добавлен</p>
           <p>• Настройка автоматизаций — раздел «Автоматизации»</p>
           <p>• Управление пользователями — раздел «Пользователи» (только для Admin/Директор)</p>
         </div>

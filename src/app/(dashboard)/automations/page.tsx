@@ -1,4 +1,6 @@
 import { prisma } from '@/lib/prisma'
+import { auth, hasPermission, Permission } from '@/lib/auth'
+import { redirect } from 'next/navigation'
 import { AutomationsClient } from '@/components/AutomationsClient'
 
 async function getData() {
@@ -10,6 +12,11 @@ async function getData() {
 }
 
 export default async function AutomationsPage() {
+  const session = await auth()
+  if (!session?.user || !hasPermission((session.user as any).role, Permission.MANAGE_AUTOMATIONS)) {
+    redirect('/dashboard')
+  }
+
   const { automations, stages } = await getData()
   return <AutomationsClient automations={automations as any} stages={stages} />
 }

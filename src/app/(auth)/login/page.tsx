@@ -12,6 +12,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const showDemoCredentials = process.env.NODE_ENV !== 'production'
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -104,19 +105,21 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-6 p-4 bg-slate-50 rounded-lg border border-slate-100">
-            <p className="text-xs font-medium text-slate-500 mb-2">Тестовые учётные данные:</p>
-            <div className="space-y-1 text-xs text-slate-600">
-              <div className="flex justify-between">
-                <span className="font-medium">Администратор:</span>
-                <span className="font-mono">admin@company.com / Admin1234!</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="font-medium">Менеджер:</span>
-                <span className="font-mono">lana@company.com / Pass1234!</span>
+          {showDemoCredentials && (
+            <div className="mt-6 p-4 bg-slate-50 rounded-lg border border-slate-100">
+              <p className="text-xs font-medium text-slate-500 mb-2">Тестовые учётные данные:</p>
+              <div className="space-y-1 text-xs text-slate-600">
+                <div className="flex justify-between">
+                  <span className="font-medium">Администратор:</span>
+                  <span className="font-mono">admin@company.com / Admin1234!</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-medium">Менеджер:</span>
+                  <span className="font-mono">lana@company.com / Pass1234!</span>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

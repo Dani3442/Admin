@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { auth } from '@/lib/auth'
 import { TableViewClient } from '@/components/table/TableViewClient'
 import { recalculateAllRisks } from '@/lib/risk'
 
@@ -28,6 +29,7 @@ async function getTableData() {
 }
 
 export default async function TablePage() {
+  const session = await auth()
   const { products, stages } = await getTableData()
-  return <TableViewClient products={products as any} stages={stages} />
+  return <TableViewClient products={products as any} stages={stages} currentUserRole={(session?.user as any)?.role || 'VIEWER'} />
 }
