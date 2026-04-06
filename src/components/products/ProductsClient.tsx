@@ -76,6 +76,15 @@ export function ProductsClient({ products: initialProducts, users, currentUserRo
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const contextMenuRef = useRef<HTMLDivElement>(null)
+  const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({})
+  const suppressNavigationRef = useRef(false)
+  const dragSessionRef = useRef<{
+    productId: string
+    pointerId: number
+    startX: number
+    startY: number
+    hasMoved: boolean
+  } | null>(null)
 
   const [products, setProducts] = useState(initialProducts)
   const [search, setSearch] = useState(searchParams.get('search') || '')
@@ -94,6 +103,9 @@ export function ProductsClient({ products: initialProducts, users, currentUserRo
   const [draggingProductId, setDraggingProductId] = useState<string | null>(null)
   const [dragOverState, setDragOverState] = useState<{ productId: string; position: 'before' | 'after' } | null>(null)
   const [dragPreview, setDragPreview] = useState<DragPreviewState | null>(null)
+  const productsRef = useRef(products)
+  const visibleProductsRef = useRef<ProductListItem[]>([])
+  const dragOverStateRef = useRef<{ productId: string; position: 'before' | 'after' } | null>(null)
 
   const canManageProducts = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUserRole)
   const canDeleteProducts = ['ADMIN', 'DIRECTOR'].includes(currentUserRole)
@@ -104,6 +116,10 @@ export function ProductsClient({ products: initialProducts, users, currentUserRo
   useEffect(() => {
     setProducts(initialProducts)
   }, [initialProducts])
+
+  useEffect(() => {
+    productsRef.current = products
+  }, [products])
 
   useEffect(() => {
     const params = new URLSearchParams()
@@ -182,6 +198,14 @@ export function ProductsClient({ products: initialProducts, users, currentUserRo
   const visibleProducts = useMemo(() => sortProducts(filteredProducts, sortField, sortDirection), [filteredProducts, sortDirection, sortField])
   const canReorder = canManageProducts && sortField === 'manual' && !hasActiveFilters
   const contextProduct = contextMenu ? products.find((product) => product.id === contextMenu.productId) || null : null
+
+  useEffect(() => {
+    visibleProductsRef.current = visibleProducts
+  }, [visibleProducts])
+
+  useEffect(() => {
+    dragOverStateRef.current = dragOverState
+  }, [dragOverState])
 
   const updateProduct = (productId: string, updater: (product: ProductListItem) => ProductListItem) => {
     setProducts((currentProducts) =>
@@ -277,90 +301,174 @@ export function ProductsClient({ products: initialProducts, users, currentUserRo
     })
   }
 
-  const handleDragStart = (event: React.DragEvent<HTMLButtonElement>, productId: string) => {
-    if (!canReorder) return
-
-    event.dataTransfer.effectAllowed = 'move'
-    event.dataTransfer.setData('text/plain', productId)
-    event.dataTransfer.dropEffect = 'move'
-    if (typeof document !== 'undefined') {
-      const transparentPreview = document.createElement('div')
-      transparentPreview.style.width = '1px'
-      transparentPreview.style.height = '1px'
-      transparentPreview.style.position = 'fixed'
-      transparentPreview.style.top = '-9999px'
-      transparentPreview.style.opacity = '0'
-      document.body.appendChild(transparentPreview)
-      event.dataTransfer.setDragImage(transparentPreview, 0, 0)
-      requestAnimationFrame(() => {
-        document.body.removeChild(transparentPreview)
-      })
-    }
-    setDraggingProductId(productId)
-    const draggedProduct = products.find((product) => product.id === productId)
-    if (draggedProduct) {
-      setDragPreview({
-        x: event.clientX || 0,
-        y: event.clientY || 0,
-        productName: draggedProduct.name,
-      })
-    }
-    setContextMenu(null)
-  }
-
-  const handleDrag = (event: React.DragEvent<HTMLButtonElement>) => {
-    if (!draggingProductId) return
-    if (event.clientX === 0 && event.clientY === 0) return
-
-    setDragPreview((current) =>
-      current
-        ? {
-            ...current,
-            x: event.clientX,
-            y: event.clientY,
-          }
-        : current
-    )
-  }
-
-  const handleDragOver = (event: React.DragEvent<HTMLTableRowElement>, productId: string) => {
-    if (!canReorder || !draggingProductId || draggingProductId === productId) return
-
-    event.preventDefault()
-    const rect = event.currentTarget.getBoundingClientRect()
-    const position = event.clientY - rect.top > rect.height / 2 ? 'after' : 'before'
-    setDragOverState({ productId, position })
-  }
-
-  const handleDragEnd = () => {
+  const clearDragState = () => {
+    dragSessionRef.current = null
     setDraggingProductId(null)
     setDragOverState(null)
     setDragPreview(null)
   }
 
-  const handleDrop = async (event: React.DragEvent<HTMLTableRowElement>, targetProductId: string) => {
-    event.preventDefault()
+  const resolveDropTarget = (clientY: number, draggedProductId: string) => {
+    const candidateRows = visibleProductsRef.current
+      .filter((product) => product.id !== draggedProductId)
+      .map((product) => {
+        const element = rowRefs.current[product.id]
+        if (!element) return null
 
-    if (!canReorder || !draggingProductId || !dragOverState) return
+        return {
+          productId: product.id,
+          rect: element.getBoundingClientRect(),
+        }
+      })
+      .filter((row): row is { productId: string; rect: DOMRect } => Boolean(row))
 
-    const previousProducts = products
-    const nextProducts = reorderProducts(previousProducts, draggingProductId, targetProductId, dragOverState.position)
-    const previousOrder = sortProducts(previousProducts, 'manual', 'asc').map((product) => product.id).join(',')
-    const nextOrder = sortProducts(nextProducts, 'manual', 'asc').map((product) => product.id).join(',')
+    if (!candidateRows.length) return null
 
-    handleDragEnd()
-
-    if (previousOrder === nextOrder) return
-
-    setProducts(nextProducts)
-
-    try {
-      await persistOrder(nextProducts)
-      router.refresh()
-    } catch (error: any) {
-      setProducts(previousProducts)
-      window.alert(error.message || 'Не удалось сохранить порядок продуктов')
+    for (const row of candidateRows) {
+      if (clientY >= row.rect.top && clientY <= row.rect.bottom) {
+        return {
+          productId: row.productId,
+          position: clientY - row.rect.top > row.rect.height / 2 ? 'after' as const : 'before' as const,
+        }
+      }
     }
+
+    if (clientY < candidateRows[0].rect.top) {
+      return { productId: candidateRows[0].productId, position: 'before' as const }
+    }
+
+    const lastRow = candidateRows[candidateRows.length - 1]
+    if (clientY > lastRow.rect.bottom) {
+      return { productId: lastRow.productId, position: 'after' as const }
+    }
+
+    for (const row of candidateRows) {
+      if (clientY < row.rect.top) {
+        return { productId: row.productId, position: 'before' as const }
+      }
+    }
+
+    return { productId: lastRow.productId, position: 'after' as const }
+  }
+
+  const handlePointerDragStart = (event: React.PointerEvent<HTMLButtonElement>, productId: string) => {
+    if (!canReorder) return
+
+    event.preventDefault()
+    event.stopPropagation()
+
+    const draggedProduct = productsRef.current.find((product) => product.id === productId)
+    if (!draggedProduct) return
+
+    suppressNavigationRef.current = false
+    dragSessionRef.current = {
+      productId,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      hasMoved: false,
+    }
+
+    setDraggingProductId(productId)
+    setDragPreview({
+      x: event.clientX,
+      y: event.clientY,
+      productName: draggedProduct.name,
+    })
+    setContextMenu(null)
+  }
+
+  useEffect(() => {
+    if (!draggingProductId) return
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const session = dragSessionRef.current
+      if (!session || session.pointerId !== event.pointerId) return
+
+      const deltaX = Math.abs(event.clientX - session.startX)
+      const deltaY = Math.abs(event.clientY - session.startY)
+      if (!session.hasMoved && (deltaX > 4 || deltaY > 4)) {
+        session.hasMoved = true
+      }
+
+      setDragPreview((current) =>
+        current
+          ? {
+              ...current,
+              x: event.clientX,
+              y: event.clientY,
+            }
+          : current
+      )
+
+      if (!session.hasMoved) {
+        setDragOverState(null)
+        return
+      }
+
+      setDragOverState(resolveDropTarget(event.clientY, session.productId))
+    }
+
+    const finalizeDrag = async (pointerId: number) => {
+      const session = dragSessionRef.current
+      if (!session || session.pointerId !== pointerId) return
+
+      const target = dragOverStateRef.current
+      const draggedProductId = session.productId
+      const shouldSuppressClick = session.hasMoved
+      clearDragState()
+
+      if (shouldSuppressClick) {
+        suppressNavigationRef.current = true
+        window.setTimeout(() => {
+          suppressNavigationRef.current = false
+        }, 80)
+      }
+
+      if (!canReorder || !session.hasMoved || !target) return
+
+      const previousProducts = productsRef.current
+      const nextProducts = reorderProducts(previousProducts, draggedProductId, target.productId, target.position)
+      const previousOrder = sortProducts(previousProducts, 'manual', 'asc').map((product) => product.id).join(',')
+      const nextOrder = sortProducts(nextProducts, 'manual', 'asc').map((product) => product.id).join(',')
+
+      if (previousOrder === nextOrder) return
+
+      setProducts(nextProducts)
+
+      try {
+        await persistOrder(nextProducts)
+        router.refresh()
+      } catch (error: any) {
+        setProducts(previousProducts)
+        window.alert(error.message || 'Не удалось сохранить порядок продуктов')
+      }
+    }
+
+    const handlePointerUp = (event: PointerEvent) => {
+      void finalizeDrag(event.pointerId)
+    }
+
+    const handlePointerCancel = (event: PointerEvent) => {
+      const session = dragSessionRef.current
+      if (!session || session.pointerId !== event.pointerId) return
+      clearDragState()
+    }
+
+    window.addEventListener('pointermove', handlePointerMove)
+    window.addEventListener('pointerup', handlePointerUp)
+    window.addEventListener('pointercancel', handlePointerCancel)
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerup', handlePointerUp)
+      window.removeEventListener('pointercancel', handlePointerCancel)
+    }
+  }, [canReorder, draggingProductId, router])
+
+  const handleOpenProduct = (productId: string) => {
+    if (suppressNavigationRef.current || draggingProductId) return
+    router.push(buildProductHref(productId, currentRoute))
   }
 
   const resetFilters = () => {
@@ -563,10 +671,12 @@ export function ProductsClient({ products: initialProducts, users, currentUserRo
                 return (
                   <tr
                     key={product.id}
-                    onClick={() => router.push(buildProductHref(product.id, currentRoute))}
+                    ref={(node) => {
+                      rowRefs.current[product.id] = node
+                    }}
+                    data-product-row="true"
+                    onClick={() => handleOpenProduct(product.id)}
                     onContextMenu={(event) => handleOpenContextMenu(event, product.id)}
-                    onDragOver={(event) => handleDragOver(event, product.id)}
-                    onDrop={(event) => handleDrop(event, product.id)}
                     className={cn(
                       'relative cursor-pointer transition-all duration-150 hover:bg-slate-50/70',
                       isDragging && 'bg-brand-50/80 scale-[0.995]',
@@ -603,10 +713,7 @@ export function ProductsClient({ products: initialProducts, users, currentUserRo
                       )}
                       <button
                         type="button"
-                        draggable={canReorder}
-                        onDragStart={(event) => handleDragStart(event, product.id)}
-                        onDrag={handleDrag}
-                        onDragEnd={handleDragEnd}
+                        onPointerDown={(event) => handlePointerDragStart(event, product.id)}
                         disabled={!canReorder || savingProductId === product.id || deletingProductId === product.id}
                         className={cn(
                           'inline-flex h-8 w-8 items-center justify-center rounded-lg border transition-all duration-150',
