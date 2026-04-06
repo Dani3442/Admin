@@ -14,13 +14,12 @@ async function getProductTemplates() {
     include: {
       stages: {
         orderBy: { stageOrder: 'asc' },
-        select: {
-          id: true,
-          stageTemplateId: true,
-          stageOrder: true,
-          stageName: true,
-          plannedDate: true,
-          participatesInAutoshift: true,
+        include: {
+          stageTemplate: {
+            select: {
+              participatesInAutoshift: true,
+            },
+          },
         },
       },
     },
@@ -48,7 +47,21 @@ export default async function NewProductPage() {
         <h1 className="text-2xl font-bold text-slate-900">Новый продукт</h1>
         <p className="text-slate-500 text-sm mt-1">Заполните информацию о продукте</p>
       </div>
-      <NewProductForm users={users} productTemplates={productTemplates as any} stageSuggestions={stageSuggestions} />
+      <NewProductForm
+        users={users}
+        productTemplates={productTemplates.map((template) => ({
+          ...template,
+          stages: template.stages.map((stage) => ({
+            id: stage.id,
+            stageTemplateId: stage.stageTemplateId,
+            stageOrder: stage.stageOrder,
+            stageName: stage.stageName,
+            plannedDate: stage.plannedDate,
+            participatesInAutoshift: stage.stageTemplate.participatesInAutoshift,
+          })),
+        })) as any}
+        stageSuggestions={stageSuggestions}
+      />
     </div>
   )
 }

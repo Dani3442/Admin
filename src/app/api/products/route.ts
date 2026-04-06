@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
             dateValue: stage.plannedDate,
             isCritical: stage.stageTemplate.isCritical,
             affectsFinalDate: stage.stageTemplate.affectsFinalDate,
-            participatesInAutoshift: stage.participatesInAutoshift,
+            participatesInAutoshift: stage.stageTemplate.participatesInAutoshift,
           }))
         : normalizedStageTemplates.map((template) => ({
             stageTemplateId: template.id,

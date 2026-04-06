@@ -14,20 +14,31 @@ export async function GET() {
     include: {
       stages: {
         orderBy: { stageOrder: 'asc' },
-        select: {
-          id: true,
-          stageTemplateId: true,
-          stageOrder: true,
-          stageName: true,
-          plannedDate: true,
-          participatesInAutoshift: true,
+        include: {
+          stageTemplate: {
+            select: {
+              participatesInAutoshift: true,
+            },
+          },
         },
       },
     },
     orderBy: [{ createdAt: 'desc' }],
   })
 
-  return NextResponse.json(templates)
+  return NextResponse.json(
+    templates.map((template) => ({
+      ...template,
+      stages: template.stages.map((stage) => ({
+        id: stage.id,
+        stageTemplateId: stage.stageTemplateId,
+        stageOrder: stage.stageOrder,
+        stageName: stage.stageName,
+        plannedDate: stage.plannedDate,
+        participatesInAutoshift: stage.stageTemplate.participatesInAutoshift,
+      })),
+    }))
+  )
 }
 
 export async function POST(req: NextRequest) {
@@ -87,7 +98,6 @@ export async function POST(req: NextRequest) {
         stageOrder: number
         stageName: string
         plannedDate: Date | null
-        participatesInAutoshift: boolean
       }> = []
 
       for (const stage of stages) {
@@ -116,11 +126,10 @@ export async function POST(req: NextRequest) {
           stageOrder: stage.stageOrder,
           stageName: stage.stageName,
           plannedDate: stage.plannedDate,
-          participatesInAutoshift: stage.participatesInAutoshift,
         })
       }
 
-      return tx.productTemplate.create({
+      const createdTemplate = await tx.productTemplate.create({
         data: {
           name: templateName,
           description: description || null,
@@ -128,23 +137,36 @@ export async function POST(req: NextRequest) {
             create: resolvedStages,
           },
         },
+      })
+
+      return tx.productTemplate.findUniqueOrThrow({
+        where: { id: createdTemplate.id },
         include: {
           stages: {
             orderBy: { stageOrder: 'asc' },
-            select: {
-              id: true,
-              stageTemplateId: true,
-              stageOrder: true,
-              stageName: true,
-              plannedDate: true,
-              participatesInAutoshift: true,
+            include: {
+              stageTemplate: {
+                select: {
+                  participatesInAutoshift: true,
+                },
+              },
             },
           },
         },
       })
     })
 
-    return NextResponse.json(template, { status: 201 })
+    return NextResponse.json({
+      ...template,
+      stages: template.stages.map((stage) => ({
+        id: stage.id,
+        stageTemplateId: stage.stageTemplateId,
+        stageOrder: stage.stageOrder,
+        stageName: stage.stageName,
+        plannedDate: stage.plannedDate,
+        participatesInAutoshift: stage.stageTemplate.participatesInAutoshift,
+      })),
+    }, { status: 201 })
   } catch (error) {
     console.error('[product-templates:create] Failed to create template', error)
     return NextResponse.json({ error: 'Не удалось создать шаблон этапов' }, { status: 500 })
