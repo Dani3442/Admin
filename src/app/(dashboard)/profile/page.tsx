@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { userProfileSelect } from '@/lib/user-profile'
+import { canEditOperationalProfileFields, userProfileSelect } from '@/lib/user-profile'
 import { UserProfileClient } from '@/components/users/UserProfileClient'
 
 export default async function ProfilePage() {
@@ -27,7 +27,7 @@ export default async function ProfilePage() {
       viewer={{ id: viewer.id, role: viewer.role }}
       permissions={{
         canEditPersonal: true,
-        canEditOperational: false,
+        canEditOperational: canEditOperationalProfileFields(viewer.role, viewer.id, profile.id, profile.role),
         canEditSensitive: false,
       }}
     />

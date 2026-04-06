@@ -336,11 +336,11 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
                   <input
                     value={form.department}
                     onChange={(event) => updateField('department', event.target.value)}
-                    disabled={!isEditing || !permissions.canEditOperational || isSelf}
+                    disabled={!isEditing || !permissions.canEditOperational}
                     className="input"
                     placeholder="Например, Разработка продукта"
                   />
-                  {(!permissions.canEditOperational || isSelf) && (
+                  {!permissions.canEditOperational && (
                     <span className="text-xs text-slate-400">Поле назначается руководителем или администратором.</span>
                   )}
                 </label>
@@ -350,7 +350,7 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
                   <select
                     value={form.employeeType}
                     onChange={(event) => updateField('employeeType', event.target.value as EmployeeType)}
-                    disabled={!isEditing || !permissions.canEditOperational || isSelf}
+                    disabled={!isEditing || !permissions.canEditOperational}
                     className="input"
                   >
                     {EMPLOYEE_TYPE_OPTIONS.map((option) => (
@@ -366,7 +366,7 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
                   <select
                     value={form.verificationStatus}
                     onChange={(event) => updateField('verificationStatus', event.target.value as VerificationStatus)}
-                    disabled={!isEditing || !permissions.canEditOperational || isSelf}
+                    disabled={!isEditing || !permissions.canEditOperational}
                     className="input"
                   >
                     {VERIFICATION_STATUS_OPTIONS.map((option) => (
