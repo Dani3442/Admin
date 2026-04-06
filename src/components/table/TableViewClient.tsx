@@ -448,8 +448,8 @@ export function TableViewClient({ products: initial, stages: initialStages }: Ta
                                 onChange={setEditValue}
                                 onCommit={saveEdit}
                                 onCancel={() => setEditingCell(null)}
-                                inputClassName="h-10 min-w-[180px] text-sm"
-                                panelClassName="w-[360px]"
+                                inputClassName="h-9 min-w-[140px] text-xs px-2"
+                                panelClassName="w-[308px]"
                                 autoFocus
                               />
                             </div>
