@@ -46,7 +46,7 @@
   }
 
   .btn-primary {
-    @apply btn bg-brand-600 text-white shadow-sm hover:bg-brand-700 hover:shadow-[0_0_0_6px_rgba(37,99,235,0.12),0_18px_30px_-18px_rgba(37,99,235,0.7)] active:bg-brand-800;
+    @apply btn bg-transparent text-brand-600 shadow-none hover:bg-brand-50 hover:text-brand-700 hover:shadow-none active:bg-brand-100;
   }
 
   .btn-secondary {
