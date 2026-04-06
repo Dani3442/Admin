@@ -20,7 +20,7 @@ async function getProducts() {
           orderBy: { stageOrder: 'asc' },
         },
       },
-      orderBy: [{ priority: 'asc' }, { finalDate: 'asc' }],
+      orderBy: [{ isPinned: 'desc' }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
     }),
     prisma.user.findMany({
       where: { isActive: true },

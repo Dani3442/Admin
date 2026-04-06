@@ -32,6 +32,9 @@ export interface ProductWithStages {
   riskScore: number
   progressPercent: number
   notes: string | null
+  sortOrder: number
+  isPinned: boolean
+  isFavorite: boolean
   isArchived: boolean
   createdAt: Date
   updatedAt: Date

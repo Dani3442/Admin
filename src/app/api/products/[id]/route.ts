@@ -67,6 +67,8 @@ export async function PATCH(
     'finalDate',
     'responsibleId',
     'notes',
+    'isPinned',
+    'isFavorite',
   ])
   const data = Object.fromEntries(
     Object.entries(body).filter(([key]) => allowedFields.has(key))

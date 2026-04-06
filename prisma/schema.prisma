@@ -62,6 +62,9 @@ model Product {
   riskScore       Int       @default(0)
   progressPercent Int       @default(0)
   notes           String?
+  sortOrder       Int       @default(0)
+  isPinned        Boolean   @default(false)
+  isFavorite      Boolean   @default(false)
   isArchived      Boolean   @default(false)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -72,6 +75,7 @@ model Product {
   automations   Automation[]
   changeHistory ChangeHistory[]
 
+  @@index([isArchived, isPinned, sortOrder])
   @@map("products")
 }
 

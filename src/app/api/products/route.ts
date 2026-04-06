@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
           : false,
         _count: { select: { comments: true } },
       },
-      orderBy: [{ riskScore: 'desc' }, { finalDate: 'asc' }, { name: 'asc' }],
+      orderBy: [{ isPinned: 'desc' }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
       skip: (page - 1) * limit,
       take: limit,
     }),
@@ -58,33 +58,43 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 })
     }
 
-    const stageTemplates = await prisma.stageTemplate.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] })
-    const normalizedStageTemplates = stageTemplates.map((template, index) => ({
-      ...template,
-      normalizedOrder: index,
-    }))
+    const product = await prisma.$transaction(async (tx) => {
+      const [stageTemplates, sortOrderAggregate] = await Promise.all([
+        tx.stageTemplate.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] }),
+        tx.product.aggregate({
+          where: { isArchived: false },
+          _max: { sortOrder: true },
+        }),
+      ])
 
-    const product = await prisma.product.create({
-      data: {
-        name: name.trim(),
-        country,
-        category,
-        sku,
-        priority: priority || 'MEDIUM',
-        responsibleId,
-        notes,
-        stages: {
-          create: normalizedStageTemplates.map((t) => ({
-            stageTemplateId: t.id,
-            stageOrder: t.normalizedOrder,
-            stageName: t.name,
-            isCritical: t.isCritical,
-            affectsFinalDate: t.affectsFinalDate,
-            participatesInAutoshift: t.participatesInAutoshift,
-          })),
+      const normalizedStageTemplates = stageTemplates.map((template, index) => ({
+        ...template,
+        normalizedOrder: index,
+      }))
+
+      return tx.product.create({
+        data: {
+          name: name.trim(),
+          country,
+          category,
+          sku,
+          priority: priority || 'MEDIUM',
+          responsibleId,
+          notes,
+          sortOrder: (sortOrderAggregate._max.sortOrder ?? -1) + 1,
+          stages: {
+            create: normalizedStageTemplates.map((t) => ({
+              stageTemplateId: t.id,
+              stageOrder: t.normalizedOrder,
+              stageName: t.name,
+              isCritical: t.isCritical,
+              affectsFinalDate: t.affectsFinalDate,
+              participatesInAutoshift: t.participatesInAutoshift,
+            })),
+          },
         },
-      },
-      select: { id: true },
+        select: { id: true },
+      })
     })
 
     return NextResponse.json({ id: product.id }, { status: 201 })
