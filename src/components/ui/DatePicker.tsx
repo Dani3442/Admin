@@ -52,6 +52,7 @@ export function DatePicker({
   const panelRef = useRef<HTMLDivElement>(null)
 
   const initialDate = value ? new Date(value) : new Date()
+  const today = new Date()
   const [displayValue, setDisplayValue] = useState(formatDateInputValue(value))
   const [viewDate, setViewDate] = useState(initialDate)
   const [isOpen, setIsOpen] = useState(false)
@@ -217,6 +218,7 @@ export function DatePicker({
       <div className="grid grid-cols-7 gap-1">
         {days.map((day) => {
           const isSelected = value ? isSameDay(day, value) : false
+          const isToday = isSameDay(day, today)
           const isCurrentMonth = isSameMonth(day, viewDate)
 
           return (
@@ -224,9 +226,11 @@ export function DatePicker({
               key={day.toISOString()}
               type="button"
               onClick={() => applyDate(day, true)}
+              title={isToday ? 'Сегодня' : undefined}
               className={cn(
                 'h-9 rounded-lg text-sm font-semibold transition-colors',
                 isSelected && 'bg-brand-600 text-white shadow-sm',
+                !isSelected && isToday && 'border border-brand-200 bg-brand-50 text-brand-700',
                 !isSelected && isCurrentMonth && 'text-slate-700 hover:bg-brand-50 hover:text-brand-700',
                 !isCurrentMonth && 'text-slate-300 hover:bg-slate-50'
               )}
