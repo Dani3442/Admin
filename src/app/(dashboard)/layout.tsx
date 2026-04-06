@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { Header } from '@/components/layout/Header'
+import { PageTransition } from '@/components/layout/PageTransition'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await auth()
@@ -13,7 +14,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Header user={session.user as any} />
         <main className="flex-1 overflow-y-auto p-6">
-          {children}
+          <PageTransition>{children}</PageTransition>
         </main>
       </div>
     </div>

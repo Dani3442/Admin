@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { signOut } from 'next-auth/react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { LogOut, Bell, AlertTriangle, Clock, History, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { buildProductHref, getRouteWithSearch } from '@/lib/navigation'
 
 interface Notification {
   id: string
@@ -27,6 +29,9 @@ export function Header({ user }: HeaderProps) {
   const [loaded, setLoaded] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const currentRoute = getRouteWithSearch(pathname, searchParams.toString())
 
   // Close on outside click
   useEffect(() => {
@@ -68,7 +73,7 @@ export function Header({ user }: HeaderProps) {
 
   const handleClickNotification = (n: Notification) => {
     if (n.productId) {
-      router.push(`/products/${n.productId}`)
+      router.push(buildProductHref(n.productId, currentRoute))
       setOpen(false)
     }
   }
@@ -127,8 +132,15 @@ export function Header({ user }: HeaderProps) {
             )}
           </button>
 
+          <AnimatePresence>
           {open && (
-            <div className="absolute right-0 top-full mt-2 w-96 bg-white rounded-xl shadow-xl border border-slate-200 z-50 overflow-hidden">
+            <motion.div
+              className="absolute right-0 top-full mt-2 w-96 bg-white rounded-xl shadow-xl border border-slate-200 z-50 overflow-hidden"
+              initial={{ opacity: 0, y: 8, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 6, scale: 0.98 }}
+              transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+            >
               {/* Header */}
               <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50">
                 <div className="flex items-center gap-2">
@@ -203,8 +215,9 @@ export function Header({ user }: HeaderProps) {
                   ))
                 )}
               </div>
-            </div>
+            </motion.div>
           )}
+          </AnimatePresence>
         </div>
 
         <div className="flex items-center gap-2 pl-3 border-l border-slate-100">

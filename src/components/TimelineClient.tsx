@@ -1,11 +1,13 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import { usePathname, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval, differenceInDays, isSameDay } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { cn, formatDate, detectStageOverlaps } from '@/lib/utils'
 import { ChevronLeft, ChevronRight, AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { buildProductHref, getRouteWithSearch } from '@/lib/navigation'
 
 interface ProductStage {
   id: string; stageName: string; stageOrder: number;
@@ -20,8 +22,11 @@ interface Product {
 
 export function TimelineClient({ products }: { products: Product[] }) {
   const now = new Date()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const [viewStart, setViewStart] = useState(new Date(now.getFullYear(), now.getMonth(), 1))
   const [search, setSearch] = useState('')
+  const currentRoute = getRouteWithSearch(pathname, searchParams.toString())
 
   const viewEnd = addDays(viewStart, 89) // 3 months view
   const days = eachDayOfInterval({ start: viewStart, end: viewEnd })
@@ -142,7 +147,7 @@ export function TimelineClient({ products }: { products: Product[] }) {
               <div key={product.id} className="flex border-b border-slate-50 hover:bg-slate-50/60 group" style={{ height: 52 }}>
                 {/* Name */}
                 <div className="w-48 flex-shrink-0 px-3 py-2 border-r border-slate-100 flex flex-col justify-center">
-                  <Link href={`/products/${product.id}`} className="text-xs font-medium text-slate-700 hover:text-brand-700 truncate">
+                  <Link href={buildProductHref(product.id, currentRoute)} className="text-xs font-medium text-slate-700 hover:text-brand-700 truncate">
                     {product.name.length > 28 ? product.name.slice(0, 28) + '…' : product.name}
                   </Link>
                   <div className="flex items-center gap-1.5 mt-0.5">

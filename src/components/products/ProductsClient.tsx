@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import { AnimatePresence, motion } from 'framer-motion'
 import {
   Filter,
   GripVertical,
@@ -15,6 +16,7 @@ import {
   X,
 } from 'lucide-react'
 import { cn, detectStageOverlaps, formatDate, getPriorityColor, getPriorityLabel, getStatusColor, getStatusLabel } from '@/lib/utils'
+import { buildProductHref, getRouteWithSearch } from '@/lib/navigation'
 import {
   filterProducts,
   hasActiveProductFilters,
@@ -65,6 +67,7 @@ const isValidQuickView = (value: string | null): value is ProductQuickView =>
 
 export function ProductsClient({ products: initialProducts, users, currentUserRole }: ProductsClientProps) {
   const router = useRouter()
+  const pathname = usePathname()
   const searchParams = useSearchParams()
   const contextMenuRef = useRef<HTMLDivElement>(null)
 
@@ -87,6 +90,9 @@ export function ProductsClient({ products: initialProducts, users, currentUserRo
 
   const canManageProducts = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUserRole)
   const canDeleteProducts = ['ADMIN', 'DIRECTOR'].includes(currentUserRole)
+  const currentRoute = typeof window === 'undefined'
+    ? getRouteWithSearch(pathname, searchParams.toString())
+    : `${window.location.pathname}${window.location.search}`
 
   useEffect(() => {
     setProducts(initialProducts)
@@ -388,8 +394,16 @@ export function ProductsClient({ products: initialProducts, users, currentUserRo
           ))}
         </div>
 
-        {showAdvancedFilters && (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 pt-1">
+        <AnimatePresence initial={false}>
+          {showAdvancedFilters && (
+            <motion.div
+              initial={{ opacity: 0, height: 0, y: -8 }}
+              animate={{ opacity: 1, height: 'auto', y: 0 }}
+              exit={{ opacity: 0, height: 0, y: -8 }}
+              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+              className="overflow-hidden"
+            >
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 pt-1">
             <label className="space-y-1.5">
               <span className="label mb-0">Статус</span>
               <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="input">
@@ -445,8 +459,10 @@ export function ProductsClient({ products: initialProducts, users, currentUserRo
               />
               Только с пересечениями дат
             </label>
-          </div>
-        )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50/80 px-3.5 py-3">
           <div className="text-sm text-slate-600">
@@ -487,7 +503,7 @@ export function ProductsClient({ products: initialProducts, users, currentUserRo
                 return (
                   <tr
                     key={product.id}
-                    onClick={() => router.push(`/products/${product.id}`)}
+                    onClick={() => router.push(buildProductHref(product.id, currentRoute))}
                     onContextMenu={(event) => handleOpenContextMenu(event, product.id)}
                     onDragOver={(event) => handleDragOver(event, product.id)}
                     onDrop={(event) => handleDrop(event, product.id)}
@@ -524,7 +540,7 @@ export function ProductsClient({ products: initialProducts, users, currentUserRo
                           <Star className={cn('w-3.5 h-3.5', product.isFavorite ? 'text-amber-500 fill-amber-100' : 'text-slate-300')} />
                         </div>
                         <div className="min-w-0">
-                          <Link href={`/products/${product.id}`} className="font-medium text-slate-800 hover:text-brand-700 transition-colors">
+                          <Link href={buildProductHref(product.id, currentRoute)} className="font-medium text-slate-800 hover:text-brand-700 transition-colors">
                             {product.name.length > 70 ? `${product.name.slice(0, 70)}…` : product.name}
                           </Link>
                           <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-400">
@@ -608,11 +624,16 @@ export function ProductsClient({ products: initialProducts, users, currentUserRo
         </div>
       </div>
 
-      {contextMenu && contextProduct && (
-        <div
+      <AnimatePresence>
+        {contextMenu && contextProduct && (
+        <motion.div
           ref={contextMenuRef}
           className="fixed z-50 w-60 rounded-xl border border-slate-200 bg-white p-2 shadow-2xl"
           style={{ left: contextMenu.x, top: contextMenu.y }}
+          initial={{ opacity: 0, scale: 0.96, y: -6 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.98, y: -4 }}
+          transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
         >
           <div className="px-2.5 py-2 border-b border-slate-100">
             <div className="text-sm font-semibold text-slate-800 truncate">{contextProduct.name}</div>
@@ -620,13 +641,13 @@ export function ProductsClient({ products: initialProducts, users, currentUserRo
           </div>
 
           <div className="py-1">
-            <button
-              onClick={() => {
-                setContextMenu(null)
-                router.push(`/products/${contextProduct.id}`)
-              }}
-              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-            >
+              <button
+                onClick={() => {
+                  setContextMenu(null)
+                  router.push(buildProductHref(contextProduct.id, currentRoute))
+                }}
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+              >
               <Search className="w-4 h-4 text-slate-400" />
               Открыть продукт
             </button>
@@ -671,8 +692,9 @@ export function ProductsClient({ products: initialProducts, users, currentUserRo
               </>
             )}
           </div>
-        </div>
+        </motion.div>
       )}
+      </AnimatePresence>
     </div>
   )
 }

@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Search, CheckCircle2, AlertTriangle, Plus, ChevronLeft, ChevronRight, Pencil, X, Trash2 } from 'lucide-react'
 import { cn, formatDate, detectStageOverlaps } from '@/lib/utils'
 import { DatePicker } from '@/components/ui/DatePicker'
+import { buildProductHref, getRouteWithSearch } from '@/lib/navigation'
 
 interface Stage {
   id: string; order: number; name: string; durationText: string | null
@@ -40,7 +41,10 @@ export function TableViewClient({ products: initial, stages: initialStages, curr
   const [editValue, setEditValue] = useState<Date | null>(null)
   const [saving, setSaving] = useState(false)
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const now = new Date()
+  const currentRoute = getRouteWithSearch(pathname, searchParams.toString())
 
   // Stage management state
   const [stageMenu, setStageMenu] = useState<{ stageId: string; x: number; y: number } | null>(null)
@@ -427,14 +431,14 @@ export function TableViewClient({ products: initial, stages: initialStages, curr
                       rowIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40',
                       'hover:bg-brand-50/20'
                     )}
-                    onClick={() => router.push(`/products/${product.id}`)}
+                    onClick={() => router.push(buildProductHref(product.id, currentRoute))}
                   >
                     {/* Product Name */}
                     <td
                       className={cn('sticky left-0 z-10 border-r border-slate-100 px-3 py-2', rowIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50')}
                       style={{ width: columnWidths.__product, minWidth: 120, maxWidth: columnWidths.__product }}
                     >
-                      <Link href={`/products/${product.id}`} className="block">
+                      <Link href={buildProductHref(product.id, currentRoute)} className="block">
                         <div className="text-xs font-medium text-slate-800 hover:text-brand-700 truncate" title={product.name}>
                           {product.name}
                         </div>

@@ -2,10 +2,12 @@
 
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeft, CheckCircle2, Circle, AlertTriangle, MessageCircle, Clock, History, Zap, ExternalLink, Edit2, Save, Pencil, ChevronUp, ChevronDown, X, Plus, Trash2 } from 'lucide-react'
 import { cn, getStatusColor, getStatusLabel, getPriorityColor, getPriorityLabel, formatDate, detectStageOverlaps } from '@/lib/utils'
 import { DatePicker } from '@/components/ui/DatePicker'
+import { resolveBackNavigation } from '@/lib/navigation'
 // Types are string-based (no Prisma enums needed)
 
 const AUTOMATION_ACTIONS = [
@@ -31,6 +33,7 @@ const TABS = [
 
 export function ProductCardClient({ product: initial, users, currentUser }: ProductCardClientProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [product, setProduct] = useState(initial)
   const [tab, setTab] = useState('stages')
   const [newComment, setNewComment] = useState('')
@@ -69,6 +72,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
 
   const canEdit = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUser?.role)
   const canDeleteProduct = ['ADMIN', 'DIRECTOR'].includes(currentUser?.role)
+  const backNavigation = resolveBackNavigation(searchParams.get('returnTo'))
 
   const now = new Date()
   const completedStages = product.stages.filter((s: any) => s.isCompleted).length
@@ -324,7 +328,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
         throw new Error(data?.error || 'Не удалось удалить продукт')
       }
 
-      router.push('/products')
+      router.push(backNavigation.href)
       router.refresh()
     } catch (error: any) {
       alert(error.message || 'Не удалось удалить продукт')
@@ -338,8 +342,8 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
     <div className="space-y-5 animate-fade-in">
       {/* Back */}
       <div className="flex items-center justify-between gap-3">
-        <Link href="/products" className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 transition-colors">
-          <ArrowLeft className="w-4 h-4" /> Назад к продуктам
+        <Link href={backNavigation.href} className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 transition-colors">
+          <ArrowLeft className="w-4 h-4" /> {backNavigation.label}
         </Link>
         {canDeleteProduct && (
           <button
@@ -413,20 +417,35 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                 key={t.id}
                 onClick={() => setTab(t.id)}
                 className={cn(
-                  'flex items-center gap-2 px-4 py-3 text-sm font-medium rounded-t-lg transition-colors',
+                  'relative flex items-center gap-2 px-4 py-3 text-sm font-medium rounded-t-lg transition-colors',
                   tab === t.id
-                    ? 'text-brand-700 border-b-2 border-brand-600 bg-brand-50/50'
+                    ? 'text-brand-700 bg-brand-50/50'
                     : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
                 )}
               >
-                <Icon className="w-3.5 h-3.5" />
-                {t.label}
+                {tab === t.id && (
+                  <motion.span
+                    layoutId="product-tab-indicator"
+                    className="absolute inset-x-0 bottom-0 h-0.5 bg-brand-600"
+                    transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+                  />
+                )}
+                <Icon className="relative z-10 w-3.5 h-3.5" />
+                <span className="relative z-10">{t.label}</span>
               </button>
             )
           })}
         </div>
 
         <div className="p-5">
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={tab}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+            >
           {/* STAGES TAB */}
           {tab === 'stages' && (
             <div className="space-y-2">
@@ -726,10 +745,13 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
               )}
             </div>
           )}
+            </motion.div>
+          </AnimatePresence>
         </div>
       </div>
 
       {/* Stage Context Menu */}
+      <AnimatePresence>
       {stageMenu && (() => {
         const stage = product.stages.find((s: any) => s.id === stageMenu.stageId)
         if (!stage) return null
@@ -737,10 +759,14 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
         const isFirst = idx === 0
         const isLast = idx === product.stages.length - 1
         return (
-          <div
+          <motion.div
             ref={menuRef}
             className="fixed z-50 bg-white rounded-lg shadow-lg border border-slate-200 py-1 min-w-[200px]"
             style={{ left: stageMenu.x, top: stageMenu.y }}
+            initial={{ opacity: 0, scale: 0.96, y: -6 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.98, y: -4 }}
+            transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
           >
             <button
               className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
@@ -789,14 +815,30 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
               <Trash2 className="w-3.5 h-3.5 text-red-500" />
               Удалить этап
             </button>
-          </div>
+          </motion.div>
         )
       })()}
+      </AnimatePresence>
 
       {/* Automation Modal */}
+      <AnimatePresence>
       {automationModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setAutomationModal(null)}>
-          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md space-y-4" onClick={(e) => e.stopPropagation()}>
+        <motion.div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+          onClick={() => setAutomationModal(null)}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.18 }}
+        >
+          <motion.div
+            className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md space-y-4"
+            onClick={(e) => e.stopPropagation()}
+            initial={{ opacity: 0, y: 18, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 12, scale: 0.98 }}
+            transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+          >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Zap className="w-5 h-5 text-amber-500" />
@@ -856,9 +898,10 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                 {savingAutomation ? 'Сохраняем...' : 'Создать автоматизацию'}
               </button>
             </div>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       )}
+      </AnimatePresence>
     </div>
   )
 }

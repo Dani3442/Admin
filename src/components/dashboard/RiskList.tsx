@@ -1,8 +1,10 @@
 'use client'
 
 import Link from 'next/link'
+import { usePathname, useSearchParams } from 'next/navigation'
 import { AlertTriangle, ArrowRight } from 'lucide-react'
 import { getStatusColor, getStatusLabel, formatDate, cn } from '@/lib/utils'
+import { buildProductHref, getRouteWithSearch } from '@/lib/navigation'
 import type { ProductStatus } from '@/types'
 // Types are string-based (no Prisma enums needed)
 
@@ -20,6 +22,10 @@ interface RiskListProps {
 }
 
 export function RiskList({ products }: RiskListProps) {
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const currentRoute = getRouteWithSearch(pathname, searchParams.toString())
+
   if (products.length === 0) return null
 
   return (
@@ -38,7 +44,7 @@ export function RiskList({ products }: RiskListProps) {
         {products.map((product) => (
           <Link
             key={product.id}
-            href={`/products/${product.id}`}
+            href={buildProductHref(product.id, currentRoute)}
             className="flex items-center gap-4 py-3 px-2 -mx-2 rounded-lg hover:bg-slate-50 transition-colors group"
           >
             {/* Risk Score */}

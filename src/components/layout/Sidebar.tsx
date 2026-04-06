@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { motion } from 'framer-motion'
 import {
   LayoutDashboard, Package, Table2, Zap, Users, Settings,
   ChevronRight, Package2
@@ -27,7 +28,12 @@ export function Sidebar({ user }: SidebarProps) {
   const isAdmin = ['ADMIN', 'DIRECTOR'].includes(user.role)
 
   return (
-    <aside className="w-60 flex-shrink-0 bg-sidebar flex flex-col h-full">
+    <motion.aside
+      className="w-60 flex-shrink-0 bg-sidebar flex flex-col h-full"
+      initial={{ opacity: 0, x: -12 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+    >
       {/* Logo */}
       <div className="px-5 py-5 border-b border-slate-800">
         <div className="flex items-center gap-3">
@@ -52,15 +58,20 @@ export function Sidebar({ user }: SidebarProps) {
               key={item.href}
               href={item.href}
               className={cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150 group',
-                active
-                  ? 'bg-brand-600 text-white shadow-sm'
-                  : 'text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-text-active'
+                'relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150 group overflow-hidden',
+                active ? 'text-white shadow-sm' : 'text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-text-active'
               )}
             >
-              <Icon className={cn('w-4 h-4 flex-shrink-0', active ? 'text-white' : 'text-slate-500 group-hover:text-slate-300')} />
-              <span className="flex-1 font-medium">{item.label}</span>
-              {active && <ChevronRight className="w-3 h-3 text-white/60" />}
+              {active && (
+                <motion.span
+                  layoutId="sidebar-active-pill"
+                  className="absolute inset-0 rounded-lg bg-brand-600"
+                  transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+                />
+              )}
+              <Icon className={cn('relative z-10 w-4 h-4 flex-shrink-0', active ? 'text-white' : 'text-slate-500 group-hover:text-slate-300')} />
+              <span className="relative z-10 flex-1 font-medium">{item.label}</span>
+              {active && <ChevronRight className="relative z-10 w-3 h-3 text-white/60" />}
             </Link>
           )
         })}
@@ -78,6 +89,6 @@ export function Sidebar({ user }: SidebarProps) {
           </div>
         </div>
       </div>
-    </aside>
+    </motion.aside>
   )
 }
