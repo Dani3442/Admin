@@ -1,6 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { recalculateProductRisk } from '@/lib/risk'
+
+async function updateProductProgress(productId: string) {
+  const stages = await prisma.productStage.findMany({
+    where: { productId },
+    select: { isCompleted: true },
+  })
+
+  const completedCount = stages.filter((stage) => stage.isCompleted).length
+  const progressPercent = stages.length > 0
+    ? Math.round((completedCount / stages.length) * 100)
+    : 0
+
+  await prisma.product.update({
+    where: { id: productId },
+    data: { progressPercent },
+  })
+}
 
 // Create a new stage template
 export async function POST(req: NextRequest) {
@@ -142,19 +160,28 @@ export async function DELETE(req: NextRequest) {
 
     const template = await prisma.stageTemplate.findUnique({
       where: { id },
-      select: { id: true },
+      select: { id: true, name: true },
     })
 
     if (!template) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 })
     }
 
+    let affectedProductIds: string[] = []
+
     await prisma.$transaction(async (tx) => {
       const productStages = await tx.productStage.findMany({
-        where: { stageTemplateId: id },
-        select: { id: true },
+        where: {
+          stageTemplateId: id,
+          stageName: template.name,
+        },
+        select: {
+          id: true,
+          productId: true,
+        },
       })
       const productStageIds = productStages.map((stage) => stage.id)
+      affectedProductIds = [...new Set(productStages.map((stage) => stage.productId))]
 
       if (productStageIds.length > 0) {
         await tx.comment.deleteMany({
@@ -168,11 +195,28 @@ export async function DELETE(req: NextRequest) {
             productStageId: { in: productStageIds },
           },
         })
-      }
 
-      await tx.productStage.deleteMany({
-        where: { stageTemplateId: id },
-      })
+        await tx.productStage.deleteMany({
+          where: {
+            id: { in: productStageIds },
+          },
+        })
+
+        for (const productId of affectedProductIds) {
+          const remainingStages = await tx.productStage.findMany({
+            where: { productId },
+            orderBy: [{ stageOrder: 'asc' }, { createdAt: 'asc' }],
+            select: { id: true },
+          })
+
+          for (const [index, remainingStage] of remainingStages.entries()) {
+            await tx.productStage.update({
+              where: { id: remainingStage.id },
+              data: { stageOrder: index },
+            })
+          }
+        }
+      }
 
       await tx.stageTemplate.delete({
         where: { id },
@@ -188,13 +232,15 @@ export async function DELETE(req: NextRequest) {
           where: { id: remainingTemplate.id },
           data: { order: index },
         })
-
-        await tx.productStage.updateMany({
-          where: { stageTemplateId: remainingTemplate.id },
-          data: { stageOrder: index },
-        })
       }
     })
+
+    await Promise.all(
+      affectedProductIds.map(async (productId) => {
+        await updateProductProgress(productId)
+        await recalculateProductRisk(productId)
+      })
+    )
 
     const all = await prisma.stageTemplate.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'asc' }] })
     return NextResponse.json(all)
