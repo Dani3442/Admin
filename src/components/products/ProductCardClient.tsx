@@ -37,6 +37,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
   const [saving, setSaving] = useState(false)
   const [showAddStageForm, setShowAddStageForm] = useState(false)
   const [newStageName, setNewStageName] = useState('')
+  const [newStageDate, setNewStageDate] = useState('')
 
   // Context menu state
   const [stageMenu, setStageMenu] = useState<{ stageId: string; x: number; y: number } | null>(null)
@@ -245,7 +246,10 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
       const res = await fetch(`/api/products/${product.id}/stages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stageName }),
+        body: JSON.stringify({
+          stageName,
+          dateValue: newStageDate || null,
+        }),
       })
       const data = await res.json()
 
@@ -261,6 +265,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
         status: data.status,
       }))
       setNewStageName('')
+      setNewStageDate('')
       setShowAddStageForm(false)
     } catch (error: any) {
       alert(error.message || 'Не удалось добавить этап')
@@ -414,8 +419,16 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                       if (e.key === 'Escape') {
                         setShowAddStageForm(false)
                         setNewStageName('')
+                        setNewStageDate('')
                       }
                     }}
+                  />
+                  <input
+                    type="date"
+                    value={newStageDate}
+                    onChange={(e) => setNewStageDate(e.target.value)}
+                    className="input text-sm w-44"
+                    title="Дата этапа (необязательно)"
                   />
                   <button onClick={handleAddStage} className="btn-primary text-sm" disabled={!newStageName.trim() || saving}>
                     <Save className="w-4 h-4" />
@@ -425,6 +438,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                     onClick={() => {
                       setShowAddStageForm(false)
                       setNewStageName('')
+                      setNewStageDate('')
                     }}
                     className="btn-secondary text-sm"
                     disabled={saving}

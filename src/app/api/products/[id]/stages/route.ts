@@ -55,6 +55,7 @@ export async function POST(
   try {
     const body = await req.json()
     const stageName = String(body.stageName || '').trim()
+    const dateValue = body.dateValue ? new Date(body.dateValue) : null
 
     if (!stageName) {
       return NextResponse.json({ error: 'Укажите название этапа' }, { status: 400 })
@@ -92,6 +93,7 @@ export async function POST(
         affectsFinalDate: false,
         participatesInAutoshift: false,
         status: 'NOT_STARTED',
+        dateValue,
       },
     })
 
