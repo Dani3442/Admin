@@ -1,9 +1,11 @@
 import { prisma } from '@/lib/prisma'
 import { TableViewClient } from '@/components/table/TableViewClient'
 import { recalculateAllRisks } from '@/lib/risk'
+import { syncProductsWithStageTemplates } from '@/lib/table-sync'
 
 async function getTableData() {
   // Recalculate risks on every page load
+  await syncProductsWithStageTemplates()
   await recalculateAllRisks()
 
   const [products, stages] = await Promise.all([
@@ -14,7 +16,7 @@ async function getTableData() {
         stages: {
           orderBy: { stageOrder: 'asc' },
           select: {
-            id: true, stageOrder: true, stageName: true,
+            id: true, stageTemplateId: true, stageOrder: true, stageName: true,
             dateValue: true, dateRaw: true, isCompleted: true,
             isCritical: true, status: true,
           },
