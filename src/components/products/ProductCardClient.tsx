@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, CheckCircle2, Circle, AlertTriangle, MessageCircle, Clock, History, Zap, ExternalLink, Edit2, Save, Pencil, ChevronUp, ChevronDown, X } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Circle, AlertTriangle, MessageCircle, Clock, History, Zap, ExternalLink, Edit2, Save, Pencil, ChevronUp, ChevronDown, X, Plus, Trash2 } from 'lucide-react'
 import { cn, getStatusColor, getStatusLabel, getPriorityColor, getPriorityLabel, formatDate, detectStageOverlaps } from '@/lib/utils'
 // Types are string-based (no Prisma enums needed)
 
@@ -35,6 +35,8 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
   const [editingStageId, setEditingStageId] = useState<string | null>(null)
   const [stageEditValues, setStageEditValues] = useState<Record<string, any>>({})
   const [saving, setSaving] = useState(false)
+  const [showAddStageForm, setShowAddStageForm] = useState(false)
+  const [newStageName, setNewStageName] = useState('')
 
   // Context menu state
   const [stageMenu, setStageMenu] = useState<{ stageId: string; x: number; y: number } | null>(null)
@@ -234,6 +236,69 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
     }
   }
 
+  const handleAddStage = async () => {
+    const stageName = newStageName.trim()
+    if (!stageName) return
+
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/products/${product.id}/stages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stageName }),
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Не удалось добавить этап')
+      }
+
+      setProduct((prev: any) => ({
+        ...prev,
+        stages: data.stages,
+        progressPercent: data.progressPercent,
+        riskScore: data.riskScore,
+        status: data.status,
+      }))
+      setNewStageName('')
+      setShowAddStageForm(false)
+    } catch (error: any) {
+      alert(error.message || 'Не удалось добавить этап')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDeleteStage = async (stageId: string) => {
+    const confirmed = window.confirm('Удалить этот этап из продукта?')
+    if (!confirmed) return
+
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/products/${product.id}/stages?stageId=${encodeURIComponent(stageId)}`, {
+        method: 'DELETE',
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Не удалось удалить этап')
+      }
+
+      setProduct((prev: any) => ({
+        ...prev,
+        stages: data.stages,
+        progressPercent: data.progressPercent,
+        riskScore: data.riskScore,
+        status: data.status,
+      }))
+      setStageMenu(null)
+    } catch (error: any) {
+      alert(error.message || 'Не удалось удалить этап')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const { overlappingIds, overlaps } = detectStageOverlaps(product.stages)
 
   return (
@@ -320,6 +385,54 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
           {/* STAGES TAB */}
           {tab === 'stages' && (
             <div className="space-y-2">
+              {canEdit && (
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <div className="text-sm text-slate-500">
+                    Добавляй и удаляй этапы прямо в карточке продукта.
+                  </div>
+                  <button
+                    onClick={() => setShowAddStageForm((prev) => !prev)}
+                    className="btn-primary text-sm"
+                    disabled={saving}
+                  >
+                    <Plus className="w-4 h-4" />
+                    Добавить этап
+                  </button>
+                </div>
+              )}
+              {canEdit && showAddStageForm && (
+                <div className="flex items-center gap-2 p-3 bg-slate-50 border border-slate-200 rounded-lg mb-3">
+                  <input
+                    type="text"
+                    value={newStageName}
+                    onChange={(e) => setNewStageName(e.target.value)}
+                    className="input text-sm flex-1"
+                    placeholder="Название нового этапа"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleAddStage()
+                      if (e.key === 'Escape') {
+                        setShowAddStageForm(false)
+                        setNewStageName('')
+                      }
+                    }}
+                  />
+                  <button onClick={handleAddStage} className="btn-primary text-sm" disabled={!newStageName.trim() || saving}>
+                    <Save className="w-4 h-4" />
+                    Сохранить
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowAddStageForm(false)
+                      setNewStageName('')
+                    }}
+                    className="btn-secondary text-sm"
+                    disabled={saving}
+                  >
+                    Отмена
+                  </button>
+                </div>
+              )}
               {overlaps.length > 0 && (
                 <div className="flex items-start gap-2 p-3 bg-orange-50 border border-orange-200 rounded-lg mb-3">
                   <AlertTriangle className="w-4 h-4 text-orange-500 mt-0.5 flex-shrink-0" />
@@ -613,6 +726,14 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
             >
               <Zap className="w-3.5 h-3.5 text-amber-500" />
               Настроить автоматизацию
+            </button>
+            <div className="border-t border-slate-100 my-1" />
+            <button
+              className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+              onClick={() => handleDeleteStage(stage.id)}
+            >
+              <Trash2 className="w-3.5 h-3.5 text-red-500" />
+              Удалить этап
             </button>
           </div>
         )
