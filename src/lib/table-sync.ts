@@ -20,6 +20,13 @@ export async function syncProductsWithStageTemplates() {
         orderBy: [{ stageOrder: 'asc' }, { createdAt: 'asc' }],
       })
 
+      for (const [index, stage] of stages.entries()) {
+        await tx.productStage.update({
+          where: { id: stage.id },
+          data: { stageOrder: -1000 - index },
+        })
+      }
+
       const usedStageIds = new Set<string>()
 
       for (const template of templates) {
