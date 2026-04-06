@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
@@ -66,10 +67,12 @@ export async function POST(req: NextRequest) {
         }
 
         // Create product with stages
-        const stagesData = (prod.stages || []).map((s) => {
+        const stagesData: Prisma.ProductStageUncheckedCreateWithoutProductInput[] = (
+          prod.stages || []
+        ).map((s) => {
           const template = templateMap.get(s.stageName?.toLowerCase() || '')
           return {
-            stageTemplateId: template?.id,
+            stageTemplateId: template?.id ?? '',
             stageOrder: s.stageOrder ?? template?.order ?? 999,
             stageName: s.stageName || template?.name || 'Этап',
             dateValue: s.dateValue ? new Date(s.dateValue) : null,
@@ -83,7 +86,7 @@ export async function POST(req: NextRequest) {
         })
 
         // If no stages provided, create from templates
-        const finalStages =
+        const finalStages: Prisma.ProductStageUncheckedCreateWithoutProductInput[] =
           stagesData.length > 0
             ? stagesData
             : stageTemplates.map((t) => ({

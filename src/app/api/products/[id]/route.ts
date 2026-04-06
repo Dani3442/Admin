@@ -2,12 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const product = await prisma.product.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: {
       responsible: { select: { id: true, name: true, email: true } },
       stages: {
@@ -40,21 +44,25 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   return NextResponse.json(product)
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
 
   const product = await prisma.product.update({
-    where: { id: params.id },
+    where: { id },
     data: body,
     include: { responsible: true, _count: { select: { comments: true } } },
   })
 
   await prisma.changeHistory.create({
     data: {
-      productId: params.id,
+      productId: id,
       field: Object.keys(body).join(', '),
       newValue: JSON.stringify(body),
       changedById: (session.user as any).id,
@@ -64,7 +72,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   return NextResponse.json(product)
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const role = (session.user as any).role
@@ -73,7 +85,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   }
 
   await prisma.product.update({
-    where: { id: params.id },
+    where: { id },
     data: { isArchived: true },
   })
 

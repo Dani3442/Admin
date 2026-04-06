@@ -129,7 +129,7 @@ export function AutomationsClient({ automations: initial, stages }: { automation
           </div>
           <div className="flex items-start gap-2">
             <span className="w-5 h-5 rounded-full bg-blue-100 text-xs flex items-center justify-center flex-shrink-0 mt-0.5 text-blue-600">2</span>
-            <span>Активная автоматизация <strong>«{templates.find(a => a.isActive)?.name || 'выберите'}}»</strong> запускается</span>
+            <span>Активная автоматизация <strong>«{templates.find(a => a.isActive)?.name || 'выберите'}»</strong> запускается</span>
           </div>
           <div className="flex items-start gap-2">
             <span className="w-5 h-5 rounded-full bg-emerald-100 text-xs flex items-center justify-center flex-shrink-0 mt-0.5 text-emerald-600">3</span>

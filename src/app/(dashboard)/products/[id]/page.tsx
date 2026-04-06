@@ -46,9 +46,15 @@ async function getUsers() {
   })
 }
 
-export default async function ProductPage({ params }: { params: { id: string } }) {
+export default async function ProductPage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const { id } = await params
+
   const [product, users, session] = await Promise.all([
-    getProduct(params.id),
+    getProduct(id),
     getUsers(),
     auth(),
   ])

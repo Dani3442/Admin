@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { AlertTriangle, ArrowRight } from 'lucide-react'
 import { getStatusColor, getStatusLabel, formatDate, cn } from '@/lib/utils'
+import type { ProductStatus } from '@/types'
 // Types are string-based (no Prisma enums needed)
 
 interface RiskListProps {

@@ -3,7 +3,10 @@
 import { useState } from 'react'
 import { Plus, UserCheck, UserX, Shield } from 'lucide-react'
 import { cn, getRoleLabel, formatDate } from '@/lib/utils'
+import type { UserRole } from '@/types'
 // Types are string-based (no Prisma enums needed)
+
+const ROLE_OPTIONS: UserRole[] = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER', 'EMPLOYEE', 'VIEWER']
 
 const ROLE_COLORS: Record<string, string> = {
   ADMIN: 'text-red-600 bg-red-50 border-red-200',
@@ -76,7 +79,7 @@ export function UsersClient({ users: initial }: { users: any[] }) {
             <div>
               <label className="label">Роль</label>
               <select value={form.role} onChange={(e) => setForm(p => ({...p, role: e.target.value}))} className="input">
-                {Object.values(UserRole).map(r => (
+                {ROLE_OPTIONS.map((r) => (
                   <option key={r} value={r}>{getRoleLabel(r)}</option>
                 ))}
               </select>
