@@ -20,9 +20,76 @@ export async function PATCH(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { stageId, updates, applyAutomations = true, swapWithStageId } = body
+  const { stageId, updates, applyAutomations = true, swapWithStageId, productId, stageTemplateId, stageOrder, stageName } = body
 
-  const existingStage = await prisma.productStage.findUnique({ where: { id: stageId } })
+  let existingStage = stageId ? await prisma.productStage.findUnique({ where: { id: stageId } }) : null
+
+  if (!existingStage && productId && stageTemplateId && typeof stageOrder === 'number') {
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+      select: { id: true, isArchived: true },
+    })
+    if (!product || product.isArchived) {
+      return NextResponse.json({ error: 'Product not found' }, { status: 404 })
+    }
+
+    existingStage = await prisma.productStage.findFirst({
+      where: {
+        productId,
+        stageOrder,
+      },
+      orderBy: { createdAt: 'asc' },
+    })
+
+    if (!existingStage) {
+      const exactTemplateMatch = await prisma.productStage.findFirst({
+        where: {
+          productId,
+          stageTemplateId,
+        },
+        orderBy: { createdAt: 'asc' },
+      })
+
+      if (exactTemplateMatch) {
+        existingStage = exactTemplateMatch
+      }
+    }
+
+    if (!existingStage) {
+      const template = await prisma.stageTemplate.findUnique({
+        where: { id: stageTemplateId },
+      })
+      if (!template) {
+        return NextResponse.json({ error: 'Stage template not found' }, { status: 404 })
+      }
+
+      await prisma.$transaction(async (tx) => {
+        await tx.productStage.updateMany({
+          where: {
+            productId,
+            stageOrder: { gte: stageOrder },
+          },
+          data: {
+            stageOrder: { increment: 1 },
+          },
+        })
+
+        existingStage = await tx.productStage.create({
+          data: {
+            productId,
+            stageTemplateId,
+            stageOrder,
+            stageName: typeof stageName === 'string' && stageName.trim() ? stageName.trim() : template.name,
+            isCritical: template.isCritical,
+            affectsFinalDate: template.affectsFinalDate,
+            participatesInAutoshift: template.participatesInAutoshift,
+            status: 'NOT_STARTED',
+          },
+        })
+      })
+    }
+  }
+
   if (!existingStage) return NextResponse.json({ error: 'Stage not found' }, { status: 404 })
 
   // Handle order swap (move up/down)
@@ -96,5 +163,10 @@ export async function PATCH(req: NextRequest) {
   // Recalculate risk after any stage change
   await recalculateProductRisk(existingStage.productId)
 
-  return NextResponse.json({ stage: updatedStage, automationResult })
+  const stages = await prisma.productStage.findMany({
+    where: { productId: existingStage.productId },
+    orderBy: { stageOrder: 'asc' },
+  })
+
+  return NextResponse.json({ stage: updatedStage, stages, automationResult })
 }

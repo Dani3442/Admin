@@ -88,7 +88,7 @@ export function TableViewClient({ products: initial, stages: initialStages, curr
   const [stages, setStages] = useState(initialStages)
   const [search, setSearch] = useState('')
   const [showOnlyRisk, setShowOnlyRisk] = useState(false)
-  const [editingCell, setEditingCell] = useState<{ productId: string; stageId: string } | null>(null)
+  const [editingCell, setEditingCell] = useState<{ productId: string; stageId: string | null; stageTemplateId: string; stageOrder: number; stageName: string } | null>(null)
   const [editValue, setEditValue] = useState<Date | null>(null)
   const [saving, setSaving] = useState(false)
   const router = useRouter()
@@ -313,10 +313,16 @@ export function TableViewClient({ products: initial, stages: initialStages, curr
     return '—'
   }
 
-  const startEdit = (productId: string, stageId: string, currentDate: Date | null) => {
+  const startEdit = (productId: string, stageTemplate: Stage, stage: ProductStage | undefined) => {
     if (!canEditTable) return
-    setEditingCell({ productId, stageId })
-    setEditValue(currentDate ? new Date(currentDate) : null)
+    setEditingCell({
+      productId,
+      stageId: stage?.id || null,
+      stageTemplateId: stageTemplate.id,
+      stageOrder: stageTemplate.order,
+      stageName: stage?.stageName || stageTemplate.name,
+    })
+    setEditValue(stage?.dateValue ? new Date(stage.dateValue) : null)
   }
 
   const saveEdit = async (nextDate = editValue) => {
@@ -328,19 +334,29 @@ export function TableViewClient({ products: initial, stages: initialStages, curr
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           stageId: editingCell.stageId,
+          productId: editingCell.productId,
+          stageTemplateId: editingCell.stageTemplateId,
+          stageOrder: editingCell.stageOrder,
+          stageName: editingCell.stageName,
           updates: { dateValue: nextDate },
           applyAutomations: true,
         }),
       })
-      const { stage: updated } = await res.json()
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data?.error || 'Не удалось сохранить дату этапа')
+      }
+
       setProducts((prev) =>
         prev.map((p) =>
           p.id !== editingCell.productId ? p : {
             ...p,
-            stages: p.stages.map((s) => s.id === editingCell.stageId ? { ...s, ...updated } : s),
+            stages: data?.stages || p.stages,
           }
         )
       )
+    } catch (error: any) {
+      window.alert(error.message || 'Не удалось сохранить дату этапа')
     } finally {
       setSaving(false)
       setEditingCell(null)
@@ -525,7 +541,9 @@ export function TableViewClient({ products: initial, stages: initialStages, curr
                     {/* Stage cells */}
                     {stages.map((stageTemplate) => {
                       const stage = resolvedStageMap.get(stageTemplate.id)
-                      const isEditing = editingCell?.stageId === stage?.id && editingCell?.productId === product.id
+                      const isEditing =
+                        editingCell?.productId === product.id &&
+                        editingCell?.stageTemplateId === stageTemplate.id
                       const cellClass = getCellClass(stage, stageTemplate)
                       const cellText = getCellText(stage)
                       const hasOverlap = stage && overlappingIds.has(stage.id)
@@ -552,8 +570,8 @@ export function TableViewClient({ products: initial, stages: initialStages, curr
                             </div>
                           ) : (
                             <div
-                              className={cn(cellClass, 'cursor-pointer hover:opacity-80 transition-opacity mx-0.5 relative', hasOverlap && 'ring-2 ring-orange-400 ring-inset')}
-                              onClick={() => stage && canEditTable && startEdit(product.id, stage.id, stage.dateValue)}
+                              className={cn(cellClass, canEditTable && 'cursor-pointer hover:opacity-80 transition-opacity', 'mx-0.5 relative', hasOverlap && 'ring-2 ring-orange-400 ring-inset')}
+                              onClick={() => canEditTable && startEdit(product.id, stageTemplate, stage)}
                               title={stage ? `${stage.stageName}\n${stage.dateValue ? formatDate(stage.dateValue) : stage.dateRaw || 'Нет даты'}${stage.isCritical ? '\n⚠️ Критичный этап' : ''}${hasOverlap ? '\n⚠️ Пересечение дат с соседним этапом' : ''}` : stageTemplate.name}
                             >
                               {stage?.isCompleted && <CheckCircle2 className="w-2.5 h-2.5 inline mr-0.5" />}
