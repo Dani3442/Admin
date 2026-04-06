@@ -1,12 +1,12 @@
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
-import { ProductsClient } from '@/components/products/ProductsClient'
+import { ProductsWorkspace } from '@/components/products/ProductsWorkspace'
 import { recalculateAllRisks } from '@/lib/risk'
 
-async function getProducts() {
+async function getProductsWorkspaceData() {
   await recalculateAllRisks()
 
-  const [products, users] = await Promise.all([
+  const [listProducts, tableProducts, users, stages] = await Promise.all([
     prisma.product.findMany({
       where: { isArchived: false },
       include: {
@@ -22,21 +22,45 @@ async function getProducts() {
       },
       orderBy: [{ isPinned: 'desc' }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
     }),
+    prisma.product.findMany({
+      where: { isArchived: false },
+      include: {
+        responsible: { select: { id: true, name: true } },
+        stages: {
+          orderBy: { stageOrder: 'asc' },
+          select: {
+            id: true, stageTemplateId: true, stageOrder: true, stageName: true,
+            dateValue: true, dateRaw: true, isCompleted: true,
+            isCritical: true, status: true,
+          },
+        },
+      },
+      orderBy: [{ priority: 'asc' }, { finalDate: 'asc' }],
+    }),
     prisma.user.findMany({
       where: { isActive: true },
       select: { id: true, name: true },
       orderBy: { name: 'asc' },
     }),
+    prisma.stageTemplate.findMany({ orderBy: { order: 'asc' } }),
   ])
 
-  return { products, users }
+  return { listProducts, tableProducts, users, stages }
 }
 
 export default async function ProductsPage() {
   const [data, session] = await Promise.all([
-    getProducts(),
+    getProductsWorkspaceData(),
     auth(),
   ])
 
-  return <ProductsClient products={data.products as any} users={data.users} currentUserRole={(session?.user as any)?.role || 'VIEWER'} />
+  return (
+    <ProductsWorkspace
+      listProducts={data.listProducts as any}
+      tableProducts={data.tableProducts as any}
+      users={data.users}
+      stages={data.stages as any}
+      currentUserRole={(session?.user as any)?.role || 'VIEWER'}
+    />
+  )
 }

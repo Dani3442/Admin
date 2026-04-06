@@ -30,6 +30,7 @@ interface TableViewClientProps {
   products: Product[]
   stages: Stage[]
   currentUserRole: string
+  embedded?: boolean
 }
 
 interface EditingCellState {
@@ -91,7 +92,7 @@ function resolveStageMapForProduct(productStages: ProductStage[], stageTemplates
   return resolvedMap
 }
 
-export function TableViewClient({ products: initial, stages: initialStages, currentUserRole }: TableViewClientProps) {
+export function TableViewClient({ products: initial, stages: initialStages, currentUserRole, embedded = false }: TableViewClientProps) {
   const [products, setProducts] = useState(initial)
   const [stages, setStages] = useState(initialStages)
   const [search, setSearch] = useState('')
@@ -388,10 +389,16 @@ export function TableViewClient({ products: initial, stages: initialStages, curr
     <div className="space-y-4 animate-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Таблица этапов</h1>
-          <p className="text-slate-500 text-sm mt-0.5">{filteredProducts.length} продуктов × {stages.length} этапов</p>
-        </div>
+        {!embedded ? (
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Таблица этапов</h1>
+            <p className="text-slate-500 text-sm mt-0.5">{filteredProducts.length} продуктов × {stages.length} этапов</p>
+          </div>
+        ) : (
+          <div className="text-sm text-slate-500">
+            {filteredProducts.length} продуктов × {stages.length} этапов
+          </div>
+        )}
         <div className="flex items-center gap-3">
           <button
             onClick={() => setShowOnlyRisk(!showOnlyRisk)}

@@ -51,6 +51,7 @@ interface ProductsClientProps {
   products: ProductListItem[]
   users: Array<{ id: string; name: string }>
   currentUserRole: string
+  embedded?: boolean
 }
 
 interface ContextMenuState {
@@ -71,7 +72,7 @@ const isValidSortField = (value: string | null): value is ProductListSortField =
 const isValidQuickView = (value: string | null): value is ProductQuickView =>
   QUICK_VIEW_OPTIONS.some((option) => option.value === value)
 
-export function ProductsClient({ products: initialProducts, users, currentUserRole }: ProductsClientProps) {
+export function ProductsClient({ products: initialProducts, users, currentUserRole, embedded = false }: ProductsClientProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -122,7 +123,11 @@ export function ProductsClient({ products: initialProducts, users, currentUserRo
   }, [products])
 
   useEffect(() => {
-    const params = new URLSearchParams()
+    const params = new URLSearchParams(searchParams.toString())
+
+    ;['search', 'status', 'responsible', 'priority', 'country', 'view', 'sort', 'dir', 'advanced', 'overlaps'].forEach((key) => {
+      params.delete(key)
+    })
 
     if (search) params.set('search', search)
     if (statusFilter) params.set('status', statusFilter)
@@ -142,7 +147,7 @@ export function ProductsClient({ products: initialProducts, users, currentUserRo
     if (nextUrl !== currentUrl) {
       window.history.replaceState(null, '', nextUrl)
     }
-  }, [countryFilter, onlyWithOverlaps, priorityFilter, quickView, responsibleFilter, search, showAdvancedFilters, sortDirection, sortField, statusFilter])
+  }, [countryFilter, onlyWithOverlaps, priorityFilter, quickView, responsibleFilter, search, searchParams, showAdvancedFilters, sortDirection, sortField, statusFilter])
 
   useEffect(() => {
     if (!contextMenu) return
@@ -484,17 +489,19 @@ export function ProductsClient({ products: initialProducts, users, currentUserRo
 
   return (
     <div className="space-y-5 animate-fade-in">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Продукты</h1>
-          <p className="text-slate-500 text-sm mt-0.5">
-            {visibleProducts.length} из {products.length} продуктов
-          </p>
+      {!embedded && (
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Продукты</h1>
+            <p className="text-slate-500 text-sm mt-0.5">
+              {visibleProducts.length} из {products.length} продуктов
+            </p>
+          </div>
+          <Link href="/products/new" className="btn-primary">
+            <Plus className="w-4 h-4" /> Новый продукт
+          </Link>
         </div>
-        <Link href="/products/new" className="btn-primary">
-          <Plus className="w-4 h-4" /> Новый продукт
-        </Link>
-      </div>
+      )}
 
       <div className="card p-4 space-y-4">
         <div className="flex flex-wrap items-center gap-3">
