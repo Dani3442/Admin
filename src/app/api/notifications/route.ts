@@ -28,7 +28,10 @@ export async function GET(req: NextRequest) {
         dateValue: { lt: now },
         product: { isArchived: false, status: { notIn: ['COMPLETED', 'CANCELLED'] } },
       },
-      include: {
+      select: {
+        id: true,
+        stageName: true,
+        dateValue: true,
         product: { select: { id: true, name: true } },
       },
       orderBy: { dateValue: 'asc' },

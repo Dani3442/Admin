@@ -84,7 +84,20 @@ export async function applyAutomation(
 
   const product = await prisma.product.findUnique({
     where: { id: productId },
-    include: { stages: { orderBy: { stageOrder: 'asc' } } },
+    select: {
+      id: true,
+      finalDate: true,
+      stages: {
+        orderBy: { stageOrder: 'asc' },
+        select: {
+          id: true,
+          stageOrder: true,
+          dateValue: true,
+          plannedDate: true,
+          participatesInAutoshift: true,
+        },
+      },
+    },
   })
   if (!product) return null
 

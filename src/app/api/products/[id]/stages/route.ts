@@ -28,7 +28,28 @@ async function getProductStageSnapshot(productId: string) {
     select: {
       stages: {
         orderBy: { stageOrder: 'asc' },
-        include: {
+        select: {
+          id: true,
+          productId: true,
+          stageTemplateId: true,
+          stageOrder: true,
+          stageName: true,
+          dateValue: true,
+          dateRaw: true,
+          dateEnd: true,
+          status: true,
+          isCompleted: true,
+          isCritical: true,
+          participatesInAutoshift: true,
+          affectsFinalDate: true,
+          responsibleId: true,
+          comment: true,
+          priority: true,
+          plannedDate: true,
+          actualDate: true,
+          daysDeviation: true,
+          createdAt: true,
+          updatedAt: true,
           stageTemplate: {
             select: {
               id: true,
@@ -79,7 +100,28 @@ export async function POST(
       include: {
         stages: {
           orderBy: { stageOrder: 'asc' },
-          include: {
+          select: {
+            id: true,
+            productId: true,
+            stageTemplateId: true,
+            stageOrder: true,
+            stageName: true,
+            dateValue: true,
+            dateRaw: true,
+            dateEnd: true,
+            status: true,
+            isCompleted: true,
+            isCritical: true,
+            participatesInAutoshift: true,
+            affectsFinalDate: true,
+            responsibleId: true,
+            comment: true,
+            priority: true,
+            plannedDate: true,
+            actualDate: true,
+            daysDeviation: true,
+            createdAt: true,
+            updatedAt: true,
             stageTemplate: {
               select: {
                 id: true,
@@ -134,6 +176,7 @@ export async function POST(
     return NextResponse.json({
       stages: (snapshot?.stages || []).map((stage) => ({
         ...stage,
+        overlapAccepted: false,
         participatesInAutoshift: stage.participatesInAutoshift ?? true,
       })),
       progressPercent,
@@ -210,6 +253,7 @@ export async function DELETE(
     return NextResponse.json({
       stages: (snapshot?.stages || []).map((stage) => ({
         ...stage,
+        overlapAccepted: false,
         participatesInAutoshift: stage.participatesInAutoshift ?? true,
       })),
       progressPercent,

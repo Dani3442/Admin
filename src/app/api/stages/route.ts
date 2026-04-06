@@ -198,6 +198,29 @@ export async function PATCH(req: NextRequest) {
   const updatedStage = await prisma.productStage.update({
     where: { id: existingStage.id },
     data: normalizedUpdates,
+    select: {
+      id: true,
+      productId: true,
+      stageTemplateId: true,
+      stageOrder: true,
+      stageName: true,
+      dateValue: true,
+      dateRaw: true,
+      dateEnd: true,
+      status: true,
+      isCompleted: true,
+      isCritical: true,
+      participatesInAutoshift: true,
+      affectsFinalDate: true,
+      responsibleId: true,
+      comment: true,
+      priority: true,
+      plannedDate: true,
+      actualDate: true,
+      daysDeviation: true,
+      createdAt: true,
+      updatedAt: true,
+    },
   })
 
   // Apply automation if date changed
@@ -215,6 +238,7 @@ export async function PATCH(req: NextRequest) {
   // Recalculate product progress
   const allStages = await prisma.productStage.findMany({
     where: { productId: existingStage.productId },
+    select: { isCompleted: true },
   })
   const completedCount = allStages.filter((s) => s.isCompleted).length
   const progress = allStages.length > 0 ? Math.round((completedCount / allStages.length) * 100) : 0
@@ -241,7 +265,35 @@ export async function PATCH(req: NextRequest) {
   const stages = await prisma.productStage.findMany({
     where: { productId: existingStage.productId },
     orderBy: { stageOrder: 'asc' },
+    select: {
+      id: true,
+      productId: true,
+      stageTemplateId: true,
+      stageOrder: true,
+      stageName: true,
+      dateValue: true,
+      dateRaw: true,
+      dateEnd: true,
+      status: true,
+      isCompleted: true,
+      isCritical: true,
+      participatesInAutoshift: true,
+      affectsFinalDate: true,
+      responsibleId: true,
+      comment: true,
+      priority: true,
+      plannedDate: true,
+      actualDate: true,
+      daysDeviation: true,
+      createdAt: true,
+      updatedAt: true,
+    },
   })
 
-  return NextResponse.json({ stage: updatedStage, stages, automationResult, product: updatedProduct })
+  return NextResponse.json({
+    stage: { ...updatedStage, overlapAccepted: false },
+    stages: stages.map((stage) => ({ ...stage, overlapAccepted: false })),
+    automationResult,
+    product: updatedProduct,
+  })
 }

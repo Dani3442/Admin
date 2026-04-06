@@ -10,7 +10,28 @@ async function getProduct(id: string) {
       responsible: { select: { id: true, name: true, email: true } },
       stages: {
         orderBy: { stageOrder: 'asc' },
-        include: {
+        select: {
+          id: true,
+          productId: true,
+          stageTemplateId: true,
+          stageOrder: true,
+          stageName: true,
+          dateValue: true,
+          dateRaw: true,
+          dateEnd: true,
+          status: true,
+          isCompleted: true,
+          isCritical: true,
+          participatesInAutoshift: true,
+          affectsFinalDate: true,
+          responsibleId: true,
+          comment: true,
+          priority: true,
+          plannedDate: true,
+          actualDate: true,
+          daysDeviation: true,
+          createdAt: true,
+          updatedAt: true,
           stageTemplate: {
             select: {
               id: true,
@@ -45,7 +66,13 @@ async function getProduct(id: string) {
   })
 
   if (!product || product.isArchived) return null
-  return product
+  return {
+    ...product,
+    stages: product.stages.map((stage) => ({
+      ...stage,
+      overlapAccepted: false,
+    })),
+  }
 }
 
 async function getUsers() {

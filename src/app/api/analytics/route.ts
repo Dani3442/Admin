@@ -45,7 +45,17 @@ export async function GET(req: NextRequest) {
     prisma.product.findMany({
       where: { isArchived: false },
       include: {
-        stages: { orderBy: { stageOrder: 'asc' } },
+        stages: {
+          orderBy: { stageOrder: 'asc' },
+          select: {
+            id: true,
+            stageOrder: true,
+            stageName: true,
+            dateValue: true,
+            isCompleted: true,
+            isCritical: true,
+          },
+        },
         responsible: { select: { id: true, name: true } },
       },
     }),

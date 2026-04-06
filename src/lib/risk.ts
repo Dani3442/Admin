@@ -16,8 +16,22 @@ export async function recalculateAllRisks() {
 
   const products = await prisma.product.findMany({
     where: { isArchived: false },
-    include: {
-      stages: { orderBy: { stageOrder: 'asc' } },
+    select: {
+      id: true,
+      status: true,
+      finalDate: true,
+      riskScore: true,
+      stages: {
+        orderBy: { stageOrder: 'asc' },
+        select: {
+          id: true,
+          stageOrder: true,
+          stageName: true,
+          dateValue: true,
+          isCompleted: true,
+          isCritical: true,
+        },
+      },
     },
   })
 
@@ -59,7 +73,9 @@ export async function recalculateAllRisks() {
       }
     }
 
-    const { overlaps } = detectStageOverlaps(product.stages)
+    const { overlaps } = detectStageOverlaps(
+      product.stages.map((stage) => ({ ...stage, overlapAccepted: false }))
+    )
     for (const overlap of overlaps) {
       riskScore += 15
       issues.push(`overlap:${overlap.names.join('->')}`)
@@ -96,7 +112,24 @@ export async function recalculateProductRisk(productId: string) {
 
   const product = await prisma.product.findUnique({
     where: { id: productId },
-    include: { stages: { orderBy: { stageOrder: 'asc' } } },
+    select: {
+      id: true,
+      isArchived: true,
+      status: true,
+      finalDate: true,
+      riskScore: true,
+      stages: {
+        orderBy: { stageOrder: 'asc' },
+        select: {
+          id: true,
+          stageOrder: true,
+          stageName: true,
+          dateValue: true,
+          isCompleted: true,
+          isCritical: true,
+        },
+      },
+    },
   })
 
   if (!product || product.isArchived || product.status === 'COMPLETED' || product.status === 'CANCELLED') return
@@ -121,7 +154,9 @@ export async function recalculateProductRisk(productId: string) {
     }
   }
 
-  const { overlaps } = detectStageOverlaps(product.stages)
+  const { overlaps } = detectStageOverlaps(
+    product.stages.map((stage) => ({ ...stage, overlapAccepted: false }))
+  )
   for (const overlap of overlaps) {
     riskScore += 15
   }
