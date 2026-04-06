@@ -32,6 +32,14 @@ interface TableViewClientProps {
   currentUserRole: string
 }
 
+interface EditingCellState {
+  productId: string
+  stageId: string | null
+  stageTemplateId: string
+  stageOrder: number
+  stageName: string
+}
+
 function scoreStageMatch(productStage: ProductStage, stageTemplate: Stage) {
   const sameTemplate = productStage.stageTemplateId === stageTemplate.id
   const sameOrder = productStage.stageOrder === stageTemplate.order
@@ -88,7 +96,7 @@ export function TableViewClient({ products: initial, stages: initialStages, curr
   const [stages, setStages] = useState(initialStages)
   const [search, setSearch] = useState('')
   const [showOnlyRisk, setShowOnlyRisk] = useState(false)
-  const [editingCell, setEditingCell] = useState<{ productId: string; stageId: string | null; stageTemplateId: string; stageOrder: number; stageName: string } | null>(null)
+  const [editingCell, setEditingCell] = useState<EditingCellState | null>(null)
   const [editValue, setEditValue] = useState<Date | null>(null)
   const [saving, setSaving] = useState(false)
   const router = useRouter()
@@ -325,19 +333,29 @@ export function TableViewClient({ products: initial, stages: initialStages, curr
     setEditValue(stage?.dateValue ? new Date(stage.dateValue) : null)
   }
 
+  const isSameEditingCell = (left: EditingCellState | null, right: EditingCellState | null) => {
+    if (!left || !right) return false
+    return (
+      left.productId === right.productId &&
+      left.stageTemplateId === right.stageTemplateId &&
+      left.stageOrder === right.stageOrder
+    )
+  }
+
   const saveEdit = async (nextDate = editValue) => {
     if (!editingCell) return
+    const activeCell = editingCell
     setSaving(true)
     try {
       const res = await fetch('/api/stages', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          stageId: editingCell.stageId,
-          productId: editingCell.productId,
-          stageTemplateId: editingCell.stageTemplateId,
-          stageOrder: editingCell.stageOrder,
-          stageName: editingCell.stageName,
+          stageId: activeCell.stageId,
+          productId: activeCell.productId,
+          stageTemplateId: activeCell.stageTemplateId,
+          stageOrder: activeCell.stageOrder,
+          stageName: activeCell.stageName,
           updates: { dateValue: nextDate },
           applyAutomations: true,
         }),
@@ -349,7 +367,7 @@ export function TableViewClient({ products: initial, stages: initialStages, curr
 
       setProducts((prev) =>
         prev.map((p) =>
-          p.id !== editingCell.productId ? p : {
+          p.id !== activeCell.productId ? p : {
             ...p,
             stages: data?.stages || p.stages,
           }
@@ -359,7 +377,7 @@ export function TableViewClient({ products: initial, stages: initialStages, curr
       window.alert(error.message || 'Не удалось сохранить дату этапа')
     } finally {
       setSaving(false)
-      setEditingCell(null)
+      setEditingCell((current) => (isSameEditingCell(current, activeCell) ? null : current))
     }
   }
 
