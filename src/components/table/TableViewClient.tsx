@@ -3,10 +3,11 @@
 import { useState, useRef, useCallback, useEffect, type ReactNode } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { Search, CheckCircle2, AlertTriangle, Plus, ChevronLeft, ChevronRight, Pencil, X, Trash2 } from 'lucide-react'
-import { cn, formatDate, detectStageOverlaps } from '@/lib/utils'
+import { Search, CheckCircle2, AlertTriangle, Plus, ChevronLeft, ChevronRight, Pencil, X, Trash2, Filter } from 'lucide-react'
+import { cn, formatDate, detectStageOverlaps, getPriorityLabel, getStatusLabel } from '@/lib/utils'
 import { DatePicker } from '@/components/ui/DatePicker'
 import { buildProductHref, getRouteWithSearch } from '@/lib/navigation'
+import type { ProductQuickView } from '@/lib/product-list'
 
 interface Stage {
   id: string; order: number; name: string; durationText: string | null
@@ -20,8 +21,9 @@ interface ProductStage {
 }
 
 interface Product {
-  id: string; name: string; country: string | null; status: string
+  id: string; name: string; country: string | null; status: string; priority: string
   finalDate: Date | null; progressPercent: number; riskScore: number
+  isPinned?: boolean; isFavorite?: boolean
   responsible?: { id: string; name: string } | null
   stages: ProductStage[]
 }
@@ -41,6 +43,16 @@ interface EditingCellState {
   stageOrder: number
   stageName: string
 }
+
+const ALL_STATUSES = ['PLANNED', 'IN_PROGRESS', 'AT_RISK', 'DELAYED', 'COMPLETED', 'CANCELLED'] as const
+const ALL_PRIORITIES = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] as const
+const QUICK_VIEW_OPTIONS: Array<{ value: ProductQuickView; label: string }> = [
+  { value: 'all', label: 'Все' },
+  { value: 'pinned', label: 'Закреплённые' },
+  { value: 'favorite', label: 'Избранное' },
+  { value: 'overdue', label: 'Просроченные' },
+  { value: 'atRisk', label: 'Под риском' },
+]
 
 function scoreStageMatch(productStage: ProductStage, stageTemplate: Stage) {
   const sameTemplate = productStage.stageTemplateId === stageTemplate.id
@@ -103,7 +115,13 @@ export function TableViewClient({
   const [products, setProducts] = useState(initial)
   const [stages, setStages] = useState(initialStages)
   const [search, setSearch] = useState('')
-  const [showOnlyRisk, setShowOnlyRisk] = useState(false)
+  const [statusFilter, setStatusFilter] = useState('')
+  const [responsibleFilter, setResponsibleFilter] = useState('')
+  const [priorityFilter, setPriorityFilter] = useState('')
+  const [countryFilter, setCountryFilter] = useState('')
+  const [quickView, setQuickView] = useState<ProductQuickView>('all')
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
+  const [onlyWithOverlaps, setOnlyWithOverlaps] = useState(false)
   const [editingCell, setEditingCell] = useState<EditingCellState | null>(null)
   const [editValue, setEditValue] = useState<Date | null>(null)
   const [saving, setSaving] = useState(false)
@@ -122,6 +140,13 @@ export function TableViewClient({
   const [newStageDuration, setNewStageDuration] = useState('')
   const menuRef = useRef<HTMLDivElement>(null)
   const canEditTable = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUserRole)
+  const userOptions = Array.from(
+    new Map(
+      products
+        .filter((product) => product.responsible?.id && product.responsible?.name)
+        .map((product) => [product.responsible!.id, product.responsible!])
+    ).values()
+  ).sort((left, right) => left.name.localeCompare(right.name, 'ru'))
 
   useEffect(() => {
     setProducts(initial)
@@ -302,11 +327,36 @@ export function TableViewClient({
     setStageMenu(null)
   }
 
-  const filteredProducts = products.filter((p) => {
-    if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false
-    if (showOnlyRisk && p.riskScore < 25) return false
+  const filteredProducts = products.filter((product) => {
+    if (search && !product.name.toLowerCase().includes(search.toLowerCase())) return false
+    if (statusFilter && product.status !== statusFilter) return false
+    if (responsibleFilter && product.responsible?.id !== responsibleFilter) return false
+    if (priorityFilter && product.priority !== priorityFilter) return false
+    if (countryFilter.trim() && !(product.country || '').toLowerCase().includes(countryFilter.trim().toLowerCase())) return false
+
+    const { overlaps } = detectStageOverlaps(product.stages)
+    const overdue = Boolean(product.finalDate && product.status !== 'COMPLETED' && new Date(product.finalDate) < now)
+    const atRisk = product.status === 'AT_RISK' || product.riskScore >= 40
+
+    if (onlyWithOverlaps && overlaps.length === 0) return false
+    if (quickView === 'pinned' && !product.isPinned) return false
+    if (quickView === 'favorite' && !product.isFavorite) return false
+    if (quickView === 'overdue' && !overdue) return false
+    if (quickView === 'atRisk' && !atRisk) return false
+
     return true
   })
+
+  const resetFilters = () => {
+    setSearch('')
+    setStatusFilter('')
+    setResponsibleFilter('')
+    setPriorityFilter('')
+    setCountryFilter('')
+    setQuickView('all')
+    setShowAdvancedFilters(false)
+    setOnlyWithOverlaps(false)
+  }
 
   function getCellClass(stage: ProductStage | undefined, stageTemplate: Stage): string {
     if (!stage) return 'stage-cell empty'
@@ -419,13 +469,97 @@ export function TableViewClient({
             </div>
 
             <button
-              onClick={() => setShowOnlyRisk(!showOnlyRisk)}
-              className={cn('btn text-sm', showOnlyRisk ? 'bg-slate-900 text-white hover:bg-slate-800' : 'btn-secondary')}
+              onClick={() => setShowAdvancedFilters((current) => !current)}
+              className={cn('btn-secondary', showAdvancedFilters && 'bg-slate-900 text-white border-slate-900 hover:bg-slate-800 hover:text-white')}
             >
-              <AlertTriangle className="w-3.5 h-3.5" />
-              {showOnlyRisk ? 'Только риски' : 'Все'}
+              <Filter className="w-4 h-4" />
+              Фильтры
             </button>
+
+            {(search || statusFilter || responsibleFilter || priorityFilter || countryFilter.trim() || quickView !== 'all' || onlyWithOverlaps) && (
+              <button onClick={resetFilters} className="btn-secondary">
+                <X className="w-4 h-4" />
+                Сбросить
+              </button>
+            )}
           </div>
+
+          <div className="flex flex-wrap gap-2">
+            {QUICK_VIEW_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                onClick={() => setQuickView(option.value)}
+                className={cn(
+                  'rounded-full px-3.5 py-2 text-sm font-medium transition-colors',
+                  quickView === option.value
+                    ? 'bg-slate-900 text-white'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-800'
+                )}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+
+          {showAdvancedFilters && (
+            <div className="surface-subtle grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4">
+              <label className="space-y-1.5">
+                <span className="label mb-0">Статус</span>
+                <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="input">
+                  <option value="">Все статусы</option>
+                  {ALL_STATUSES.map((status) => (
+                  <option key={status} value={status}>
+                      {getStatusLabel(status)}
+                  </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="space-y-1.5">
+                <span className="label mb-0">Приоритет</span>
+                <select value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value)} className="input">
+                  <option value="">Все приоритеты</option>
+                  {ALL_PRIORITIES.map((priority) => (
+                  <option key={priority} value={priority}>
+                      {getPriorityLabel(priority)}
+                  </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="space-y-1.5">
+                <span className="label mb-0">Ответственный</span>
+                <select value={responsibleFilter} onChange={(event) => setResponsibleFilter(event.target.value)} className="input">
+                  <option value="">Все ответственные</option>
+                  {userOptions.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="space-y-1.5">
+                <span className="label mb-0">Страна</span>
+                <input
+                  value={countryFilter}
+                  onChange={(event) => setCountryFilter(event.target.value)}
+                  className="input"
+                  placeholder="Например, Китай"
+                />
+              </label>
+
+              <label className="inline-flex items-center gap-2 pt-1 text-sm text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={onlyWithOverlaps}
+                  onChange={(event) => setOnlyWithOverlaps(event.target.checked)}
+                  className="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                />
+                Только с пересечениями дат
+              </label>
+            </div>
+          )}
 
           {layoutSwitcher && <div className="pt-1">{layoutSwitcher}</div>}
         </div>

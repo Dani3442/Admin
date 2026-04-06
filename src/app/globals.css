@@ -42,11 +42,11 @@
   }
 
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-[20px] px-4 py-2.5 text-sm font-medium transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-[18px] px-4 py-2.5 text-sm font-medium transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   .btn-primary {
-    @apply btn bg-brand-600 text-white shadow-sm hover:bg-brand-700 active:bg-brand-800;
+    @apply btn bg-brand-600 text-white shadow-sm hover:bg-brand-700 hover:shadow-[0_0_0_6px_rgba(37,99,235,0.12),0_18px_30px_-18px_rgba(37,99,235,0.7)] active:bg-brand-800;
   }
 
   .btn-secondary {
@@ -180,7 +180,7 @@
 
 /* Stage date cell */
 .stage-cell {
-  @apply text-xs text-center py-1.5 px-1 rounded cursor-pointer transition-colors select-none;
+  @apply cursor-pointer select-none rounded-[18px] px-2 py-2 text-center text-xs transition-colors;
   min-width: 90px;
 }
 
