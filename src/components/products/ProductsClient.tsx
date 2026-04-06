@@ -544,7 +544,7 @@ export function ProductsClient({
 
             <button
               onClick={() => setShowAdvancedFilters((current) => !current)}
-              className={cn('btn-secondary', showAdvancedFilters && 'bg-slate-900 text-white border-slate-900 hover:bg-slate-800 hover:text-white')}
+              className={cn('btn-secondary', showAdvancedFilters && 'bg-brand-950 text-white border-brand-950 hover:bg-brand-900 hover:text-white')}
             >
               <Filter className="w-4 h-4" />
               Фильтры
@@ -566,7 +566,7 @@ export function ProductsClient({
                 className={cn(
                   'rounded-full px-3.5 py-2 text-sm font-medium transition-colors',
                   quickView === option.value
-                    ? 'bg-slate-900 text-white'
+                    ? 'bg-brand-950 text-white'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-800'
                 )}
               >

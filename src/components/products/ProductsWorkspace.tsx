@@ -81,7 +81,7 @@ function LayoutSwitcher({
             {active && (
               <motion.span
                 layoutId="products-layout-pill"
-                className="absolute inset-0 rounded-full bg-slate-950 shadow-[0_14px_28px_-18px_rgba(15,23,42,0.7)]"
+                className="absolute inset-0 rounded-full bg-brand-950 shadow-[0_14px_28px_-18px_rgba(23,37,84,0.62)]"
                 transition={{ type: 'spring', stiffness: 380, damping: 34 }}
               />
             )}

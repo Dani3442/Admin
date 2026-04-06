@@ -470,7 +470,7 @@ export function TableViewClient({
 
             <button
               onClick={() => setShowAdvancedFilters((current) => !current)}
-              className={cn('btn-secondary', showAdvancedFilters && 'bg-slate-900 text-white border-slate-900 hover:bg-slate-800 hover:text-white')}
+              className={cn('btn-secondary', showAdvancedFilters && 'bg-brand-950 text-white border-brand-950 hover:bg-brand-900 hover:text-white')}
             >
               <Filter className="w-4 h-4" />
               Фильтры
@@ -492,7 +492,7 @@ export function TableViewClient({
                 className={cn(
                   'rounded-full px-3.5 py-2 text-sm font-medium transition-colors',
                   quickView === option.value
-                    ? 'bg-slate-900 text-white'
+                    ? 'bg-brand-950 text-white'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-800'
                 )}
               >
@@ -572,7 +572,7 @@ export function TableViewClient({
             <thead className="sticky top-0 z-10">
               <tr>
                 <th
-                  className="sticky left-0 z-20 bg-slate-900 text-white text-xs px-4 py-2 text-left border-r border-slate-700 relative"
+                  className="sticky left-0 z-20 bg-brand-950 text-blue-50 text-xs px-4 py-2 text-left border-r border-brand-900 relative"
                   style={{ width: columnWidths.__product, minWidth: 120 }}
                 >
                   Продукт
@@ -582,7 +582,7 @@ export function TableViewClient({
                   />
                 </th>
                 <th
-                  className="bg-slate-800 text-slate-300 text-xs px-2 py-2 text-center border-r border-slate-700 relative"
+                  className="bg-brand-900 text-blue-100 text-xs px-2 py-2 text-center border-r border-brand-800 relative"
                   style={{ width: columnWidths.__progress, minWidth: 60 }}
                 >
                   Прогресс
@@ -595,8 +595,10 @@ export function TableViewClient({
                   <th
                     key={stage.id}
                     className={cn(
-                      'text-xs py-2 px-1.5 text-center border-r border-slate-700 relative group',
-                      stage.isCritical ? 'bg-red-900 text-red-200' : 'bg-slate-800 text-slate-300'
+                      'text-xs py-2 px-1.5 text-center border-r relative group',
+                      stage.isCritical
+                        ? 'bg-[#2d4673] text-blue-50 border-brand-800'
+                        : 'bg-[#263b61] text-slate-100 border-brand-800'
                     )}
                     style={{ width: columnWidths[stage.id], minWidth: 60 }}
                     title={`ПКМ: управление этапом\n${stage.name}`}
@@ -623,7 +625,7 @@ export function TableViewClient({
                       </div>
                     )}
                     {stage.durationText && !renamingStage && (
-                      <div className="text-slate-500 font-normal text-[10px] mt-0.5">{stage.durationText}</div>
+                      <div className="text-blue-200/70 font-normal text-[10px] mt-0.5">{stage.durationText}</div>
                     )}
                     <div
                       className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-brand-500/50 transition-colors"
@@ -634,13 +636,13 @@ export function TableViewClient({
 
                 {/* Add new stage column */}
                 <th
-                  className="bg-slate-800 border-r border-slate-700 text-center align-middle"
+                  className="bg-brand-900 border-r border-brand-800 text-center align-middle"
                   style={{ width: addColumnWidth, minWidth: addColumnWidth }}
                 >
                   {canEditTable && (
                     <button
                       onClick={() => setShowNewStageForm(true)}
-                      className="w-7 h-7 mx-auto rounded-md bg-slate-700 hover:bg-brand-600 text-slate-300 hover:text-white transition-colors flex items-center justify-center"
+                      className="w-7 h-7 mx-auto rounded-md bg-brand-950 text-blue-100 hover:bg-brand-700 hover:text-white transition-colors flex items-center justify-center"
                       title="Добавить новый этап"
                     >
                       <Plus className="w-4 h-4" />
