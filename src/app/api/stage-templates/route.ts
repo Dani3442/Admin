@@ -200,7 +200,7 @@ export async function DELETE(req: NextRequest) {
 
     const template = await prisma.stageTemplate.findUnique({
       where: { id },
-      select: { id: true, name: true },
+      select: { id: true, name: true, order: true },
     })
 
     if (!template) {
@@ -213,7 +213,7 @@ export async function DELETE(req: NextRequest) {
       const productStages = await tx.productStage.findMany({
         where: {
           stageTemplateId: id,
-          stageName: template.name,
+          stageOrder: template.order,
         },
         select: {
           id: true,
