@@ -68,6 +68,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
   const [savingAutomation, setSavingAutomation] = useState(false)
   const [deletingProduct, setDeletingProduct] = useState(false)
   const commentInputRef = useRef<HTMLInputElement>(null)
+  const commentsScrollRef = useRef<HTMLDivElement>(null)
 
   // Close context menu on outside click
   useEffect(() => {
@@ -166,6 +167,20 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
       window.clearInterval(intervalId)
     }
   }, [product.id, tab])
+
+  useEffect(() => {
+    if (tab !== 'comments') return
+
+    const container = commentsScrollRef.current
+    if (!container) return
+
+    requestAnimationFrame(() => {
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior: 'smooth',
+      })
+    })
+  }, [commentFeed.length, tab])
 
   const now = new Date()
   const completedStages = product.stages.filter((s: any) => s.isCompleted).length
@@ -964,7 +979,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                 )}
 
                 {tab === 'comments' && (
-                  <div className="grid gap-5 xl:grid-cols-[280px,minmax(0,1fr)]">
+                  <div className="grid gap-5 xl:grid-cols-[280px,minmax(0,1fr)] xl:items-start">
                     <div className="space-y-4">
                       <div className="rounded-[28px] bg-slate-50 p-4">
                         <div className="mb-3 flex items-center gap-2">
@@ -1002,13 +1017,13 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                     </div>
 
                     <div className="rounded-[28px] bg-slate-50 p-4">
-                      <div className="flex min-h-[560px] flex-col overflow-hidden rounded-[24px] bg-white shadow-[inset_0_0_0_1px_rgba(226,232,240,0.7)]">
+                      <div className="flex h-[min(72vh,760px)] min-h-[480px] flex-col overflow-hidden rounded-[24px] bg-white shadow-[inset_0_0_0_1px_rgba(226,232,240,0.7)]">
                         <div className="border-b border-slate-100 px-4 py-3">
                           <h3 className="text-sm font-semibold text-slate-800">Комментарии по продукту</h3>
                           <p className="mt-1 text-xs text-slate-400">Пиши сообщения, отмечай коллег через `@` и обсуждай изменения прямо в карточке продукта.</p>
                         </div>
 
-                        <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
+                        <div ref={commentsScrollRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
                           {commentFeed.length === 0 ? (
                             <div className="flex h-full min-h-[280px] items-center justify-center rounded-[20px] border border-dashed border-slate-200 bg-slate-50/80 text-center">
                               <div>
