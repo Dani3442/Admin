@@ -723,7 +723,7 @@ export function TableViewClient({
             <thead className="sticky top-0 z-10">
               <tr>
                 <th
-                  className="sticky left-0 z-20 bg-brand-950 px-4 py-3 text-left text-[18px] font-semibold leading-[1.2] text-slate-100 border-r border-brand-900 relative"
+                  className="sticky left-0 z-20 bg-brand-950 px-4 py-3 text-left text-[17px] font-medium leading-[1.2] text-slate-100 border-r border-brand-900 relative"
                   style={{ width: columnWidths.__product, minWidth: 120 }}
                 >
                   Продукт
@@ -733,7 +733,7 @@ export function TableViewClient({
                   />
                 </th>
                 <th
-                  className="bg-brand-950 px-2 py-3 text-center text-[17px] font-semibold leading-[1.2] text-slate-100 border-r border-brand-900 relative"
+                  className="bg-brand-950 px-2 py-3 text-center text-[17px] font-medium leading-[1.2] text-slate-100 border-r border-brand-900 relative"
                   style={{ width: columnWidths.__progress, minWidth: 60 }}
                 >
                   Прогресс
@@ -766,7 +766,7 @@ export function TableViewClient({
                         />
                       </div>
                     ) : (
-                      <div className="cursor-context-menu break-words whitespace-normal text-[18px] font-semibold leading-[1.15]">
+                      <div className="cursor-context-menu break-words whitespace-normal text-[17px] font-medium leading-[1.18]">
                         {stage.name}
                       </div>
                     )}
@@ -818,7 +818,7 @@ export function TableViewClient({
                       style={{ width: columnWidths.__product, minWidth: 120, maxWidth: columnWidths.__product }}
                     >
                       <Link href={buildProductHref(product.id, currentRoute)} className="block">
-                        <div className="truncate text-[19px] font-medium leading-[1.2] text-slate-800 hover:text-brand-700" title={product.name}>
+                        <div className="truncate text-[17px] font-medium leading-[1.2] text-slate-800 hover:text-brand-700" title={product.name}>
                           {product.name}
                         </div>
                         <div className="flex items-center gap-2 mt-0.5">
@@ -933,10 +933,10 @@ export function TableViewClient({
                 </button>
                 <button
                   className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
-                  onClick={() => handleToggleStageTemplateAutoshift(stage, !stage.participatesInAutoshift)}
+                  onClick={() => handleToggleStageTemplateAutoshift(stage, stage.participatesInAutoshift === false)}
                 >
-                  <CheckCircle2 className={cn('w-3.5 h-3.5', stage.participatesInAutoshift ? 'text-emerald-500' : 'text-slate-400')} />
-                  {stage.participatesInAutoshift ? 'Отключить автосдвиг' : 'Включить автосдвиг'}
+                  <CheckCircle2 className={cn('w-3.5 h-3.5', stage.participatesInAutoshift === false ? 'text-slate-400' : 'text-emerald-500')} />
+                  {stage.participatesInAutoshift === false ? 'Включить автосдвиг' : 'Отключить автосдвиг'}
                 </button>
                 <button
                   className={cn('w-full px-3 py-2 text-left text-sm flex items-center gap-2', isFirst ? 'text-slate-300 cursor-not-allowed' : 'text-slate-700 hover:bg-slate-50')}
@@ -972,10 +972,10 @@ export function TableViewClient({
             return (
               <button
                 className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
-                onClick={() => handleToggleProductStageAutoshift(stage.id, product.id, !stage.participatesInAutoshift)}
+                onClick={() => handleToggleProductStageAutoshift(stage.id, product.id, stage.participatesInAutoshift === false)}
               >
-                <CheckCircle2 className={cn('w-3.5 h-3.5', stage.participatesInAutoshift ? 'text-emerald-500' : 'text-slate-400')} />
-                {stage.participatesInAutoshift ? 'Отключить автосдвиг' : 'Включить автосдвиг'}
+                <CheckCircle2 className={cn('w-3.5 h-3.5', stage.participatesInAutoshift === false ? 'text-slate-400' : 'text-emerald-500')} />
+                {stage.participatesInAutoshift === false ? 'Включить автосдвиг' : 'Отключить автосдвиг'}
               </button>
             )
           })()}

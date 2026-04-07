@@ -682,7 +682,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                         <p className={cn('text-sm font-medium', stage.isCompleted ? 'line-through text-slate-400' : 'text-slate-700')}>
                           {stage.stageName}
                           {stage.isCritical && <span className="ml-1.5 text-xs text-red-500 font-semibold">КРИТИЧНЫЙ</span>}
-                          {!stage.participatesInAutoshift && (
+                          {stage.participatesInAutoshift === false && (
                             <span className="ml-1.5 text-xs text-slate-500 font-semibold">АВТОСДВИГ ВЫКЛ.</span>
                           )}
                           {hasOverlap && <span className="ml-1.5 text-xs text-orange-600 font-semibold" title="Даты пересекаются с соседним этапом">⚠ ПЕРЕСЕЧЕНИЕ</span>}
@@ -918,10 +918,10 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
             </button>
             <button
               className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
-              onClick={() => handleToggleStageAutoshift(stage, !stage.participatesInAutoshift)}
+              onClick={() => handleToggleStageAutoshift(stage, stage.participatesInAutoshift === false)}
             >
-              <Zap className={cn('w-3.5 h-3.5', stage.participatesInAutoshift ? 'text-emerald-500' : 'text-slate-400')} />
-              {stage.participatesInAutoshift ? 'Отключить автосдвиг' : 'Включить автосдвиг'}
+              <Zap className={cn('w-3.5 h-3.5', stage.participatesInAutoshift === false ? 'text-slate-400' : 'text-emerald-500')} />
+              {stage.participatesInAutoshift === false ? 'Включить автосдвиг' : 'Отключить автосдвиг'}
             </button>
             <div className="border-t border-slate-100 my-1" />
             <button

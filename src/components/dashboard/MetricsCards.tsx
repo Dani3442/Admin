@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { Package, Clock, CheckCircle2, AlertTriangle, XCircle, TrendingUp, CalendarClock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -27,6 +28,7 @@ export function DashboardMetricsCards({ metrics }: MetricsCardsProps) {
       icon: Package,
       color: 'text-slate-600',
       bg: 'bg-slate-50',
+      href: '/products',
     },
     {
       label: 'В работе',
@@ -34,6 +36,7 @@ export function DashboardMetricsCards({ metrics }: MetricsCardsProps) {
       icon: Clock,
       color: 'text-blue-600',
       bg: 'bg-blue-50',
+      href: '/products?status=IN_PROGRESS',
     },
     {
       label: 'Завершено',
@@ -42,6 +45,7 @@ export function DashboardMetricsCards({ metrics }: MetricsCardsProps) {
       color: 'text-emerald-600',
       bg: 'bg-emerald-50',
       sub: `${metrics.completionRate}% выполнено`,
+      href: '/products?status=COMPLETED',
     },
     {
       label: 'Под риском',
@@ -49,6 +53,7 @@ export function DashboardMetricsCards({ metrics }: MetricsCardsProps) {
       icon: AlertTriangle,
       color: 'text-amber-600',
       bg: 'bg-amber-50',
+      href: '/products?view=atRisk',
     },
     {
       label: 'Просрочено',
@@ -56,6 +61,7 @@ export function DashboardMetricsCards({ metrics }: MetricsCardsProps) {
       icon: XCircle,
       color: 'text-red-600',
       bg: 'bg-red-50',
+      href: '/products?status=DELAYED',
     },
     {
       label: 'Отклонение',
@@ -64,6 +70,7 @@ export function DashboardMetricsCards({ metrics }: MetricsCardsProps) {
       color: metrics.avgDaysDeviation > 5 ? 'text-red-600' : 'text-slate-600',
       bg: metrics.avgDaysDeviation > 5 ? 'bg-red-50' : 'bg-slate-50',
       sub: 'Среднее по датам',
+      href: '/products?sort=riskScore&dir=desc',
     },
     {
       label: 'Срок через 7 дней',
@@ -72,6 +79,7 @@ export function DashboardMetricsCards({ metrics }: MetricsCardsProps) {
       color: metrics.dueSoon7 > 0 ? 'text-orange-600' : 'text-slate-500',
       bg: metrics.dueSoon7 > 0 ? 'bg-orange-50' : 'bg-slate-50',
       sub: `${metrics.dueSoon30} за 30 дней`,
+      href: '/products?sort=finalDate&dir=asc',
     },
   ]
 
@@ -80,9 +88,10 @@ export function DashboardMetricsCards({ metrics }: MetricsCardsProps) {
       {cards.map((card, i) => {
         const Icon = card.icon
         return (
-          <div
+          <Link
             key={i}
-            className="surface-panel p-4 transition-shadow duration-150 hover:shadow-card-hover lg:p-5"
+            href={card.href}
+            className="surface-panel block p-4 transition-all duration-150 hover:-translate-y-0.5 hover:shadow-card-hover lg:p-5"
           >
             <div className={cn('mb-3 flex h-9 w-9 items-center justify-center rounded-xl', card.bg)}>
               <Icon className={cn('h-4 w-4', card.color)} />
@@ -90,7 +99,7 @@ export function DashboardMetricsCards({ metrics }: MetricsCardsProps) {
             <div className={cn('text-[26px] font-semibold tracking-[-0.03em]', card.color)}>{card.value}</div>
             <div className="mt-1 text-xs font-medium uppercase tracking-[0.06em] text-slate-500">{card.label}</div>
             {card.sub && <div className="mt-1 text-xs text-slate-400">{card.sub}</div>}
-          </div>
+          </Link>
         )
       })}
     </div>

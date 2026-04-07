@@ -15,7 +15,7 @@ async function getProductsWorkspaceData() {
         stages: {
           select: {
             id: true, stageOrder: true, isCompleted: true, dateValue: true,
-            isCritical: true, status: true, stageName: true,
+            isCritical: true, status: true, stageName: true, participatesInAutoshift: true,
           },
           orderBy: { stageOrder: 'asc' },
         },
@@ -31,7 +31,7 @@ async function getProductsWorkspaceData() {
           select: {
             id: true, stageTemplateId: true, stageOrder: true, stageName: true,
             dateValue: true, dateRaw: true, isCompleted: true,
-            isCritical: true, status: true,
+            isCritical: true, status: true, participatesInAutoshift: true,
           },
         },
       },
@@ -49,6 +49,7 @@ async function getProductsWorkspaceData() {
         order: true,
         durationText: true,
         isCritical: true,
+        participatesInAutoshift: true,
       },
       orderBy: { order: 'asc' },
     }),
