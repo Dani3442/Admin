@@ -4,6 +4,17 @@ import Credentials from 'next-auth/providers/credentials'
 import { authConfig } from './auth.config'
 import { prisma } from './prisma'
 
+function normalizeSessionAvatar(avatar: string | null | undefined) {
+  if (!avatar) return null
+
+  const trimmed = avatar.trim()
+  if (!trimmed) return null
+  if (trimmed.startsWith('data:image/')) return null
+  if (trimmed.length > 1024) return null
+
+  return trimmed
+}
+
 async function ensureDefaultAdminUser(email: string, password: string) {
   const adminEmail = (process.env.ADMIN_EMAIL || 'admin@company.com').trim().toLowerCase()
   const adminPassword = process.env.ADMIN_PASSWORD || 'Admin1234!'
@@ -50,6 +61,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         let user = await prisma.user.findUnique({
           where: { email },
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            lastName: true,
+            password: true,
+            role: true,
+            avatar: true,
+            isActive: true,
+          },
         })
 
         if (!user) {
@@ -82,7 +103,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           name: user.name,
           lastName: user.lastName,
           role: user.role,
-          avatar: user.avatar,
+          avatar: normalizeSessionAvatar(user.avatar),
         }
       },
     }),

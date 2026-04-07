@@ -190,9 +190,9 @@ export async function PATCH(req: NextRequest) {
     })
   }
 
+  const { overlapAccepted: _ignoredOverlapAccepted, ...safeUpdates } = updates || {}
   const normalizedUpdates = {
-    ...updates,
-    ...(Object.prototype.hasOwnProperty.call(updates, 'dateValue') ? { overlapAccepted: false } : {}),
+    ...safeUpdates,
   }
 
   const updatedStage = await prisma.productStage.update({
