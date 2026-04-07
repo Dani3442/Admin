@@ -165,18 +165,18 @@ export function Header({ user }: HeaderProps) {
       <div className="page-shell flex justify-center">
         <motion.div
           layout
-          className="floating-island flex w-full max-w-[1180px] items-center gap-3 px-3 py-3"
+          className="floating-island flex w-full max-w-[1060px] items-center gap-2.5 px-2.5 py-2.5"
           transition={{ type: 'spring', stiffness: 360, damping: 32 }}
         >
           <Link
             href="/dashboard"
-            className="hidden h-14 w-14 flex-shrink-0 items-center justify-center rounded-full bg-slate-950 text-white shadow-sm transition hover:scale-[1.03] sm:inline-flex"
+            className="hidden h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-slate-950 text-white shadow-sm transition hover:scale-[1.03] sm:inline-flex"
             aria-label="Перейти на дашборд"
           >
-            <Package2 className="h-5.5 w-5.5" />
+            <Package2 className="h-5 w-5" />
           </Link>
 
-          <div className="no-scrollbar flex min-w-0 flex-1 items-center justify-center gap-2 overflow-x-auto px-2">
+          <div className="no-scrollbar flex min-w-0 flex-1 items-center justify-center gap-1.5 overflow-x-auto px-1">
             {NAV_ITEMS.map((item) => {
               if (item.adminOnly && !isAdmin) return null
 
@@ -189,7 +189,7 @@ export function Header({ user }: HeaderProps) {
                   href={item.href}
                   className={cn(
                     'relative inline-flex flex-shrink-0 items-center gap-2 rounded-full font-medium transition-all',
-                    active ? 'h-12 px-6 text-[15px]' : 'h-11 px-4 text-sm',
+                    active ? 'h-11 px-5 text-[15px]' : 'h-10 px-3.5 text-[15px]',
                     active ? 'text-white' : 'text-slate-600 hover:text-slate-900'
                   )}
                 >
@@ -200,7 +200,7 @@ export function Header({ user }: HeaderProps) {
                       transition={{ type: 'spring', stiffness: 390, damping: 34 }}
                     />
                   )}
-                  <Icon className={cn('relative z-10', active ? 'h-[18px] w-[18px]' : 'h-4 w-4')} />
+                  <Icon className={cn('relative z-10', active ? 'h-[17px] w-[17px]' : 'h-[16px] w-[16px]')} />
                   <span className="relative z-10 whitespace-nowrap">{item.label}</span>
                 </Link>
               )
@@ -212,10 +212,10 @@ export function Header({ user }: HeaderProps) {
               <button
                 type="button"
                 onClick={handleToggleNotifications}
-                className="relative inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200/80 bg-white/90 text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200/80 bg-white/90 text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
                 aria-label="Открыть уведомления"
               >
-                <Bell className="h-[18px] w-[18px]" />
+                <Bell className="h-[17px] w-[17px]" />
                 {totalBadge > 0 && (
                   <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
                     {totalBadge > 99 ? '99+' : totalBadge}
@@ -312,13 +312,13 @@ export function Header({ user }: HeaderProps) {
               <button
                 type="button"
                 onClick={handleToggleProfile}
-                className="inline-flex h-11 items-center gap-2 rounded-full border border-slate-200/80 bg-white/90 pl-1.5 pr-3 text-left transition hover:border-slate-300"
+                className="inline-flex h-10 items-center gap-2 rounded-full border border-slate-200/80 bg-white/90 pl-1.5 pr-3 text-left transition hover:border-slate-300"
                 aria-label="Открыть меню профиля"
               >
                 <UserAvatar user={user} size="sm" />
                 <div className="hidden min-w-0 text-left sm:block">
-                  <p className="max-w-[140px] truncate text-sm font-medium text-slate-800">{getUserDisplayName(user)}</p>
-                  <p className="truncate text-[11px] text-slate-500">{getRoleLabel(user.role)}</p>
+                  <p className="max-w-[140px] truncate text-[15px] font-medium leading-6 text-slate-800">{getUserDisplayName(user)}</p>
+                  <p className="truncate text-[15px] leading-6 text-slate-500">{getRoleLabel(user.role)}</p>
                 </div>
                 <ChevronDown className={cn('h-4 w-4 text-slate-400 transition-transform', profileOpen && 'rotate-180')} />
               </button>

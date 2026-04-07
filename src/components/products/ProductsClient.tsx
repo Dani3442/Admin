@@ -721,10 +721,10 @@ export function ProductsClient({
                           <Star className={cn('w-3.5 h-3.5', product.isFavorite ? 'text-slate-700 fill-slate-200' : 'text-slate-300')} />
                         </div>
                         <div className="min-w-0">
-                          <Link href={buildProductHref(product.id, currentRoute)} className="text-[18px] font-bold leading-tight tracking-[-0.01em] text-slate-800 hover:text-brand-700 transition-colors">
+                          <Link href={buildProductHref(product.id, currentRoute)} className="text-[17px] font-semibold leading-[1.25] tracking-[-0.02em] text-slate-800 hover:text-brand-700 transition-colors">
                             {product.name.length > 70 ? `${product.name.slice(0, 70)}…` : product.name}
                           </Link>
-                          <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                          <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[15px] leading-6 text-slate-400">
                             <span>{product._count.stages} этапов</span>
                             <span>•</span>
                             <span>{product._count.comments} комм.</span>
@@ -743,7 +743,7 @@ export function ProductsClient({
                       </div>
                     </td>
                     <td className={cn('table-cell', isDragging && 'bg-white')}>
-                      <span className="text-xs text-slate-500">{product.country || '—'}</span>
+                      <span className="text-[15px] leading-6 text-slate-500">{product.country || '—'}</span>
                     </td>
                     <td className={cn('table-cell', isDragging && 'bg-white')}>
                       <span className={cn('badge text-xs', getStatusColor(product.status))}>{getStatusLabel(product.status)}</span>
@@ -752,7 +752,7 @@ export function ProductsClient({
                       <span className={cn('badge text-xs border', getPriorityColor(product.priority))}>{getPriorityLabel(product.priority)}</span>
                     </td>
                     <td className={cn('table-cell', isDragging && 'bg-white')}>
-                      <span className="text-xs text-slate-600">{product.responsible?.name || '—'}</span>
+                      <span className="text-[15px] leading-6 text-slate-600">{product.responsible?.name || '—'}</span>
                     </td>
                     <td className={cn('table-cell', isDragging && 'bg-white')}>
                       <div className="flex items-center gap-2">
@@ -765,19 +765,19 @@ export function ProductsClient({
                             style={{ width: `${product.progressPercent}%` }}
                           />
                         </div>
-                        <span className="text-xs text-slate-500 w-8 text-right">{product.progressPercent}%</span>
+                        <span className="w-8 text-right text-[15px] leading-6 text-slate-500">{product.progressPercent}%</span>
                       </div>
                     </td>
                     <td className={cn('table-cell', isDragging && 'bg-white')}>
-                      <span className={cn('text-xs font-medium', isOverdue ? 'text-red-600' : 'text-slate-600')}>
+                      <span className={cn('text-[15px] font-medium leading-6', isOverdue ? 'text-red-600' : 'text-slate-600')}>
                         {formatDate(product.finalDate)}
                       </span>
-                      {isOverdue && <div className="text-xs text-red-500 mt-0.5">просрочен</div>}
+                      {isOverdue && <div className="mt-0.5 text-[15px] leading-6 text-red-500">просрочен</div>}
                     </td>
                     <td className={cn('table-cell', isDragging && 'bg-white')}>
                       <div
                         className={cn(
-                          'inline-flex items-center justify-center w-8 h-8 rounded-lg text-xs font-bold',
+                          'inline-flex h-8 w-8 items-center justify-center rounded-lg text-[15px] font-semibold leading-none',
                           product.riskScore >= 70
                             ? 'bg-red-100 text-red-700'
                             : product.riskScore >= 40
