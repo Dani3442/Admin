@@ -3,7 +3,8 @@ import { auth, hasPermission, Permission } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { applyAutomation, ensureDefaultShiftFollowingAutomation } from '@/lib/automation'
 import { recalculateProductRisk } from '@/lib/risk'
-import { supportsProductStageAutoshiftColumn } from '@/lib/schema-compat'
+import { supportsProductStageAutoshiftColumn, supportsProductStageOverlapAcceptedColumn } from '@/lib/schema-compat'
+import { recalculateProductDerivedFields } from '@/lib/product-derived-fields'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -34,7 +35,10 @@ export async function PATCH(req: NextRequest) {
 
   const body = await req.json()
   const { stageId, stageIds, updates, applyAutomations = true, swapWithStageId, productId, stageTemplateId, stageOrder, stageName } = body
-  const hasAutoshiftColumn = await supportsProductStageAutoshiftColumn()
+  const [hasAutoshiftColumn, hasOverlapAcceptedColumn] = await Promise.all([
+    supportsProductStageAutoshiftColumn(),
+    supportsProductStageOverlapAcceptedColumn(),
+  ])
   const stageResponseSelect: Record<string, boolean> = {
     id: true,
     stageTemplateId: true,
@@ -61,7 +65,17 @@ export async function PATCH(req: NextRequest) {
     stageResponseSelect.participatesInAutoshift = true
   }
 
+  if (hasOverlapAcceptedColumn) {
+    stageResponseSelect.overlapAccepted = true
+  }
+
   if (Array.isArray(stageIds) && stageIds.length > 0) {
+    const bulkUpdates = { ...(updates || {}) }
+    const requestedOverlapAccepted = bulkUpdates.overlapAccepted
+    if (!hasOverlapAcceptedColumn) {
+      delete bulkUpdates.overlapAccepted
+    }
+
     const stagesToUpdate = await prisma.productStage.findMany({
       where: { id: { in: stageIds } },
       select: { id: true, productId: true },
@@ -76,11 +90,14 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'Stages must belong to the same product' }, { status: 400 })
     }
 
-    await prisma.productStage.updateMany({
-      where: { id: { in: stageIds } },
-      data: updates,
-    })
+    if (Object.keys(bulkUpdates).length > 0) {
+      await prisma.productStage.updateMany({
+        where: { id: { in: stageIds } },
+        data: bulkUpdates,
+      })
+    }
 
+    await recalculateProductDerivedFields(targetProductId)
     await recalculateProductRisk(targetProductId)
 
     const updatedProduct = await prisma.product.findUnique({
@@ -100,11 +117,18 @@ export async function PATCH(req: NextRequest) {
       select: stageResponseSelect,
     })
 
+    const acceptedFallbackIds =
+      !hasOverlapAcceptedColumn && requestedOverlapAccepted === true
+        ? new Set(stageIds)
+        : null
+
     return NextResponse.json({
       stages: stages.map((stage) => ({
         ...stage,
         participatesInAutoshift: hasAutoshiftColumn ? (stage as any).participatesInAutoshift ?? true : true,
-        overlapAccepted: false,
+        overlapAccepted: hasOverlapAcceptedColumn
+          ? (stage as any).overlapAccepted ?? false
+          : acceptedFallbackIds?.has(stage.id) ?? false,
       })),
       product: updatedProduct,
     })
@@ -260,7 +284,21 @@ export async function PATCH(req: NextRequest) {
     })
   }
 
-  const { overlapAccepted: _ignoredOverlapAccepted, ...safeUpdates } = updates || {}
+  const safeUpdates = { ...(updates || {}) }
+  if (!hasOverlapAcceptedColumn) {
+    delete safeUpdates.overlapAccepted
+  }
+
+  if (
+    hasOverlapAcceptedColumn &&
+    Object.prototype.hasOwnProperty.call(safeUpdates, 'dateValue') &&
+    oldDate &&
+    newDate &&
+    oldDate.getTime() !== newDate.getTime()
+  ) {
+    safeUpdates.overlapAccepted = false
+  }
+
   const normalizedUpdates = {
     ...safeUpdates,
   }
@@ -286,18 +324,7 @@ export async function PATCH(req: NextRequest) {
     )
   }
 
-  // Recalculate product progress
-  const allStages = await prisma.productStage.findMany({
-    where: { productId: existingStage.productId },
-    select: { isCompleted: true },
-  })
-  const completedCount = allStages.filter((s) => s.isCompleted).length
-  const progress = allStages.length > 0 ? Math.round((completedCount / allStages.length) * 100) : 0
-
-  await prisma.product.update({
-    where: { id: existingStage.productId },
-    data: { progressPercent: progress },
-  })
+  await recalculateProductDerivedFields(existingStage.productId)
 
   // Recalculate risk after any stage change
   await recalculateProductRisk(existingStage.productId)
@@ -323,12 +350,12 @@ export async function PATCH(req: NextRequest) {
     stage: {
       ...updatedStage,
       participatesInAutoshift: hasAutoshiftColumn ? (updatedStage as any).participatesInAutoshift ?? true : true,
-      overlapAccepted: false,
+      overlapAccepted: hasOverlapAcceptedColumn ? (updatedStage as any).overlapAccepted ?? false : false,
     },
     stages: stages.map((stage) => ({
       ...stage,
       participatesInAutoshift: hasAutoshiftColumn ? (stage as any).participatesInAutoshift ?? true : true,
-      overlapAccepted: false,
+      overlapAccepted: hasOverlapAcceptedColumn ? (stage as any).overlapAccepted ?? false : false,
     })),
     automationResult,
     product: updatedProduct,

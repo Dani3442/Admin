@@ -2,30 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { recalculateProductRisk } from '@/lib/risk'
-
-async function updateProductProgress(productId: string) {
-  const stages = await prisma.productStage.findMany({
-    where: { productId },
-    select: { isCompleted: true },
-  })
-
-  const completedCount = stages.filter((stage) => stage.isCompleted).length
-  const progressPercent = stages.length > 0
-    ? Math.round((completedCount / stages.length) * 100)
-    : 0
-
-  await prisma.product.update({
-    where: { id: productId },
-    data: { progressPercent },
-  })
-
-  return progressPercent
-}
+import { recalculateProductDerivedFields } from '@/lib/product-derived-fields'
 
 async function getProductStageSnapshot(productId: string) {
   const product = await prisma.product.findUnique({
     where: { id: productId },
     select: {
+      finalDate: true,
       stages: {
         orderBy: { stageOrder: 'asc' },
         select: {
@@ -169,17 +152,17 @@ export async function POST(
       },
     })
 
-    const progressPercent = await updateProductProgress(productId)
+    const derivedProduct = await recalculateProductDerivedFields(productId)
     await recalculateProductRisk(productId)
     const snapshot = await getProductStageSnapshot(productId)
 
     return NextResponse.json({
       stages: (snapshot?.stages || []).map((stage) => ({
         ...stage,
-        overlapAccepted: false,
         participatesInAutoshift: stage.participatesInAutoshift ?? true,
       })),
-      progressPercent,
+      progressPercent: derivedProduct?.progressPercent ?? snapshot?.progressPercent ?? 0,
+      finalDate: derivedProduct?.finalDate ?? snapshot?.finalDate ?? null,
       riskScore: snapshot?.riskScore || 0,
       status: snapshot?.status || 'PLANNED',
     })
@@ -246,17 +229,17 @@ export async function DELETE(
       }
     })
 
-    const progressPercent = await updateProductProgress(productId)
+    const derivedProduct = await recalculateProductDerivedFields(productId)
     await recalculateProductRisk(productId)
     const snapshot = await getProductStageSnapshot(productId)
 
     return NextResponse.json({
       stages: (snapshot?.stages || []).map((stage) => ({
         ...stage,
-        overlapAccepted: false,
         participatesInAutoshift: stage.participatesInAutoshift ?? true,
       })),
-      progressPercent,
+      progressPercent: derivedProduct?.progressPercent ?? snapshot?.progressPercent ?? 0,
+      finalDate: derivedProduct?.finalDate ?? snapshot?.finalDate ?? null,
       riskScore: snapshot?.riskScore || 0,
       status: snapshot?.status || 'PLANNED',
     })

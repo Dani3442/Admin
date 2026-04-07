@@ -466,6 +466,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
       setProduct((prev: any) => ({
         ...prev,
         stages: data.stages,
+        finalDate: data.finalDate ?? prev.finalDate,
         progressPercent: data.progressPercent,
         riskScore: data.riskScore,
         status: data.status,
@@ -533,6 +534,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
       setProduct((prev: any) => ({
         ...prev,
         stages: data.stages,
+        finalDate: data.finalDate ?? prev.finalDate,
         progressPercent: data.progressPercent,
         riskScore: data.riskScore,
         status: data.status,

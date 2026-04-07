@@ -1,5 +1,6 @@
 import { detectStageOverlaps } from './utils'
 import { prisma } from './prisma'
+import { supportsProductStageOverlapAcceptedColumn } from './schema-compat'
 
 /**
  * Recalculates risk scores and statuses for all active products.
@@ -13,27 +14,50 @@ import { prisma } from './prisma'
  */
 export async function recalculateAllRisks() {
   const now = new Date()
+  const hasOverlapAcceptedColumn = await supportsProductStageOverlapAcceptedColumn()
 
-  const products = await prisma.product.findMany({
-    where: { isArchived: false },
-    select: {
-      id: true,
-      status: true,
-      finalDate: true,
-      riskScore: true,
-      stages: {
-        orderBy: { stageOrder: 'asc' },
+  const products = hasOverlapAcceptedColumn
+    ? await prisma.product.findMany({
+        where: { isArchived: false },
         select: {
           id: true,
-          stageOrder: true,
-          stageName: true,
-          dateValue: true,
-          isCompleted: true,
-          isCritical: true,
+          status: true,
+          finalDate: true,
+          riskScore: true,
+          stages: {
+            orderBy: { stageOrder: 'asc' },
+            select: {
+              id: true,
+              stageOrder: true,
+              stageName: true,
+              dateValue: true,
+              isCompleted: true,
+              isCritical: true,
+              overlapAccepted: true,
+            },
+          },
         },
-      },
-    },
-  })
+      })
+    : await prisma.product.findMany({
+        where: { isArchived: false },
+        select: {
+          id: true,
+          status: true,
+          finalDate: true,
+          riskScore: true,
+          stages: {
+            orderBy: { stageOrder: 'asc' },
+            select: {
+              id: true,
+              stageOrder: true,
+              stageName: true,
+              dateValue: true,
+              isCompleted: true,
+              isCritical: true,
+            },
+          },
+        },
+      })
 
   for (const product of products) {
     if (product.status === 'COMPLETED' || product.status === 'CANCELLED') continue
@@ -74,7 +98,10 @@ export async function recalculateAllRisks() {
     }
 
     const { overlaps } = detectStageOverlaps(
-      product.stages.map((stage) => ({ ...stage, overlapAccepted: false }))
+      product.stages.map((stage) => ({
+        ...stage,
+        overlapAccepted: hasOverlapAcceptedColumn ? (stage as any).overlapAccepted ?? false : false,
+      }))
     )
     for (const overlap of overlaps) {
       riskScore += 15
@@ -109,28 +136,52 @@ export async function recalculateAllRisks() {
  */
 export async function recalculateProductRisk(productId: string) {
   const now = new Date()
+  const hasOverlapAcceptedColumn = await supportsProductStageOverlapAcceptedColumn()
 
-  const product = await prisma.product.findUnique({
-    where: { id: productId },
-    select: {
-      id: true,
-      isArchived: true,
-      status: true,
-      finalDate: true,
-      riskScore: true,
-      stages: {
-        orderBy: { stageOrder: 'asc' },
+  const product = hasOverlapAcceptedColumn
+    ? await prisma.product.findUnique({
+        where: { id: productId },
         select: {
           id: true,
-          stageOrder: true,
-          stageName: true,
-          dateValue: true,
-          isCompleted: true,
-          isCritical: true,
+          isArchived: true,
+          status: true,
+          finalDate: true,
+          riskScore: true,
+          stages: {
+            orderBy: { stageOrder: 'asc' },
+            select: {
+              id: true,
+              stageOrder: true,
+              stageName: true,
+              dateValue: true,
+              isCompleted: true,
+              isCritical: true,
+              overlapAccepted: true,
+            },
+          },
         },
-      },
-    },
-  })
+      })
+    : await prisma.product.findUnique({
+        where: { id: productId },
+        select: {
+          id: true,
+          isArchived: true,
+          status: true,
+          finalDate: true,
+          riskScore: true,
+          stages: {
+            orderBy: { stageOrder: 'asc' },
+            select: {
+              id: true,
+              stageOrder: true,
+              stageName: true,
+              dateValue: true,
+              isCompleted: true,
+              isCritical: true,
+            },
+          },
+        },
+      })
 
   if (!product || product.isArchived || product.status === 'COMPLETED' || product.status === 'CANCELLED') return
 
@@ -155,7 +206,10 @@ export async function recalculateProductRisk(productId: string) {
   }
 
   const { overlaps } = detectStageOverlaps(
-    product.stages.map((stage) => ({ ...stage, overlapAccepted: false }))
+    product.stages.map((stage) => ({
+      ...stage,
+      overlapAccepted: hasOverlapAcceptedColumn ? (stage as any).overlapAccepted ?? false : false,
+    }))
   )
   for (const overlap of overlaps) {
     riskScore += 15

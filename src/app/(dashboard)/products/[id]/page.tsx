@@ -2,75 +2,96 @@ import { notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { ProductCardClient } from '@/components/products/ProductCardClient'
+import { getFinalDateFromStages } from '@/lib/product-derived-fields'
+import { supportsProductStageOverlapAcceptedColumn } from '@/lib/schema-compat'
 
 async function getProduct(id: string) {
-  const product = await prisma.product.findUnique({
-    where: { id },
-    include: {
-      responsible: { select: { id: true, name: true, email: true } },
-      stages: {
-        orderBy: { stageOrder: 'asc' },
-        select: {
-          id: true,
-          productId: true,
-          stageTemplateId: true,
-          stageOrder: true,
-          stageName: true,
-          dateValue: true,
-          dateRaw: true,
-          dateEnd: true,
-          status: true,
-          isCompleted: true,
-          isCritical: true,
-          participatesInAutoshift: true,
-          affectsFinalDate: true,
-          responsibleId: true,
-          comment: true,
-          priority: true,
-          plannedDate: true,
-          actualDate: true,
-          daysDeviation: true,
-          createdAt: true,
-          updatedAt: true,
-          stageTemplate: {
-            select: {
-              id: true,
-              name: true,
-              order: true,
-              durationText: true,
-              durationDays: true,
-              isCritical: true,
-              affectsFinalDate: true,
+  const [product, hasOverlapAcceptedColumn] = await Promise.all([
+    prisma.product.findUnique({
+      where: { id },
+      include: {
+        responsible: { select: { id: true, name: true, email: true } },
+        stages: {
+          orderBy: { stageOrder: 'asc' },
+          select: {
+            id: true,
+            productId: true,
+            stageTemplateId: true,
+            stageOrder: true,
+            stageName: true,
+            dateValue: true,
+            dateRaw: true,
+            dateEnd: true,
+            status: true,
+            isCompleted: true,
+            isCritical: true,
+            participatesInAutoshift: true,
+            affectsFinalDate: true,
+            responsibleId: true,
+            comment: true,
+            priority: true,
+            plannedDate: true,
+            actualDate: true,
+            daysDeviation: true,
+            createdAt: true,
+            updatedAt: true,
+            stageTemplate: {
+              select: {
+                id: true,
+                name: true,
+                order: true,
+                durationText: true,
+                durationDays: true,
+                isCritical: true,
+                affectsFinalDate: true,
+              },
+            },
+            responsible: { select: { id: true, name: true } },
+            comments: {
+              include: { author: { select: { id: true, name: true, lastName: true, avatar: true } } },
+              orderBy: { createdAt: 'desc' },
             },
           },
-          responsible: { select: { id: true, name: true } },
-          comments: {
-            include: { author: { select: { id: true, name: true, lastName: true, avatar: true } } },
-            orderBy: { createdAt: 'desc' },
-          },
         },
+        comments: {
+          where: { productStageId: null },
+          include: { author: { select: { id: true, name: true, lastName: true, avatar: true } } },
+          orderBy: { createdAt: 'desc' },
+        },
+        automations: { where: { isActive: true } },
+        changeHistory: {
+          include: { changedBy: { select: { id: true, name: true } } },
+          orderBy: { createdAt: 'desc' },
+          take: 30,
+        },
+        _count: { select: { comments: true } },
       },
-      comments: {
-        where: { productStageId: null },
-        include: { author: { select: { id: true, name: true, lastName: true, avatar: true } } },
-        orderBy: { createdAt: 'desc' },
-      },
-      automations: { where: { isActive: true } },
-      changeHistory: {
-        include: { changedBy: { select: { id: true, name: true } } },
-        orderBy: { createdAt: 'desc' },
-        take: 30,
-      },
-      _count: { select: { comments: true } },
-    },
-  })
+    }),
+    supportsProductStageOverlapAcceptedColumn(),
+  ])
 
   if (!product || product.isArchived) return null
+
+  const overlapAcceptedRows = hasOverlapAcceptedColumn
+    ? await prisma.productStage.findMany({
+        where: { productId: id },
+        select: {
+          id: true,
+          overlapAccepted: true,
+        },
+      })
+    : []
+
+  const overlapAcceptedById = new Map(
+    overlapAcceptedRows.map((stage) => [stage.id, stage.overlapAccepted])
+  )
+
   return {
     ...product,
+    finalDate: getFinalDateFromStages(product.stages),
     stages: product.stages.map((stage) => ({
       ...stage,
-      overlapAccepted: false,
+      overlapAccepted: overlapAcceptedById.get(stage.id) ?? false,
     })),
   }
 }
