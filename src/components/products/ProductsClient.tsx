@@ -69,6 +69,10 @@ interface ProductsClientProps {
   currentUserRole: string
   embedded?: boolean
   layoutSwitcher?: ReactNode
+  controlsHidden?: boolean
+  externalFilters?: ProductListFilters
+  externalSortField?: ProductListSortField
+  externalSortDirection?: ProductListSortDirection
 }
 
 interface ContextMenuState {
@@ -89,6 +93,10 @@ export function ProductsClient({
   currentUserRole,
   embedded = false,
   layoutSwitcher,
+  controlsHidden = false,
+  externalFilters,
+  externalSortField,
+  externalSortDirection,
 }: ProductsClientProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -140,6 +148,8 @@ export function ProductsClient({
   }, [products])
 
   useEffect(() => {
+    if (controlsHidden || externalFilters || externalSortField || externalSortDirection) return
+
     const params = new URLSearchParams(searchParams.toString())
 
     ;['search', 'status', 'responsible', 'priority', 'country', 'view', 'sort', 'dir', 'advanced', 'overlaps'].forEach((key) => {
@@ -164,7 +174,7 @@ export function ProductsClient({
     if (nextUrl !== currentUrl) {
       window.history.replaceState(null, '', nextUrl)
     }
-  }, [countryFilter, onlyWithOverlaps, priorityFilter, quickView, responsibleFilter, search, searchParams, showAdvancedFilters, sortDirection, sortField, statusFilter])
+  }, [controlsHidden, countryFilter, externalFilters, externalSortDirection, externalSortField, onlyWithOverlaps, priorityFilter, quickView, responsibleFilter, search, searchParams, showAdvancedFilters, sortDirection, sortField, statusFilter])
 
   useEffect(() => {
     if (!contextMenu) return
@@ -206,7 +216,9 @@ export function ProductsClient({
   }, [draggingProductId])
 
   const now = new Date()
-  const filters = useMemo<ProductListFilters>(() => ({
+  const effectiveSortField = externalSortField ?? sortField
+  const effectiveSortDirection = externalSortDirection ?? sortDirection
+  const filters = useMemo<ProductListFilters>(() => externalFilters ?? ({
     search,
     status: statusFilter,
     responsibleId: responsibleFilter,
@@ -214,11 +226,11 @@ export function ProductsClient({
     country: countryFilter,
     quickView,
     onlyWithOverlaps,
-  }), [countryFilter, onlyWithOverlaps, priorityFilter, quickView, responsibleFilter, search, statusFilter])
+  }), [countryFilter, externalFilters, onlyWithOverlaps, priorityFilter, quickView, responsibleFilter, search, statusFilter])
   const hasActiveFilters = hasActiveProductFilters(filters)
   const filteredProducts = useMemo(() => filterProducts(products, filters), [filters, products])
-  const visibleProducts = useMemo(() => sortProducts(filteredProducts, sortField, sortDirection), [filteredProducts, sortDirection, sortField])
-  const canReorder = canManageProducts && sortField === 'manual' && !hasActiveFilters
+  const visibleProducts = useMemo(() => sortProducts(filteredProducts, effectiveSortField, effectiveSortDirection), [effectiveSortDirection, effectiveSortField, filteredProducts])
+  const canReorder = canManageProducts && effectiveSortField === 'manual' && !hasActiveFilters
   const contextProduct = contextMenu ? products.find((product) => product.id === contextMenu.productId) || null : null
 
   useEffect(() => {
@@ -511,6 +523,7 @@ export function ProductsClient({
         </div>
       )}
 
+      {!controlsHidden && (
       <div className="surface-panel space-y-5 p-5">
         <div className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center gap-3">
@@ -645,6 +658,7 @@ export function ProductsClient({
           {layoutSwitcher && <div className="pt-1">{layoutSwitcher}</div>}
         </div>
       </div>
+      )}
 
       <div className="surface-panel overflow-hidden">
         <div className="overflow-x-auto">

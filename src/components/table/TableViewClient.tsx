@@ -8,7 +8,7 @@ import { cn, formatDate, detectStageOverlaps, getPriorityLabel, getStatusLabel }
 import { DatePicker } from '@/components/ui/DatePicker'
 import { FilterSelect } from '@/components/ui/FilterSelect'
 import { buildProductHref, getRouteWithSearch } from '@/lib/navigation'
-import type { ProductQuickView } from '@/lib/product-list'
+import { filterProducts, sortProducts, type ProductListFilters, type ProductListSortDirection, type ProductListSortField, type ProductQuickView } from '@/lib/product-list'
 
 interface Stage {
   id: string; order: number; name: string; durationText: string | null
@@ -27,6 +27,8 @@ interface ProductStage {
 interface Product {
   id: string; name: string; country: string | null; status: string; priority: string
   finalDate: Date | null; progressPercent: number; riskScore: number
+  createdAt?: Date | string
+  sortOrder?: number
   isPinned?: boolean; isFavorite?: boolean
   responsible?: { id: string; name: string } | null
   stages: ProductStage[]
@@ -38,6 +40,10 @@ interface TableViewClientProps {
   currentUserRole: string
   embedded?: boolean
   layoutSwitcher?: ReactNode
+  controlsHidden?: boolean
+  externalFilters?: ProductListFilters
+  externalSortField?: ProductListSortField
+  externalSortDirection?: ProductListSortDirection
 }
 
 interface EditingCellState {
@@ -129,6 +135,10 @@ export function TableViewClient({
   currentUserRole,
   embedded = false,
   layoutSwitcher,
+  controlsHidden = false,
+  externalFilters,
+  externalSortField,
+  externalSortDirection,
 }: TableViewClientProps) {
   const [products, setProducts] = useState(initial)
   const [stages, setStages] = useState(initialStages)
@@ -200,6 +210,31 @@ export function TableViewClient({
     return widths
   })
   const resizingRef = useRef<{ colId: string; startX: number; startWidth: number } | null>(null)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    try {
+      const saved = window.localStorage.getItem('product-admin:table-column-widths')
+      if (!saved) return
+      const parsed = JSON.parse(saved) as Record<string, number>
+      if (!parsed || typeof parsed !== 'object') return
+
+      setColumnWidths((prev) => ({
+        ...prev,
+        ...Object.fromEntries(
+          Object.entries(parsed).filter(([, value]) => typeof value === 'number' && Number.isFinite(value))
+        ),
+      }))
+    } catch {
+      // Ignore corrupted saved widths.
+    }
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem('product-admin:table-column-widths', JSON.stringify(columnWidths))
+  }, [columnWidths])
 
   const handleResizeStart = useCallback((e: React.MouseEvent, colId: string) => {
     e.preventDefault()
@@ -431,25 +466,34 @@ export function TableViewClient({
     }
   }
 
-  const filteredProducts = products.filter((product) => {
-    if (search && !product.name.toLowerCase().includes(search.toLowerCase())) return false
-    if (statusFilter && product.status !== statusFilter) return false
-    if (responsibleFilter && product.responsible?.id !== responsibleFilter) return false
-    if (priorityFilter && product.priority !== priorityFilter) return false
-    if (countryFilter.trim() && !(product.country || '').toLowerCase().includes(countryFilter.trim().toLowerCase())) return false
+  const effectiveFilters: ProductListFilters = externalFilters ?? {
+    search,
+    status: statusFilter,
+    responsibleId: responsibleFilter,
+    priority: priorityFilter,
+    country: countryFilter,
+    quickView,
+    onlyWithOverlaps,
+  }
+  const effectiveSortField = externalSortField ?? 'manual'
+  const effectiveSortDirection = externalSortDirection ?? 'asc'
 
-    const { overlaps } = detectStageOverlaps(product.stages)
-    const overdue = Boolean(product.finalDate && product.status !== 'COMPLETED' && new Date(product.finalDate) < now)
-    const atRisk = product.status === 'AT_RISK' || product.riskScore >= 40
-
-    if (onlyWithOverlaps && overlaps.length === 0) return false
-    if (quickView === 'pinned' && !product.isPinned) return false
-    if (quickView === 'favorite' && !product.isFavorite) return false
-    if (quickView === 'overdue' && !overdue) return false
-    if (quickView === 'atRisk' && !atRisk) return false
-
-    return true
-  })
+  const filteredProducts = sortProducts(
+    filterProducts(
+      products.map((product) => ({
+        ...product,
+        createdAt: product.createdAt ?? new Date(0),
+        sortOrder: product.sortOrder ?? 0,
+        isPinned: product.isPinned ?? false,
+        isFavorite: product.isFavorite ?? false,
+        _count: { comments: 0, stages: product.stages.length },
+      })) as any,
+      effectiveFilters,
+      now
+    ) as any,
+    effectiveSortField,
+    effectiveSortDirection
+  ) as unknown as Product[]
 
   const resetFilters = () => {
     setSearch('')
@@ -552,6 +596,7 @@ export function TableViewClient({
 
   return (
     <div className="space-y-5 animate-fade-in">
+      {!controlsHidden && (
       <div className="surface-panel flex flex-col gap-5 p-4 lg:p-5">
         <div className="space-y-4">
           {!embedded ? (
@@ -669,6 +714,7 @@ export function TableViewClient({
           {layoutSwitcher && <div className="pt-1">{layoutSwitcher}</div>}
         </div>
       </div>
+      )}
 
       {/* Matrix Table */}
       <div className="surface-panel overflow-hidden">
@@ -677,7 +723,7 @@ export function TableViewClient({
             <thead className="sticky top-0 z-10">
               <tr>
                 <th
-                  className="sticky left-0 z-20 bg-brand-900 px-4 py-3 text-left text-[18px] font-semibold leading-[1.2] text-slate-100 border-r border-brand-800 relative"
+                  className="sticky left-0 z-20 bg-brand-950 px-4 py-3 text-left text-[18px] font-semibold leading-[1.2] text-slate-100 border-r border-brand-900 relative"
                   style={{ width: columnWidths.__product, minWidth: 120 }}
                 >
                   Продукт
@@ -687,7 +733,7 @@ export function TableViewClient({
                   />
                 </th>
                 <th
-                  className="bg-brand-900 px-2 py-3 text-center text-[17px] font-semibold leading-[1.2] text-slate-100 border-r border-brand-800 relative"
+                  className="bg-brand-950 px-2 py-3 text-center text-[17px] font-semibold leading-[1.2] text-slate-100 border-r border-brand-900 relative"
                   style={{ width: columnWidths.__progress, minWidth: 60 }}
                 >
                   Прогресс
@@ -699,7 +745,7 @@ export function TableViewClient({
                 {stages.map((stage, idx) => (
                   <th
                     key={stage.id}
-                    className="bg-brand-900 py-3 px-2 text-center text-slate-100 border-r border-brand-800 relative group"
+                    className="bg-brand-950 py-3 px-2 text-center text-slate-100 border-r border-brand-900 relative group"
                     style={{ width: columnWidths[stage.id], minWidth: 60 }}
                     title={`ПКМ: управление этапом\n${stage.name}`}
                     onContextMenu={(e) => handleStageHeaderClick(e, stage)}
@@ -736,13 +782,13 @@ export function TableViewClient({
 
                 {/* Add new stage column */}
                 <th
-                  className="bg-brand-900 border-r border-brand-800 text-center align-middle"
+                  className="bg-brand-950 border-r border-brand-900 text-center align-middle"
                   style={{ width: addColumnWidth, minWidth: addColumnWidth }}
                 >
                   {canEditTable && (
                     <button
                       onClick={() => setShowNewStageForm(true)}
-                      className="w-7 h-7 mx-auto rounded-md bg-brand-950 text-blue-100 hover:bg-brand-700 hover:text-white transition-colors flex items-center justify-center"
+                      className="w-7 h-7 mx-auto rounded-md bg-brand-900 text-blue-100 hover:bg-brand-800 hover:text-white transition-colors flex items-center justify-center"
                       title="Добавить новый этап"
                     >
                       <Plus className="w-4 h-4" />
