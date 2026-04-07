@@ -517,9 +517,23 @@ export function ProductsClient({
               {visibleProducts.length} из {products.length} продуктов
             </p>
           </div>
-          <Link href="/products/new" className="btn-primary">
+          <button
+            type="button"
+            onClick={() => {
+              if (typeof window !== 'undefined') {
+                window.sessionStorage.setItem('product-admin:open-create-modal', '1')
+                window.dispatchEvent(new CustomEvent('product-admin:open-create-modal'))
+              }
+
+              const params = new URLSearchParams(searchParams.toString())
+              params.set('create', '1')
+              const nextQuery = params.toString()
+              router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false })
+            }}
+            className="btn-primary"
+          >
             <Plus className="w-4 h-4" /> Новый продукт
-          </Link>
+          </button>
         </div>
       )}
 

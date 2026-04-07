@@ -221,6 +221,7 @@ export function Header({ user }: HeaderProps) {
 
     if (typeof window !== 'undefined') {
       window.sessionStorage.setItem('product-admin:open-create-modal', '1')
+      window.dispatchEvent(new CustomEvent('product-admin:open-create-modal'))
     }
 
     if (pathname === '/products') {

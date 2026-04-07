@@ -164,6 +164,8 @@ export function ProductsWorkspace({
   const [showNewProductModal, setShowNewProductModal] = useState(createQueryOpen)
 
   const openCreateModal = () => {
+    setShowNewProductModal(true)
+
     const params = new URLSearchParams(searchParams.toString())
     params.set('create', '1')
     const nextQuery = params.toString()
@@ -232,9 +234,7 @@ export function ProductsWorkspace({
   }, [openCreateModal])
 
   useEffect(() => {
-    if (createQueryOpen) {
-      setShowNewProductModal(true)
-    }
+    setShowNewProductModal(createQueryOpen)
   }, [createQueryOpen])
 
   useEffect(() => {
