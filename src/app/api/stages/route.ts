@@ -6,6 +6,7 @@ import { recalculateProductRisk } from '@/lib/risk'
 import { supportsProductStageAutoshiftColumn, supportsProductStageOverlapAcceptedColumn } from '@/lib/schema-compat'
 import { recalculateProductDerivedFields } from '@/lib/product-derived-fields'
 import { createProductStageCompat } from '@/lib/product-stage-compat'
+import { getOverlapAcceptedMap, persistOverlapAccepted } from '@/lib/overlap-acceptance'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -36,6 +37,7 @@ export async function PATCH(req: NextRequest) {
 
   const body = await req.json()
   const { stageId, stageIds, updates, applyAutomations = true, swapWithStageId, productId, stageTemplateId, stageOrder, stageName } = body
+  const userId = (session.user as any).id
   const [hasAutoshiftColumn, hasOverlapAcceptedColumn] = await Promise.all([
     supportsProductStageAutoshiftColumn(),
     supportsProductStageOverlapAcceptedColumn(),
@@ -98,6 +100,10 @@ export async function PATCH(req: NextRequest) {
       })
     }
 
+    if (typeof requestedOverlapAccepted === 'boolean') {
+      await persistOverlapAccepted(targetProductId, stageIds, requestedOverlapAccepted, userId)
+    }
+
     await recalculateProductDerivedFields(targetProductId)
     await recalculateProductRisk(targetProductId)
 
@@ -118,10 +124,8 @@ export async function PATCH(req: NextRequest) {
       select: stageResponseSelect,
     })
 
-    const acceptedFallbackIds =
-      !hasOverlapAcceptedColumn && requestedOverlapAccepted === true
-        ? new Set(stageIds)
-        : null
+    const overlapAcceptedMap = await getOverlapAcceptedMap(targetProductId)
+    const overlapAcceptedByStageId = overlapAcceptedMap as Map<string, boolean>
 
     return NextResponse.json({
       stages: stages.map((stage) => ({
@@ -129,7 +133,7 @@ export async function PATCH(req: NextRequest) {
         participatesInAutoshift: hasAutoshiftColumn ? (stage as any).participatesInAutoshift ?? true : true,
         overlapAccepted: hasOverlapAcceptedColumn
           ? (stage as any).overlapAccepted ?? false
-          : acceptedFallbackIds?.has(stage.id) ?? false,
+          : overlapAcceptedByStageId.get((stage as any).id) ?? false,
       })),
       product: updatedProduct,
     })
@@ -269,7 +273,6 @@ export async function PATCH(req: NextRequest) {
   const newDate = updates.dateValue ? new Date(updates.dateValue) : null
 
   // Log change
-  const userId = (session.user as any).id
   if (oldDate !== newDate && oldDate) {
     await prisma.changeHistory.create({
       data: {
@@ -324,6 +327,16 @@ export async function PATCH(req: NextRequest) {
     )
   }
 
+  if (
+    !hasOverlapAcceptedColumn &&
+    Object.prototype.hasOwnProperty.call(updates || {}, 'dateValue') &&
+    oldDate &&
+    newDate &&
+    oldDate.getTime() !== newDate.getTime()
+  ) {
+    await persistOverlapAccepted(existingStage.productId, [existingStage.id], false, userId)
+  }
+
   await recalculateProductDerivedFields(existingStage.productId)
 
   // Recalculate risk after any stage change
@@ -345,17 +358,23 @@ export async function PATCH(req: NextRequest) {
     orderBy: { stageOrder: 'asc' },
     select: stageResponseSelect,
   })
+  const overlapAcceptedMap = await getOverlapAcceptedMap(existingStage.productId)
+  const overlapAcceptedByStageId = overlapAcceptedMap as Map<string, boolean>
 
   return NextResponse.json({
     stage: {
       ...updatedStage,
       participatesInAutoshift: hasAutoshiftColumn ? (updatedStage as any).participatesInAutoshift ?? true : true,
-      overlapAccepted: hasOverlapAcceptedColumn ? (updatedStage as any).overlapAccepted ?? false : false,
+      overlapAccepted: hasOverlapAcceptedColumn
+        ? (updatedStage as any).overlapAccepted ?? false
+        : overlapAcceptedByStageId.get((updatedStage as any).id) ?? false,
     },
     stages: stages.map((stage) => ({
       ...stage,
       participatesInAutoshift: hasAutoshiftColumn ? (stage as any).participatesInAutoshift ?? true : true,
-      overlapAccepted: hasOverlapAcceptedColumn ? (stage as any).overlapAccepted ?? false : false,
+      overlapAccepted: hasOverlapAcceptedColumn
+        ? (stage as any).overlapAccepted ?? false
+        : overlapAcceptedByStageId.get((stage as any).id) ?? false,
     })),
     automationResult,
     product: updatedProduct,

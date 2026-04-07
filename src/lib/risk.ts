@@ -1,6 +1,7 @@
 import { detectStageOverlaps } from './utils'
 import { prisma } from './prisma'
 import { supportsProductStageOverlapAcceptedColumn } from './schema-compat'
+import { getOverlapAcceptedMapForProducts } from './overlap-acceptance'
 
 /**
  * Recalculates risk scores and statuses for all active products.
@@ -59,6 +60,10 @@ export async function recalculateAllRisks() {
         },
       })
 
+  const overlapAcceptedMap = hasOverlapAcceptedColumn
+    ? new Map<string, boolean>()
+    : await getOverlapAcceptedMapForProducts(products.map((product) => product.id))
+
   for (const product of products) {
     if (product.status === 'COMPLETED' || product.status === 'CANCELLED') continue
 
@@ -100,7 +105,9 @@ export async function recalculateAllRisks() {
     const { overlaps } = detectStageOverlaps(
       product.stages.map((stage) => ({
         ...stage,
-        overlapAccepted: hasOverlapAcceptedColumn ? (stage as any).overlapAccepted ?? false : false,
+        overlapAccepted: hasOverlapAcceptedColumn
+          ? (stage as any).overlapAccepted ?? false
+          : overlapAcceptedMap.get(stage.id) ?? false,
       }))
     )
     for (const overlap of overlaps) {
@@ -205,10 +212,16 @@ export async function recalculateProductRisk(productId: string) {
     }
   }
 
+  const overlapAcceptedMap = hasOverlapAcceptedColumn
+    ? new Map<string, boolean>()
+    : await getOverlapAcceptedMapForProducts([productId])
+
   const { overlaps } = detectStageOverlaps(
     product.stages.map((stage) => ({
       ...stage,
-      overlapAccepted: hasOverlapAcceptedColumn ? (stage as any).overlapAccepted ?? false : false,
+      overlapAccepted: hasOverlapAcceptedColumn
+        ? (stage as any).overlapAccepted ?? false
+        : overlapAcceptedMap.get(stage.id) ?? false,
     }))
   )
   for (const overlap of overlaps) {

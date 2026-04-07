@@ -351,7 +351,11 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
     if (!canEdit) return
     e.preventDefault()
     e.stopPropagation()
-    setStageMenu({ stageId: stage.id, x: e.clientX, y: e.clientY })
+    const menuWidth = 220
+    const menuHeight = 320
+    const nextX = Math.max(12, Math.min(e.clientX, window.innerWidth - menuWidth - 12))
+    const nextY = Math.max(12, Math.min(e.clientY, window.innerHeight - menuHeight - 12))
+    setStageMenu({ stageId: stage.id, x: nextX, y: nextY })
   }
 
   // Rename stage
@@ -611,7 +615,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
             key={`${segment.userId}-${index}`}
             className={cn(
               'rounded-full px-2 py-0.5 font-medium',
-              ownMessage ? 'bg-white/20 text-white' : 'bg-brand-50 text-brand-700'
+              ownMessage ? 'bg-slate-100 text-slate-700' : 'bg-brand-50 text-brand-700'
             )}
           >
             {segment.text}
@@ -1025,11 +1029,11 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                                     </div>
                                     <div
                                       className={cn(
-                                        'rounded-[20px] px-3.5 py-2.5 text-sm leading-6 shadow-sm',
-                                        ownMessage ? 'bg-brand-900/92 text-white' : 'bg-slate-100/80 text-slate-700'
+                                        'px-0.5 py-0.5 text-sm leading-6',
+                                        ownMessage ? 'text-slate-800' : 'text-slate-600'
                                       )}
                                     >
-                                      <div className="flex flex-wrap items-center gap-1.5">
+                                      <div className={cn('flex flex-wrap items-center gap-1.5', ownMessage && 'justify-end')}>
                                         {renderCommentContent(comment.content || comment.displayContent || '', ownMessage)}
                                       </div>
                                     </div>
@@ -1170,7 +1174,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
         return (
           <motion.div
             ref={menuRef}
-            className="fixed z-50 bg-white rounded-lg shadow-lg border border-slate-200 py-1 min-w-[200px]"
+            className="fixed z-[130] bg-white rounded-lg shadow-lg border border-slate-200 py-1 min-w-[220px]"
             style={{ left: stageMenu.x, top: stageMenu.y }}
             initial={{ opacity: 0, scale: 0.96, y: -6 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -1254,7 +1258,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
       <AnimatePresence>
       {automationModal && (
         <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/20 backdrop-blur-md"
           onClick={() => setAutomationModal(null)}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -1262,7 +1266,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
           transition={{ duration: 0.18 }}
         >
           <motion.div
-            className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md space-y-4"
+            className="w-full max-w-md space-y-4 rounded-[28px] bg-white p-6 shadow-xl"
             onClick={(e) => e.stopPropagation()}
             initial={{ opacity: 0, y: 18, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -1317,8 +1321,13 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
               />
             </div>
 
-            <div className="flex justify-end gap-2 pt-2">
-              <button onClick={() => setAutomationModal(null)} className="btn-secondary text-sm">Отмена</button>
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => setAutomationModal(null)}
+                className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 transition-colors hover:text-slate-800"
+              >
+                Отмена
+              </button>
               <button
                 onClick={handleCreateAutomation}
                 className="btn-primary text-sm"

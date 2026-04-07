@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth, hasPermission, Permission } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getFinalDateFromStages } from '@/lib/product-derived-fields'
-import { supportsProductStageOverlapAcceptedColumn } from '@/lib/schema-compat'
+import { getOverlapAcceptedMap } from '@/lib/overlap-acceptance'
 
 export async function GET(
   req: NextRequest,
@@ -11,7 +11,6 @@ export async function GET(
   const { id } = await params
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const hasOverlapAcceptedColumn = await supportsProductStageOverlapAcceptedColumn()
 
   const product = await prisma.product.findUnique({
     where: { id },
@@ -75,19 +74,7 @@ export async function GET(
   })
 
   if (!product) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  const overlapAcceptedRows = hasOverlapAcceptedColumn
-    ? await prisma.productStage.findMany({
-        where: { productId: id },
-        select: {
-          id: true,
-          overlapAccepted: true,
-        },
-      })
-    : []
-
-  const overlapAcceptedById = new Map(
-    overlapAcceptedRows.map((stage) => [stage.id, stage.overlapAccepted])
-  )
+  const overlapAcceptedById = await getOverlapAcceptedMap(id)
 
   return NextResponse.json({
     ...product,
