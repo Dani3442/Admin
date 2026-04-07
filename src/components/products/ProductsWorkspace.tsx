@@ -3,6 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Filter, LayoutList, Plus, Search, Table2, X } from 'lucide-react'
+import { useProductCreation } from '@/components/products/ProductCreationContext'
 import { ProductsClient } from '@/components/products/ProductsClient'
 import { TableViewClient } from '@/components/table/TableViewClient'
 import { FilterSelect } from '@/components/ui/FilterSelect'
@@ -144,6 +145,7 @@ export function ProductsWorkspace({
   stageSuggestions,
   currentUserRole,
 }: ProductsWorkspaceProps) {
+  const { openCreateProductModal } = useProductCreation()
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -158,12 +160,6 @@ export function ProductsWorkspace({
   const [sortDirection, setSortDirection] = useState<ProductListSortDirection>(searchParams.get('dir') === 'desc' ? 'desc' : 'asc')
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(searchParams.get('advanced') === '1')
   const [onlyWithOverlaps, setOnlyWithOverlaps] = useState(searchParams.get('overlaps') === '1')
-
-  const openCreateModal = () => {
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('product-admin:open-create-modal'))
-    }
-  }
 
   const updateLayout = (nextLayout: ProductsLayoutMode) => {
     const params = new URLSearchParams(searchParams.toString())
@@ -367,7 +363,7 @@ export function ProductsWorkspace({
 
           <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
             <div>{layoutSwitcher}</div>
-            <button type="button" onClick={openCreateModal} className="btn-primary self-start">
+            <button type="button" onClick={openCreateProductModal} className="btn-primary self-start">
               <Plus className="h-4 w-4" /> Новый продукт
             </button>
           </div>

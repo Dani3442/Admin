@@ -18,6 +18,7 @@ import {
 import { cn, detectStageOverlaps, formatDate, formatStageOverlap, getPriorityColor, getPriorityLabel, getStatusColor, getStatusLabel } from '@/lib/utils'
 import { buildProductHref, getRouteWithSearch } from '@/lib/navigation'
 import { FilterSelect } from '@/components/ui/FilterSelect'
+import { useProductCreation } from '@/components/products/ProductCreationContext'
 import {
   filterProducts,
   hasActiveProductFilters,
@@ -98,6 +99,7 @@ export function ProductsClient({
   externalSortField,
   externalSortDirection,
 }: ProductsClientProps) {
+  const { openCreateProductModal } = useProductCreation()
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -519,11 +521,7 @@ export function ProductsClient({
           </div>
           <button
             type="button"
-            onClick={() => {
-              if (typeof window !== 'undefined') {
-                window.dispatchEvent(new CustomEvent('product-admin:open-create-modal'))
-              }
-            }}
+            onClick={openCreateProductModal}
             className="btn-primary"
           >
             <Plus className="w-4 h-4" /> Новый продукт

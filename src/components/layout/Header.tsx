@@ -25,6 +25,7 @@ import {
   Plus,
 } from 'lucide-react'
 import { UserAvatar } from '@/components/users/UserAvatar'
+import { useProductCreation } from '@/components/products/ProductCreationContext'
 import { cn, getRoleLabel, getUserDisplayName } from '@/lib/utils'
 import { buildProductHref, getRouteWithSearch } from '@/lib/navigation'
 
@@ -56,6 +57,7 @@ const NAV_ITEMS: Array<{
 ]
 
 export function Header({ user, canCreateProduct = true }: HeaderProps) {
+  const { openCreateProductModal } = useProductCreation()
   const [profileUser, setProfileUser] = useState(user)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
@@ -216,9 +218,7 @@ export function Header({ user, canCreateProduct = true }: HeaderProps) {
 
   const totalBadge = counts.mentions + counts.overdue + counts.risk
   const handleOpenCreateProduct = () => {
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('product-admin:open-create-modal'))
-    }
+    openCreateProductModal()
   }
 
   return (
