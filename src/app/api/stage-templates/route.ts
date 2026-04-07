@@ -263,7 +263,6 @@ export async function DELETE(req: NextRequest) {
       const productStages = await tx.productStage.findMany({
         where: {
           stageTemplateId: id,
-          stageOrder: template.order,
         },
         select: {
           id: true,

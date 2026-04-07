@@ -29,6 +29,7 @@ export default async function ProfilePage() {
         canEditPersonal: true,
         canEditOperational: canEditOperationalProfileFields(viewer.role, viewer.id, profile.id, profile.role),
         canEditSensitive: false,
+        canDeleteUser: false,
       }}
     />
   )

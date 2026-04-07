@@ -356,14 +356,15 @@ export function ProductsWorkspace({
         </div>
       </div>
 
-      <AnimatePresence initial={false} mode="sync">
+      <div className="relative">
+        <AnimatePresence initial={false} mode="wait">
         {layout === 'table' ? (
           <motion.div
             key="table"
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.16, ease: 'easeOut' }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
           >
             <TableViewClient
               products={tableProducts as any}
@@ -379,10 +380,10 @@ export function ProductsWorkspace({
         ) : (
           <motion.div
             key="list"
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.16, ease: 'easeOut' }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
           >
             <ProductsClient
               products={listProducts}
@@ -396,7 +397,8 @@ export function ProductsWorkspace({
             />
           </motion.div>
         )}
-      </AnimatePresence>
+        </AnimatePresence>
+      </div>
     </div>
   )
 }

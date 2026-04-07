@@ -108,6 +108,23 @@ export function canManageUserDirectory(viewerRole: string) {
   return ['ADMIN', 'DIRECTOR'].includes(viewerRole)
 }
 
+export function canCreateUser(viewerRole: string, nextRole: string) {
+  if (viewerRole === 'ADMIN') return true
+  if (viewerRole === 'DIRECTOR') {
+    return !['ADMIN', 'DIRECTOR'].includes(nextRole)
+  }
+  return false
+}
+
+export function canDeleteUser(viewerRole: string, viewerId: string, targetId: string, targetRole: string) {
+  if (viewerId === targetId) return false
+  if (viewerRole === 'ADMIN') return true
+  if (viewerRole === 'DIRECTOR') {
+    return !['ADMIN', 'DIRECTOR'].includes(targetRole)
+  }
+  return false
+}
+
 export function canEditOperationalProfileFields(viewerRole: string, viewerId: string, targetId: string, targetRole: string) {
   if (viewerId === targetId) return true
   if (viewerRole === 'ADMIN') return true

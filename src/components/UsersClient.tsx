@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, UserCheck, UserX, Shield } from 'lucide-react'
+import { Plus, Shield, Trash2, UserCheck, UserX, X } from 'lucide-react'
 import { UserAvatar } from '@/components/users/UserAvatar'
 import { cn, formatDate, getRoleLabel, getUserDisplayName, getVerificationStatusColor, getVerificationStatusLabel } from '@/lib/utils'
 import type { UserRole } from '@/types'
@@ -24,8 +24,19 @@ export function UsersClient({ users: initial, currentUserRole }: { users: any[];
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ name: '', lastName: '', email: '', password: '', role: 'EMPLOYEE' })
   const [saving, setSaving] = useState(false)
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null)
   const [error, setError] = useState('')
-  const canCreateUsers = currentUserRole === 'ADMIN'
+  const canCreateUsers = ['ADMIN', 'DIRECTOR'].includes(currentUserRole)
+  const roleOptions = currentUserRole === 'DIRECTOR'
+    ? ROLE_OPTIONS.filter((role) => !['ADMIN', 'DIRECTOR'].includes(role))
+    : ROLE_OPTIONS
+  const canDeleteUser = (user: any) => {
+    if (currentUserRole === 'ADMIN') return true
+    if (currentUserRole === 'DIRECTOR') {
+      return !['ADMIN', 'DIRECTOR'].includes(user.role)
+    }
+    return false
+  }
 
   const createUser = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -46,8 +57,30 @@ export function UsersClient({ users: initial, currentUserRole }: { users: any[];
       setUsers((prev) => [...prev, { ...user, _count: { assignedProducts: 0 } }])
       setShowForm(false)
       setForm({ name: '', lastName: '', email: '', password: '', role: 'EMPLOYEE' })
+    } catch (requestError: any) {
+      setError(requestError.message || 'Ошибка создания')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleDeleteUser = async (user: any) => {
+    const confirmed = window.confirm(`Удалить сотрудника «${getUserDisplayName(user)}»?`)
+    if (!confirmed) return
+
+    setDeletingUserId(user.id)
+    try {
+      const res = await fetch(`/api/users/${user.id}`, { method: 'DELETE' })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        throw new Error(data?.error || 'Не удалось удалить сотрудника')
+      }
+
+      setUsers((prev) => prev.filter((item) => item.id !== user.id))
+    } catch (deleteError: any) {
+      window.alert(deleteError.message || 'Не удалось удалить сотрудника')
+    } finally {
+      setDeletingUserId(null)
     }
   }
 
@@ -67,39 +100,49 @@ export function UsersClient({ users: initial, currentUserRole }: { users: any[];
       </div>
 
       {showForm && canCreateUsers && (
-        <div className="card animate-slide-up">
-          <h3 className="text-sm font-semibold text-slate-700 mb-4">Новый пользователь</h3>
-          <form onSubmit={createUser} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="label">Имя</label>
-              <input value={form.name} onChange={(e) => setForm(p => ({...p, name: e.target.value}))} className="input" placeholder="Иван" required />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/20 px-4 backdrop-blur-sm">
+          <div className="surface-panel w-full max-w-2xl animate-fade-in p-6">
+            <div className="mb-5 flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-semibold text-slate-800">Новый сотрудник</h3>
+                <p className="mt-1 text-sm text-slate-500">Создай нового пользователя и сразу выдай ему нужную роль.</p>
+              </div>
+              <button type="button" onClick={() => setShowForm(false)} className="btn-secondary px-3">
+                <X className="h-4 w-4" />
+              </button>
             </div>
-            <div>
-              <label className="label">Фамилия</label>
-              <input value={form.lastName} onChange={(e) => setForm(p => ({...p, lastName: e.target.value}))} className="input" placeholder="Иванов" />
-            </div>
-            <div>
-              <label className="label">Email</label>
-              <input type="email" value={form.email} onChange={(e) => setForm(p => ({...p, email: e.target.value}))} className="input" placeholder="ivan@company.com" required />
-            </div>
-            <div>
-              <label className="label">Пароль</label>
-              <input type="password" value={form.password} onChange={(e) => setForm(p => ({...p, password: e.target.value}))} className="input" placeholder="Минимум 8 символов" required minLength={8} />
-            </div>
-            <div>
-              <label className="label">Роль</label>
-              <select value={form.role} onChange={(e) => setForm(p => ({...p, role: e.target.value}))} className="input">
-                {ROLE_OPTIONS.map((r) => (
-                  <option key={r} value={r}>{getRoleLabel(r)}</option>
-                ))}
-              </select>
-            </div>
-            {error && <div className="md:col-span-2 text-red-600 text-sm bg-red-50 p-3 rounded-lg">{error}</div>}
-            <div className="md:col-span-2 flex gap-3">
-              <button type="submit" disabled={saving} className="btn-primary">{saving ? 'Создаём...' : 'Создать'}</button>
-              <button type="button" onClick={() => setShowForm(false)} className="btn-secondary">Отмена</button>
-            </div>
-          </form>
+            <form onSubmit={createUser} className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label className="label">Имя</label>
+                <input value={form.name} onChange={(e) => setForm(p => ({...p, name: e.target.value}))} className="input" placeholder="Иван" required />
+              </div>
+              <div>
+                <label className="label">Фамилия</label>
+                <input value={form.lastName} onChange={(e) => setForm(p => ({...p, lastName: e.target.value}))} className="input" placeholder="Иванов" />
+              </div>
+              <div>
+                <label className="label">Email</label>
+                <input type="email" value={form.email} onChange={(e) => setForm(p => ({...p, email: e.target.value}))} className="input" placeholder="ivan@company.com" required />
+              </div>
+              <div>
+                <label className="label">Пароль</label>
+                <input type="password" value={form.password} onChange={(e) => setForm(p => ({...p, password: e.target.value}))} className="input" placeholder="Минимум 8 символов" required minLength={8} />
+              </div>
+              <div className="md:col-span-2">
+                <label className="label">Роль</label>
+                <select value={form.role} onChange={(e) => setForm(p => ({...p, role: e.target.value}))} className="input">
+                  {roleOptions.map((r) => (
+                    <option key={r} value={r}>{getRoleLabel(r)}</option>
+                  ))}
+                </select>
+              </div>
+              {error && <div className="md:col-span-2 rounded-[20px] bg-red-50 p-3 text-sm text-red-600">{error}</div>}
+              <div className="md:col-span-2 flex flex-wrap gap-3">
+                <button type="submit" disabled={saving} className="btn-primary">{saving ? 'Создаём...' : 'Создать сотрудника'}</button>
+                <button type="button" onClick={() => setShowForm(false)} className="btn-secondary">Отмена</button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
@@ -114,6 +157,7 @@ export function UsersClient({ users: initial, currentUserRole }: { users: any[];
               <th className="table-header text-center">Продуктов</th>
               <th className="table-header">Добавлен</th>
               <th className="table-header text-center">Статус</th>
+              <th className="table-header text-right">Действия</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
@@ -153,6 +197,21 @@ export function UsersClient({ users: initial, currentUserRole }: { users: any[];
                     ? <UserCheck className="w-4 h-4 text-emerald-500 mx-auto" />
                     : <UserX className="w-4 h-4 text-red-400 mx-auto" />
                   }
+                </td>
+                <td className="table-cell" onClick={(event) => event.stopPropagation()}>
+                  {canDeleteUser(user) && (
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteUser(user)}
+                        disabled={deletingUserId === user.id}
+                        className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        {deletingUserId === user.id ? 'Удаление...' : 'Удалить'}
+                      </button>
+                    </div>
+                  )}
                 </td>
               </tr>
             ))}

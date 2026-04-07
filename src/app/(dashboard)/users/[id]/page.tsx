@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import {
+  canDeleteUser,
   canEditOperationalProfileFields,
   canEditSensitiveProfileFields,
   canViewUserProfile,
@@ -43,6 +44,7 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
         canEditPersonal: canEditOperationalProfileFields(viewer.role, viewer.id, profile.id, profile.role),
         canEditOperational: canEditOperationalProfileFields(viewer.role, viewer.id, profile.id, profile.role),
         canEditSensitive: canEditSensitiveProfileFields(viewer.role, viewer.id, profile.id),
+        canDeleteUser: canDeleteUser(viewer.role, viewer.id, profile.id, profile.role),
       }}
     />
   )

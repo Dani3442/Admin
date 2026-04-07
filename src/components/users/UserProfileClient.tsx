@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Briefcase, Building2, Camera, Mail, Save, Settings, ShieldCheck, Sparkles, UserCircle2, UserCog, X } from 'lucide-react'
+import { ArrowLeft, Briefcase, Building2, Camera, Mail, Save, Settings, ShieldCheck, Sparkles, Trash2, UserCircle2, UserCog, X } from 'lucide-react'
 import { UserAvatar } from '@/components/users/UserAvatar'
 import {
   cn,
@@ -31,6 +31,7 @@ interface UserProfileClientProps {
     canEditPersonal: boolean
     canEditOperational: boolean
     canEditSensitive: boolean
+    canDeleteUser: boolean
   }
 }
 
@@ -77,6 +78,7 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
   const canEditAnything = permissions.canEditPersonal || permissions.canEditOperational || permissions.canEditSensitive
   const canOpenSettingsPanel = true
   const canSaveSettings = permissions.canEditOperational || permissions.canEditSensitive
+  const backHref = isSelf ? '/dashboard' : '/users'
 
   useEffect(() => {
     setProfile(initialProfile)
@@ -166,6 +168,33 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
     }
   }
 
+  const handleDeleteUser = async () => {
+    if (!permissions.canDeleteUser || isSelf) return
+    const confirmed = window.confirm(`Удалить сотрудника «${getUserDisplayName(profile)}»?`)
+    if (!confirmed) return
+
+    setSaving(true)
+    setError('')
+    setSuccess('')
+
+    try {
+      const response = await fetch(`/api/users/${profile.id}`, {
+        method: 'DELETE',
+      })
+      const data = await response.json().catch(() => null)
+      if (!response.ok) {
+        throw new Error(data?.error || 'Не удалось удалить сотрудника')
+      }
+
+      router.push('/users')
+      router.refresh()
+    } catch (deleteError: any) {
+      setError(deleteError.message || 'Не удалось удалить сотрудника')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const renderPanelActions = (canSave: boolean) => (
     <div className="flex flex-wrap items-center gap-2">
       {canSave && (
@@ -183,6 +212,13 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
 
   return (
     <div className="page-section animate-fade-in">
+      <div className="flex items-center justify-between gap-3">
+        <Link href={backHref} className="btn-secondary">
+          <ArrowLeft className="h-4 w-4" />
+          {isSelf ? 'Назад к дашборду' : 'Назад к пользователям'}
+        </Link>
+      </div>
+
       <div className="surface-panel overflow-hidden">
         <div className="flex flex-col gap-5 p-6 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex items-start gap-4">
@@ -432,6 +468,20 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
               </div>
             </div>
           </div>
+
+          {permissions.canDeleteUser && !isSelf && (
+            <div className="border-t border-slate-100 pt-5">
+              <button
+                type="button"
+                onClick={handleDeleteUser}
+                disabled={saving}
+                className="inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Trash2 className="h-4 w-4" />
+                {saving ? 'Удаление...' : 'Удалить сотрудника'}
+              </button>
+            </div>
+          )}
         </div>
       )}
 

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
-import { EMPLOYEE_TYPE_OPTIONS, PROFILE_ROLE_OPTIONS } from '@/lib/user-profile'
+import { canCreateUser, EMPLOYEE_TYPE_OPTIONS, PROFILE_ROLE_OPTIONS } from '@/lib/user-profile'
 import { z } from 'zod'
 
 const createUserSchema = z.object({
@@ -39,7 +39,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if ((session.user as any).role !== 'ADMIN') {
+  const viewerRole = (session.user as any).role
+  if (!['ADMIN', 'DIRECTOR'].includes(viewerRole)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
@@ -51,6 +52,10 @@ export async function POST(req: NextRequest) {
   }
 
   const { email, name, lastName, password, userRole, jobTitle, department, employeeType } = parsed.data
+
+  if (!canCreateUser(viewerRole, userRole)) {
+    return NextResponse.json({ error: 'Недостаточно прав для создания сотрудника с этой ролью' }, { status: 403 })
+  }
 
   const existing = await prisma.user.findUnique({ where: { email } })
   if (existing) return NextResponse.json({ error: 'Пользователь уже существует' }, { status: 400 })

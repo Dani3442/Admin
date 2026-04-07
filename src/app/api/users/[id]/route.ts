@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import {
   adminProfileSchema,
+  canDeleteUser,
   canEditOperationalProfileFields,
   canEditSensitiveProfileFields,
   canViewUserProfile,
@@ -103,5 +104,38 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json(profile)
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Не удалось обновить профиль пользователя' }, { status: 500 })
+  }
+}
+
+export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const session = await auth()
+  const viewer = session?.user as any
+  const { id } = await params
+
+  if (!viewer?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const target = await prisma.user.findUnique({
+    where: { id },
+    select: { id: true, role: true },
+  })
+
+  if (!target) {
+    return NextResponse.json({ error: 'Пользователь не найден' }, { status: 404 })
+  }
+
+  if (!canDeleteUser(viewer.role, viewer.id, target.id, target.role)) {
+    return NextResponse.json({ error: 'Недостаточно прав для удаления сотрудника' }, { status: 403 })
+  }
+
+  try {
+    await prisma.user.delete({
+      where: { id: target.id },
+    })
+
+    return NextResponse.json({ success: true })
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || 'Не удалось удалить сотрудника' }, { status: 500 })
   }
 }
