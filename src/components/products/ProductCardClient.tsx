@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeft, AtSign, CheckCircle2, Circle, AlertTriangle, MessageCircle, Clock, History, Zap, ExternalLink, Edit2, Save, Pencil, ChevronUp, ChevronDown, X, Plus, Trash2, SendHorizontal, PanelLeft } from 'lucide-react'
+import { ArrowLeft, AtSign, CalendarDays, CheckCircle2, Circle, AlertTriangle, MessageCircle, Clock, History, Zap, ExternalLink, Edit2, Save, Pencil, ChevronUp, ChevronDown, X, Plus, Trash2, SendHorizontal, PanelLeft } from 'lucide-react'
 import { cn, getStatusColor, getStatusLabel, getPriorityColor, getPriorityLabel, formatDate, detectStageOverlaps, formatStageOverlap } from '@/lib/utils'
 import { DatePicker } from '@/components/ui/DatePicker'
 import { resolveBackNavigation } from '@/lib/navigation'
@@ -67,7 +67,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
   const [automationDesc, setAutomationDesc] = useState('')
   const [savingAutomation, setSavingAutomation] = useState(false)
   const [deletingProduct, setDeletingProduct] = useState(false)
-  const commentInputRef = useRef<HTMLTextAreaElement>(null)
+  const commentInputRef = useRef<HTMLInputElement>(null)
 
   // Close context menu on outside click
   useEffect(() => {
@@ -133,6 +133,40 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
     }
   }, [searchParams, tab])
 
+  useEffect(() => {
+    if (tab !== 'comments') return
+
+    let cancelled = false
+
+    const syncComments = async () => {
+      try {
+        const res = await fetch(`/api/comments?productId=${encodeURIComponent(product.id)}`, {
+          cache: 'no-store',
+          credentials: 'include',
+        })
+        if (!res.ok) return
+
+        const data = await res.json()
+        if (cancelled) return
+
+        setProduct((prev: any) => ({
+          ...prev,
+          comments: data.comments || prev.comments,
+        }))
+      } catch {
+        // Silent polling failure keeps chat responsive.
+      }
+    }
+
+    syncComments()
+    const intervalId = window.setInterval(syncComments, 4000)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(intervalId)
+    }
+  }, [product.id, tab])
+
   const now = new Date()
   const completedStages = product.stages.filter((s: any) => s.isCompleted).length
   const totalStages = product.stages.length
@@ -177,6 +211,24 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
     })
   }
 
+  const submitComment = () => {
+    if (savingComment || !newComment.trim()) return
+    addComment()
+  }
+
+  const handleCommentKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Enter') return
+
+    event.preventDefault()
+
+    if (mentionState && activeMentionSuggestions.length > 0) {
+      insertMention(activeMentionSuggestions[0])
+      return
+    }
+
+    submitComment()
+  }
+
   const updateActiveTab = (nextTab: string) => {
     setTab(nextTab)
     const params = new URLSearchParams(searchParams.toString())
@@ -216,7 +268,10 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
       if (!res.ok) {
         throw new Error(comment?.error || 'Не удалось добавить комментарий')
       }
-      setProduct((p: any) => ({ ...p, comments: [comment, ...p.comments] }))
+      setProduct((p: any) => ({
+        ...p,
+        comments: [...p.comments.filter((item: any) => item.id !== comment.id), comment],
+      }))
       setNewComment('')
       setSelectedMentions({})
       setMentionState(null)
@@ -852,6 +907,8 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                                   ...prev,
                                   [stage.id]: { ...prev[stage.id], dateValue: nextDate }
                                 }))}
+                                onCommit={() => updateStage(stage.id)}
+                                onCancel={() => setEditingStageId(null)}
                                 inputClassName="h-10 w-48 text-xs"
                                 panelClassName="w-[360px]"
                               />
@@ -959,15 +1016,15 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                               return (
                                 <div key={comment.id} className={cn('flex gap-3', ownMessage ? 'justify-end' : 'justify-start')}>
                                   {!ownMessage && <UserAvatar user={comment.author} size="sm" className="mt-7" />}
-                                  <div className="max-w-[80%] space-y-1">
+                                  <div className="max-w-[62%] space-y-1">
                                     <div className={cn('flex items-center gap-2 text-xs text-slate-400', ownMessage && 'justify-end')}>
                                       <span className="font-semibold text-slate-700">{authorName}</span>
                                       <span>{formatCommentTimestamp(comment.createdAt)}</span>
                                     </div>
                                     <div
                                       className={cn(
-                                        'rounded-[22px] px-4 py-3 text-sm leading-6 shadow-sm',
-                                        ownMessage ? 'bg-brand-950 text-white' : 'bg-slate-50 text-slate-700'
+                                        'rounded-[20px] px-3.5 py-2.5 text-sm leading-6 shadow-sm',
+                                        ownMessage ? 'bg-brand-900/92 text-white' : 'bg-slate-100/80 text-slate-700'
                                       )}
                                     >
                                       <div className="flex flex-wrap items-center gap-1.5">
@@ -985,14 +1042,16 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                         {canComment && (
                           <div className="border-t border-slate-100 px-4 py-4">
                             <div className="relative">
-                              <textarea
+                              <input
                                 ref={commentInputRef}
+                                type="text"
                                 value={newComment}
-                                onChange={(e) => handleCommentChange(e.target.value, e.target.selectionStart)}
-                                onClick={(e) => syncCommentMentionState(e.currentTarget.value, e.currentTarget.selectionStart)}
-                                onKeyUp={(e) => syncCommentMentionState(e.currentTarget.value, e.currentTarget.selectionStart)}
+                                onChange={(e) => handleCommentChange(e.target.value, e.target.selectionStart ?? e.target.value.length)}
+                                onClick={(e) => syncCommentMentionState(e.currentTarget.value, e.currentTarget.selectionStart ?? e.currentTarget.value.length)}
+                                onKeyUp={(e) => syncCommentMentionState(e.currentTarget.value, e.currentTarget.selectionStart ?? e.currentTarget.value.length)}
+                                onKeyDown={handleCommentKeyDown}
                                 placeholder="Напиши комментарий или отметь коллегу через @..."
-                                className="input min-h-[112px] resize-none pr-14"
+                                className="input h-12 pr-14"
                               />
                               {mentionState && activeMentionSuggestions.length > 0 && (
                                 <div className="absolute bottom-[calc(100%+10px)] left-0 z-20 w-full max-w-sm overflow-hidden rounded-[22px] border border-slate-200 bg-white p-2 shadow-[0_22px_60px_-32px_rgba(15,23,42,0.45)]">
@@ -1017,6 +1076,14 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                                   </div>
                                 </div>
                               )}
+                              <button
+                                type="button"
+                                onClick={submitComment}
+                                disabled={!newComment.trim() || savingComment}
+                                className="absolute right-2 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-brand-950 text-white transition hover:bg-brand-900 disabled:cursor-not-allowed disabled:opacity-45"
+                              >
+                                <SendHorizontal className="h-4 w-4" />
+                              </button>
                             </div>
                             <div className="mt-3 flex items-center justify-between gap-3">
                               <div className="text-xs text-slate-400">
@@ -1024,10 +1091,6 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                                   ? `Подготовлено упоминаний: ${Object.keys(selectedMentions).length}`
                                   : 'Используй @, чтобы отметить сотрудника и отправить ему уведомление.'}
                               </div>
-                              <button onClick={addComment} disabled={!newComment.trim() || savingComment} className="btn-primary">
-                                <SendHorizontal className="h-4 w-4" />
-                                {savingComment ? 'Сохраняем...' : 'Отправить'}
-                              </button>
                             </div>
                           </div>
                         )}
@@ -1112,6 +1175,20 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
             exit={{ opacity: 0, scale: 0.98, y: -4 }}
             transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
           >
+            <button
+              className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+              onClick={() => {
+                setEditingStageId(stage.id)
+                setStageEditValues((prev) => ({
+                  ...prev,
+                  [stage.id]: { ...prev[stage.id], dateValue: stage.dateValue ? new Date(stage.dateValue) : null },
+                }))
+                setStageMenu(null)
+              }}
+            >
+              <CalendarDays className="w-3.5 h-3.5 text-slate-400" />
+              Изменить дату
+            </button>
             <button
               className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
               onClick={() => {
