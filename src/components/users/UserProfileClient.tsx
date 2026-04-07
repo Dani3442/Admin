@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, Briefcase, Building2, Camera, Mail, Save, Settings, ShieldCheck, Sparkles, Trash2, UserCircle2, UserCog, X } from 'lucide-react'
 import { UserAvatar } from '@/components/users/UserAvatar'
+import { resolveBackNavigation } from '@/lib/navigation'
 import {
   cn,
   formatDate,
@@ -65,6 +66,7 @@ function mapProfileToForm(profile: UserProfileData): ProfileFormState {
 
 export function UserProfileClient({ profile: initialProfile, viewer, permissions }: UserProfileClientProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [profile, setProfile] = useState(initialProfile)
   const [form, setForm] = useState(() => mapProfileToForm(initialProfile))
@@ -78,7 +80,7 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
   const canEditAnything = permissions.canEditPersonal || permissions.canEditOperational || permissions.canEditSensitive
   const canOpenSettingsPanel = true
   const canSaveSettings = permissions.canEditOperational || permissions.canEditSensitive
-  const backHref = isSelf ? '/dashboard' : '/users'
+  const backNavigation = resolveBackNavigation(searchParams.get('returnTo'), isSelf ? '/dashboard' : '/users')
 
   useEffect(() => {
     setProfile(initialProfile)
@@ -213,9 +215,12 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
   return (
     <div className="page-section animate-fade-in">
       <div className="flex items-center justify-between gap-3">
-        <Link href={backHref} className="btn-secondary">
+        <Link
+          href={backNavigation.href}
+          className="inline-flex items-center gap-2 rounded-full px-2 py-1.5 text-[15px] font-medium text-brand-700 transition-colors hover:bg-brand-950/8"
+        >
           <ArrowLeft className="h-4 w-4" />
-          {isSelf ? 'Назад к дашборду' : 'Назад к пользователям'}
+          {backNavigation.label}
         </Link>
       </div>
 

@@ -379,7 +379,7 @@ export function Header({ user }: HeaderProps) {
 
                     <div className="space-y-1">
                       <Link
-                        href="/profile"
+                        href={`/profile?returnTo=${encodeURIComponent(currentRoute)}`}
                         onClick={() => setProfileOpen(false)}
                         className="flex items-center justify-between rounded-[18px] px-3 py-2.5 text-sm text-slate-700 transition hover:bg-slate-50 hover:text-slate-900"
                       >

@@ -1,9 +1,9 @@
 'use client'
 
-import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Filter, LayoutList, Plus, Search, Table2, X } from 'lucide-react'
+import { NewProductForm } from '@/components/products/NewProductForm'
 import { ProductsClient } from '@/components/products/ProductsClient'
 import { TableViewClient } from '@/components/table/TableViewClient'
 import { FilterSelect } from '@/components/ui/FilterSelect'
@@ -53,6 +53,8 @@ interface ProductsWorkspaceProps {
   tableProducts: TableProductView[]
   users: Array<{ id: string; name: string }>
   stages: StageTemplateView[]
+  productTemplates: any[]
+  stageSuggestions: Array<{ id: string; name: string }>
   currentUserRole: string
 }
 
@@ -139,6 +141,8 @@ export function ProductsWorkspace({
   tableProducts,
   users,
   stages,
+  productTemplates,
+  stageSuggestions,
   currentUserRole,
 }: ProductsWorkspaceProps) {
   const router = useRouter()
@@ -155,6 +159,7 @@ export function ProductsWorkspace({
   const [sortDirection, setSortDirection] = useState<ProductListSortDirection>(searchParams.get('dir') === 'desc' ? 'desc' : 'asc')
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(searchParams.get('advanced') === '1')
   const [onlyWithOverlaps, setOnlyWithOverlaps] = useState(searchParams.get('overlaps') === '1')
+  const [showNewProductModal, setShowNewProductModal] = useState(false)
 
   const updateLayout = (nextLayout: ProductsLayoutMode) => {
     const params = new URLSearchParams(searchParams.toString())
@@ -348,10 +353,10 @@ export function ProductsWorkspace({
           </AnimatePresence>
 
           <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-            <Link href="/products/new" className="btn-primary self-start">
+            <div>{layoutSwitcher}</div>
+            <button type="button" onClick={() => setShowNewProductModal(true)} className="btn-primary self-start">
               <Plus className="h-4 w-4" /> Новый продукт
-            </Link>
-            <div className="ml-auto">{layoutSwitcher}</div>
+            </button>
           </div>
         </div>
       </div>
@@ -399,6 +404,46 @@ export function ProductsWorkspace({
         )}
         </AnimatePresence>
       </div>
+
+      <AnimatePresence>
+        {showNewProductModal && (
+          <motion.div
+            className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/20 px-4 backdrop-blur-md"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowNewProductModal(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 10, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 8, scale: 0.98 }}
+              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+              className="w-full max-w-4xl"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="surface-panel max-h-[90vh] overflow-y-auto p-6">
+                <div className="mb-5">
+                  <h3 className="text-base font-semibold text-slate-800">Новый продукт</h3>
+                  <p className="mt-1 text-sm text-slate-500">Создай продукт без выхода из текущего раздела.</p>
+                </div>
+                <NewProductForm
+                  users={users}
+                  productTemplates={productTemplates}
+                  stageSuggestions={stageSuggestions}
+                  mode="modal"
+                  onCancel={() => setShowNewProductModal(false)}
+                  onCreated={(productId) => {
+                    setShowNewProductModal(false)
+                    router.push(`/products/${encodeURIComponent(productId)}?returnTo=${encodeURIComponent(pathname + (searchParams.toString() ? `?${searchParams.toString()}` : ''))}`)
+                    router.refresh()
+                  }}
+                />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

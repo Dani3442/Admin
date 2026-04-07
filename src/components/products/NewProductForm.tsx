@@ -26,6 +26,10 @@ interface NewProductFormProps {
   users: Array<{ id: string; name: string }>
   productTemplates: ProductTemplateData[]
   stageSuggestions: Array<{ id: string; name: string }>
+  mode?: 'page' | 'modal'
+  onCancel?: () => void
+  onCreated?: (productId: string) => void
+  returnTo?: string
 }
 
 function createDraftStage(): TemplateDraftStage {
@@ -37,7 +41,15 @@ function createDraftStage(): TemplateDraftStage {
   }
 }
 
-export function NewProductForm({ users, productTemplates, stageSuggestions }: NewProductFormProps) {
+export function NewProductForm({
+  users,
+  productTemplates,
+  stageSuggestions,
+  mode = 'page',
+  onCancel,
+  onCreated,
+  returnTo = '/products',
+}: NewProductFormProps) {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -196,8 +208,12 @@ export function NewProductForm({ users, productTemplates, stageSuggestions }: Ne
         throw new Error('Продукт создан, но не удалось открыть его карточку')
       }
 
-      router.push(`/products/${encodeURIComponent(productId)}`)
-      router.refresh()
+      if (onCreated) {
+        onCreated(productId)
+      } else {
+        router.push(`/products/${encodeURIComponent(productId)}`)
+        router.refresh()
+      }
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -499,9 +515,24 @@ export function NewProductForm({ users, productTemplates, stageSuggestions }: Ne
       </div>
 
       <div className="flex items-center justify-between">
-        <Link href="/products" className="btn-secondary text-sm">
-          <ArrowLeft className="w-4 h-4" /> Назад
-        </Link>
+        {mode === 'modal' ? (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="inline-flex items-center gap-2 rounded-full px-2 py-1.5 text-[15px] font-medium text-brand-700 transition-colors hover:bg-brand-950/8"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Назад
+          </button>
+        ) : (
+          <Link
+            href={returnTo}
+            className="inline-flex items-center gap-2 rounded-full px-2 py-1.5 text-[15px] font-medium text-brand-700 transition-colors hover:bg-brand-950/8"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Назад
+          </Link>
+        )}
         <button type="submit" disabled={saving} className="btn-primary">
           <Save className="w-4 h-4" />
           {saving ? 'Создание...' : 'Создать продукт'}

@@ -6,7 +6,7 @@ import { recalculateAllRisks } from '@/lib/risk'
 async function getProductsWorkspaceData() {
   await recalculateAllRisks()
 
-  const [listProducts, tableProducts, users, stages] = await Promise.all([
+  const [listProducts, tableProducts, users, stages, productTemplates, stageSuggestions] = await Promise.all([
     prisma.product.findMany({
       where: { isArchived: false },
       include: {
@@ -53,9 +53,28 @@ async function getProductsWorkspaceData() {
       },
       orderBy: { order: 'asc' },
     }),
+    prisma.productTemplate.findMany({
+      include: {
+        stages: {
+          orderBy: { stageOrder: 'asc' },
+          select: {
+            id: true,
+            stageTemplateId: true,
+            stageOrder: true,
+            stageName: true,
+            plannedDate: true,
+          },
+        },
+      },
+      orderBy: [{ createdAt: 'desc' }],
+    }),
+    prisma.stageTemplate.findMany({
+      select: { id: true, name: true },
+      orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+    }),
   ])
 
-  return { listProducts, tableProducts, users, stages }
+  return { listProducts, tableProducts, users, stages, productTemplates, stageSuggestions }
 }
 
 export default async function ProductsPage() {
@@ -70,6 +89,18 @@ export default async function ProductsPage() {
       tableProducts={data.tableProducts as any}
       users={data.users}
       stages={data.stages as any}
+      productTemplates={data.productTemplates.map((template) => ({
+        ...template,
+        stages: template.stages.map((stage) => ({
+          id: stage.id,
+          stageTemplateId: stage.stageTemplateId,
+          stageOrder: stage.stageOrder,
+          stageName: stage.stageName,
+          plannedDate: stage.plannedDate,
+          participatesInAutoshift: true,
+        })),
+      })) as any}
+      stageSuggestions={data.stageSuggestions}
       currentUserRole={(session?.user as any)?.role || 'VIEWER'}
     />
   )

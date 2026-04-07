@@ -100,7 +100,7 @@ export function UsersClient({ users: initial, currentUserRole }: { users: any[];
       </div>
 
       {showForm && canCreateUsers && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/20 px-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/20 px-4 backdrop-blur-md">
           <div className="surface-panel w-full max-w-2xl animate-fade-in p-6">
             <div className="mb-5 flex items-center justify-between gap-3">
               <div>
