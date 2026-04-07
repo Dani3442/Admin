@@ -772,7 +772,7 @@ export function TableViewClient({
                       style={{ width: columnWidths.__product, minWidth: 120, maxWidth: columnWidths.__product }}
                     >
                       <Link href={buildProductHref(product.id, currentRoute)} className="block">
-                        <div className="truncate text-[18px] font-semibold leading-[1.2] text-slate-800 hover:text-brand-700" title={product.name}>
+                        <div className="truncate text-[19px] font-medium leading-[1.2] text-slate-800 hover:text-brand-700" title={product.name}>
                           {product.name}
                         </div>
                         <div className="flex items-center gap-2 mt-0.5">

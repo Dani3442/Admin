@@ -721,7 +721,7 @@ export function ProductsClient({
                           <Star className={cn('w-3.5 h-3.5', product.isFavorite ? 'text-slate-700 fill-slate-200' : 'text-slate-300')} />
                         </div>
                         <div className="min-w-0">
-                          <Link href={buildProductHref(product.id, currentRoute)} className="text-[18px] font-semibold leading-[1.2] tracking-[-0.02em] text-slate-800 hover:text-brand-700 transition-colors">
+                          <Link href={buildProductHref(product.id, currentRoute)} className="text-[19px] font-medium leading-[1.25] tracking-normal text-slate-800 hover:text-brand-700 transition-colors">
                             {product.name.length > 70 ? `${product.name.slice(0, 70)}…` : product.name}
                           </Link>
                           <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[15px] leading-6 text-slate-400">

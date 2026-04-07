@@ -74,7 +74,7 @@ function LayoutSwitcher({
             type="button"
             onClick={() => onChange(option.value)}
             className={cn(
-              'relative inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium transition-colors',
+              'relative inline-flex min-w-[128px] items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium transition-colors',
               active ? 'text-white' : 'text-slate-600 hover:text-slate-900'
             )}
           >
@@ -82,7 +82,7 @@ function LayoutSwitcher({
               <motion.span
                 layoutId="products-layout-pill"
                 className="absolute inset-0 rounded-full bg-brand-950 shadow-[0_14px_28px_-18px_rgba(23,37,84,0.62)]"
-                transition={{ type: 'spring', stiffness: 380, damping: 34 }}
+                transition={{ type: 'spring', stiffness: 420, damping: 38, mass: 0.9 }}
               />
             )}
             <Icon className="relative z-10 h-4 w-4" />
@@ -133,32 +133,40 @@ export function ProductsWorkspace({
         </Link>
       </div>
 
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.div
-          key={layout}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -6 }}
-          transition={{ duration: 0.16, ease: 'easeOut' }}
-        >
-          {layout === 'table' ? (
+      <div className="flex justify-start">{layoutSwitcher}</div>
+
+      <AnimatePresence initial={false} mode="sync">
+        {layout === 'table' ? (
+          <motion.div
+            key="table"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.16, ease: 'easeOut' }}
+          >
             <TableViewClient
               products={tableProducts as any}
               stages={stages as any}
               currentUserRole={currentUserRole}
               embedded
-              layoutSwitcher={layoutSwitcher}
             />
-          ) : (
+          </motion.div>
+        ) : (
+          <motion.div
+            key="list"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.16, ease: 'easeOut' }}
+          >
             <ProductsClient
               products={listProducts}
               users={users}
               currentUserRole={currentUserRole}
               embedded
-              layoutSwitcher={layoutSwitcher}
             />
-          )}
-        </motion.div>
+          </motion.div>
+        )}
       </AnimatePresence>
     </div>
   )

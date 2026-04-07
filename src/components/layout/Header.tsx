@@ -76,7 +76,7 @@ export function Header({ user }: HeaderProps) {
 
     const fetchProfileUser = async () => {
       try {
-        const res = await fetch('/api/profile', { cache: 'no-store' })
+        const res = await fetch('/api/profile', { cache: 'no-store', credentials: 'include' })
         if (!res.ok) return
 
         const profile = await res.json()
@@ -248,7 +248,7 @@ export function Header({ user }: HeaderProps) {
               <button
                 type="button"
                 onClick={handleToggleNotifications}
-                className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200/80 bg-white/90 text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                className="relative inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200/80 bg-white/90 text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
                 aria-label="Открыть уведомления"
               >
                 <Bell className="h-[17px] w-[17px]" />
@@ -348,13 +348,13 @@ export function Header({ user }: HeaderProps) {
               <button
                 type="button"
                 onClick={handleToggleProfile}
-                className="inline-flex h-10 items-center gap-2 rounded-full border border-slate-200/80 bg-white/90 pl-1.5 pr-3 text-left transition hover:border-slate-300"
+                className="inline-flex h-12 items-center gap-2.5 rounded-full border border-slate-200/80 bg-white/90 pl-1.5 pr-4 text-left transition hover:border-slate-300"
                 aria-label="Открыть меню профиля"
               >
-                <UserAvatar user={profileUser} size="sm" />
+                <UserAvatar user={profileUser} size="md" />
                 <div className="hidden min-w-0 text-left sm:block">
-                  <p className="max-w-[170px] truncate text-[16px] font-semibold leading-5 text-slate-800">{getUserDisplayName(profileUser)}</p>
-                  <p className="truncate text-[14px] leading-5 text-slate-500">{getRoleLabel(profileUser.role)}</p>
+                  <p className="max-w-[180px] truncate text-[17px] font-semibold leading-5 text-slate-800">{getUserDisplayName(profileUser)}</p>
+                  <p className="truncate text-[14px] leading-4 text-slate-500">{getRoleLabel(profileUser.role)}</p>
                 </div>
                 <ChevronDown className={cn('h-4 w-4 text-slate-400 transition-transform', profileOpen && 'rotate-180')} />
               </button>
