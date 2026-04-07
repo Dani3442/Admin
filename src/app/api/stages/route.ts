@@ -8,6 +8,76 @@ import { recalculateProductDerivedFields } from '@/lib/product-derived-fields'
 import { createProductStageCompat } from '@/lib/product-stage-compat'
 import { getOverlapAcceptedMap, persistOverlapAccepted } from '@/lib/overlap-acceptance'
 
+async function normalizeProductStageOrders(
+  tx: {
+    productStage: {
+      findMany: (args: Record<string, unknown>) => Promise<Array<{
+        id: string
+        stageTemplateId: string
+        stageOrder: number
+        createdAt: Date
+      }>>
+      update: (args: Record<string, unknown>) => Promise<unknown>
+      aggregate: (args: Record<string, unknown>) => Promise<{ _max: { stageOrder: number | null } }>
+    }
+    stageTemplate: {
+      findMany: (args: Record<string, unknown>) => Promise<Array<{ id: string; order: number }>>
+    }
+  },
+  productId: string
+) {
+  const [productStages, stageTemplates] = await Promise.all([
+    tx.productStage.findMany({
+      where: { productId },
+      select: {
+        id: true,
+        stageTemplateId: true,
+        stageOrder: true,
+        createdAt: true,
+      },
+      orderBy: [{ stageOrder: 'asc' }, { createdAt: 'asc' }],
+    }),
+    tx.stageTemplate.findMany({
+      select: { id: true, order: true },
+      orderBy: { order: 'asc' },
+    }),
+  ])
+
+  const templateOrder = new Map(stageTemplates.map((stage) => [stage.id, stage.order]))
+
+  const knownStages = productStages
+    .filter((stage) => templateOrder.has(stage.stageTemplateId))
+    .sort((left, right) => {
+      const byTemplateOrder = (templateOrder.get(left.stageTemplateId) ?? left.stageOrder) - (templateOrder.get(right.stageTemplateId) ?? right.stageOrder)
+      if (byTemplateOrder !== 0) return byTemplateOrder
+      if (left.stageOrder !== right.stageOrder) return left.stageOrder - right.stageOrder
+      return left.createdAt.getTime() - right.createdAt.getTime()
+    })
+
+  const customStages = productStages
+    .filter((stage) => !templateOrder.has(stage.stageTemplateId))
+    .sort((left, right) => {
+      if (left.stageOrder !== right.stageOrder) return left.stageOrder - right.stageOrder
+      return left.createdAt.getTime() - right.createdAt.getTime()
+    })
+
+  const normalizedStages = [...knownStages, ...customStages]
+
+  for (const [index, stage] of normalizedStages.entries()) {
+    await tx.productStage.update({
+      where: { id: stage.id },
+      data: { stageOrder: -(index + 1) },
+    })
+  }
+
+  for (const [index, stage] of normalizedStages.entries()) {
+    await tx.productStage.update({
+      where: { id: stage.id },
+      data: { stageOrder: index },
+    })
+  }
+}
+
 export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -215,39 +285,28 @@ export async function PATCH(req: NextRequest) {
       }
 
       await prisma.$transaction(async (tx) => {
-        const affectedStages = await tx.productStage.findMany({
-          where: {
-            productId,
-            stageOrder: { gte: stageOrder },
-          },
-          orderBy: { stageOrder: 'desc' },
-          select: {
-            id: true,
-            stageOrder: true,
-          },
+        const orderAggregate = await tx.productStage.aggregate({
+          where: { productId },
+          _max: { stageOrder: true },
         })
-
-        for (const affectedStage of affectedStages) {
-          await tx.productStage.update({
-            where: { id: affectedStage.id },
-            data: { stageOrder: affectedStage.stageOrder + 1 },
-          })
-        }
+        const tempStageOrder = (orderAggregate._max.stageOrder ?? -1) + 1
 
         const createdStage = await createProductStageCompat(tx as any, {
           productId,
           stageTemplateId,
-          stageOrder,
+          stageOrder: tempStageOrder,
           stageName: typeof stageName === 'string' && stageName.trim() ? stageName.trim() : template.name,
           isCritical: template.isCritical,
           affectsFinalDate: template.affectsFinalDate,
           status: 'NOT_STARTED',
         })
 
+        await normalizeProductStageOrders(tx as any, productId)
+
         existingStage = {
           id: (createdStage as any).id,
           productId,
-          stageOrder,
+          stageOrder: tempStageOrder,
           stageTemplateId,
           stageName: typeof stageName === 'string' && stageName.trim() ? stageName.trim() : template.name,
           dateValue: null,

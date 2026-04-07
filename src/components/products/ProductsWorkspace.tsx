@@ -150,6 +150,7 @@ export function ProductsWorkspace({
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const layout = getLayoutFromSearchParams(searchParams)
+  const createToken = searchParams.get('create')
   const [search, setSearch] = useState(searchParams.get('search') || '')
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '')
   const [responsibleFilter, setResponsibleFilter] = useState(searchParams.get('responsible') || '')
@@ -160,7 +161,23 @@ export function ProductsWorkspace({
   const [sortDirection, setSortDirection] = useState<ProductListSortDirection>(searchParams.get('dir') === 'desc' ? 'desc' : 'asc')
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(searchParams.get('advanced') === '1')
   const [onlyWithOverlaps, setOnlyWithOverlaps] = useState(searchParams.get('overlaps') === '1')
-  const [showNewProductModal, setShowNewProductModal] = useState(searchParams.get('create') === '1')
+  const [showNewProductModal, setShowNewProductModal] = useState(Boolean(createToken))
+
+  const openCreateModal = () => {
+    setShowNewProductModal(true)
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('create', String(Date.now()))
+    const nextQuery = params.toString()
+    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false })
+  }
+
+  const closeCreateModal = () => {
+    setShowNewProductModal(false)
+    const params = new URLSearchParams(searchParams.toString())
+    params.delete('create')
+    const nextQuery = params.toString()
+    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false })
+  }
 
   const updateLayout = (nextLayout: ProductsLayoutMode) => {
     const params = new URLSearchParams(searchParams.toString())
@@ -196,8 +213,8 @@ export function ProductsWorkspace({
   )
 
   useEffect(() => {
-    setShowNewProductModal(searchParams.get('create') === '1')
-  }, [searchParams])
+    setShowNewProductModal(Boolean(createToken))
+  }, [createToken])
 
   useEffect(() => {
     const params = new URLSearchParams(searchParams.toString())
@@ -206,8 +223,6 @@ export function ProductsWorkspace({
     })
 
     if (layout === 'table') params.set('layout', 'table')
-    if (showNewProductModal) params.set('create', '1')
-    else params.delete('create')
     if (search) params.set('search', search)
     if (statusFilter) params.set('status', statusFilter)
     if (responsibleFilter) params.set('responsible', responsibleFilter)
@@ -221,7 +236,7 @@ export function ProductsWorkspace({
 
     const nextQuery = params.toString()
     router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false })
-  }, [countryFilter, layout, onlyWithOverlaps, pathname, priorityFilter, quickView, responsibleFilter, router, search, searchParams, showAdvancedFilters, showNewProductModal, sortDirection, sortField, statusFilter])
+  }, [countryFilter, layout, onlyWithOverlaps, pathname, priorityFilter, quickView, responsibleFilter, router, search, searchParams, showAdvancedFilters, sortDirection, sortField, statusFilter])
 
   const resetFilters = () => {
     setSearch('')
@@ -370,7 +385,7 @@ export function ProductsWorkspace({
 
           <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
             <div>{layoutSwitcher}</div>
-            <button type="button" onClick={() => setShowNewProductModal(true)} className="btn-primary self-start">
+            <button type="button" onClick={openCreateModal} className="btn-primary self-start">
               <Plus className="h-4 w-4" /> Новый продукт
             </button>
           </div>
@@ -428,7 +443,7 @@ export function ProductsWorkspace({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => setShowNewProductModal(false)}
+            onClick={closeCreateModal}
           >
             <motion.div
               initial={{ opacity: 0, y: 10, scale: 0.98 }}
@@ -448,9 +463,9 @@ export function ProductsWorkspace({
                   productTemplates={productTemplates}
                   stageSuggestions={stageSuggestions}
                   mode="modal"
-                  onCancel={() => setShowNewProductModal(false)}
+                  onCancel={closeCreateModal}
                   onCreated={(productId) => {
-                    setShowNewProductModal(false)
+                    closeCreateModal()
                     router.push(`/products/${encodeURIComponent(productId)}?returnTo=${encodeURIComponent(pathname + (searchParams.toString() ? `?${searchParams.toString()}` : ''))}`)
                     router.refresh()
                   }}

@@ -214,6 +214,11 @@ export function Header({ user }: HeaderProps) {
   }
 
   const totalBadge = counts.mentions + counts.overdue + counts.risk
+  const handleOpenCreateProduct = () => {
+    const params = new URLSearchParams()
+    params.set('create', String(Date.now()))
+    router.push(`/products?${params.toString()}`)
+  }
 
   return (
     <header className="relative z-[60] flex-shrink-0 px-4 pb-2 pt-5 sm:px-6 lg:px-8">
@@ -263,13 +268,14 @@ export function Header({ user }: HeaderProps) {
           </div>
 
           <div className="ml-auto flex flex-shrink-0 items-center gap-2">
-            <Link
-              href="/products?create=1"
+            <button
+              type="button"
+              onClick={handleOpenCreateProduct}
               className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200/80 bg-white/90 text-slate-950 transition hover:border-slate-300 hover:bg-slate-50"
               aria-label="Создать продукт"
             >
               <Plus className="h-[18px] w-[18px]" />
-            </Link>
+            </button>
 
             <div className="relative" ref={notificationsRef}>
               <button
