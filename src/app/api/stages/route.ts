@@ -250,12 +250,12 @@ export async function PATCH(req: NextRequest) {
     })
 
     if (!existingStage) {
-      existingStage = await prisma.productStage.findFirst({
+      const templateMatches = await prisma.productStage.findMany({
         where: {
           productId,
           stageTemplateId,
         },
-        orderBy: [{ stageOrder: 'asc' }, { createdAt: 'asc' }],
+        orderBy: [{ createdAt: 'asc' }],
         select: {
           id: true,
           productId: true,
@@ -265,6 +265,17 @@ export async function PATCH(req: NextRequest) {
           dateValue: true,
         },
       })
+
+      if (templateMatches.length === 1) {
+        existingStage = templateMatches[0]
+      } else if (templateMatches.length > 1) {
+        existingStage = [...templateMatches].sort((left, right) => {
+          const leftDistance = Math.abs(left.stageOrder - stageOrder)
+          const rightDistance = Math.abs(right.stageOrder - stageOrder)
+          if (leftDistance !== rightDistance) return leftDistance - rightDistance
+          return left.stageOrder - right.stageOrder
+        })[0]
+      }
     }
 
     if (!existingStage) {
@@ -309,12 +320,15 @@ export async function PATCH(req: NextRequest) {
           _max: { stageOrder: true },
         })
         const tempStageOrder = (orderAggregate._max.stageOrder ?? -1) + 1
+        const initialDateValue = updates?.dateValue ? new Date(updates.dateValue) : null
 
         const createdStage = await createProductStageCompat(tx as any, {
           productId,
           stageTemplateId,
           stageOrder: tempStageOrder,
           stageName: typeof stageName === 'string' && stageName.trim() ? stageName.trim() : template.name,
+          dateValue: initialDateValue,
+          plannedDate: initialDateValue,
           isCritical: template.isCritical,
           affectsFinalDate: template.affectsFinalDate,
           status: 'NOT_STARTED',
@@ -328,7 +342,7 @@ export async function PATCH(req: NextRequest) {
           stageOrder: tempStageOrder,
           stageTemplateId,
           stageName: typeof stageName === 'string' && stageName.trim() ? stageName.trim() : template.name,
-          dateValue: null,
+          dateValue: initialDateValue,
         }
       })
     }

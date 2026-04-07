@@ -150,7 +150,7 @@ export function ProductsWorkspace({
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const layout = getLayoutFromSearchParams(searchParams)
-  const createToken = searchParams.get('create')
+  const createQueryOpen = searchParams.get('create') === '1'
   const [search, setSearch] = useState(searchParams.get('search') || '')
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '')
   const [responsibleFilter, setResponsibleFilter] = useState(searchParams.get('responsible') || '')
@@ -161,25 +161,21 @@ export function ProductsWorkspace({
   const [sortDirection, setSortDirection] = useState<ProductListSortDirection>(searchParams.get('dir') === 'desc' ? 'desc' : 'asc')
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(searchParams.get('advanced') === '1')
   const [onlyWithOverlaps, setOnlyWithOverlaps] = useState(searchParams.get('overlaps') === '1')
-  const [showNewProductModal, setShowNewProductModal] = useState(Boolean(createToken))
+  const [showNewProductModal, setShowNewProductModal] = useState(createQueryOpen)
 
   const openCreateModal = () => {
-    if (typeof window !== 'undefined') {
-      window.sessionStorage.setItem('product-admin:open-create-modal', '1')
-    }
     setShowNewProductModal(true)
-    const params = new URLSearchParams(searchParams.toString())
-    params.set('create', String(Date.now()))
-    const nextQuery = params.toString()
-    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false })
   }
 
   const closeCreateModal = () => {
     setShowNewProductModal(false)
+
     const params = new URLSearchParams(searchParams.toString())
-    params.delete('create')
-    const nextQuery = params.toString()
-    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false })
+    if (params.has('create')) {
+      params.delete('create')
+      const nextQuery = params.toString()
+      router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false })
+    }
   }
 
   const updateLayout = (nextLayout: ProductsLayoutMode) => {
@@ -216,10 +212,6 @@ export function ProductsWorkspace({
   )
 
   useEffect(() => {
-    setShowNewProductModal(Boolean(createToken))
-  }, [createToken])
-
-  useEffect(() => {
     if (typeof window === 'undefined') return
 
     const shouldOpenFromStorage = window.sessionStorage.getItem('product-admin:open-create-modal') === '1'
@@ -235,6 +227,12 @@ export function ProductsWorkspace({
     window.addEventListener('product-admin:open-create-modal', handleOpenCreateModal)
     return () => window.removeEventListener('product-admin:open-create-modal', handleOpenCreateModal)
   }, [])
+
+  useEffect(() => {
+    if (createQueryOpen) {
+      setShowNewProductModal(true)
+    }
+  }, [createQueryOpen])
 
   useEffect(() => {
     const params = new URLSearchParams(searchParams.toString())
@@ -486,7 +484,8 @@ export function ProductsWorkspace({
                   onCancel={closeCreateModal}
                   onCreated={(productId) => {
                     closeCreateModal()
-                    router.push(`/products/${encodeURIComponent(productId)}?returnTo=${encodeURIComponent(pathname + (searchParams.toString() ? `?${searchParams.toString()}` : ''))}`)
+                    const returnTo = pathname + (searchParams.toString() ? `?${searchParams.toString()}` : '')
+                    router.push(`/products/${encodeURIComponent(productId)}?returnTo=${encodeURIComponent(returnTo)}`)
                     router.refresh()
                   }}
                 />

@@ -37,3 +37,7 @@ export async function supportsProductStageAutoshiftColumn() {
 export async function supportsProductStageOverlapAcceptedColumn() {
   return hasDbColumn('product_stages', 'overlapAccepted')
 }
+
+export async function supportsProductTemplateReferenceColumn() {
+  return hasDbColumn('products', 'productTemplateId')
+}

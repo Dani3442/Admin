@@ -67,10 +67,6 @@ export async function createProductStageCompat(
     updatedAt: new Date(),
   }
 
-  if (hasAutoshiftColumn && hasOverlapAcceptedColumn) {
-    return db.productStage.create({ data })
-  }
-
   const columns = [
     'id',
     'productId',

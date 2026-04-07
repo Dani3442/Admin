@@ -217,18 +217,14 @@ export function Header({ user }: HeaderProps) {
   const handleOpenCreateProduct = () => {
     if (typeof window !== 'undefined') {
       window.sessionStorage.setItem('product-admin:open-create-modal', '1')
-      window.dispatchEvent(new Event('product-admin:open-create-modal'))
     }
 
     if (pathname === '/products') {
-      const params = new URLSearchParams(searchParams.toString())
-      params.set('create', String(Date.now()))
-      const nextQuery = params.toString()
-      router.replace(nextQuery ? `/products?${nextQuery}` : '/products', { scroll: false })
+      window.dispatchEvent(new Event('product-admin:open-create-modal'))
       return
     }
 
-    router.push('/products')
+    router.push('/products?create=1')
   }
 
   return (

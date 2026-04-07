@@ -3,6 +3,7 @@ import { auth, hasPermission, Permission } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { createProductStageCompat } from '@/lib/product-stage-compat'
 import { getFinalDateFromStages } from '@/lib/product-derived-fields'
+import { supportsProductTemplateReferenceColumn } from '@/lib/schema-compat'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -107,7 +108,7 @@ export async function POST(req: NextRequest) {
     }
 
     const product = await prisma.$transaction(async (tx) => {
-      const [stageTemplates, sortOrderAggregate, selectedTemplate] = await Promise.all([
+      const [stageTemplates, sortOrderAggregate, selectedTemplate, hasProductTemplateReferenceColumn] = await Promise.all([
         tx.stageTemplate.findMany({
           select: {
             id: true,
@@ -144,6 +145,7 @@ export async function POST(req: NextRequest) {
               },
             })
           : Promise.resolve(null),
+        supportsProductTemplateReferenceColumn(),
       ])
 
       if (productTemplateId && !selectedTemplate) {
@@ -195,19 +197,24 @@ export async function POST(req: NextRequest) {
             participatesInAutoshift: true,
           }))
 
+      const productCreateData: any = {
+        name: name.trim(),
+        country,
+        category,
+        sku,
+        priority: priority || 'MEDIUM',
+        responsibleId,
+        notes,
+        sortOrder: (sortOrderAggregate._max.sortOrder ?? -1) + 1,
+        finalDate: null,
+      }
+
+      if (hasProductTemplateReferenceColumn) {
+        productCreateData.productTemplateId = selectedTemplate?.id ?? null
+      }
+
       const createdProduct = await tx.product.create({
-        data: {
-          name: name.trim(),
-          country,
-          category,
-          sku,
-          priority: priority || 'MEDIUM',
-          responsibleId,
-          notes,
-          productTemplateId: selectedTemplate?.id ?? null,
-          sortOrder: (sortOrderAggregate._max.sortOrder ?? -1) + 1,
-          finalDate: null,
-        },
+        data: productCreateData,
         select: { id: true },
       })
 
