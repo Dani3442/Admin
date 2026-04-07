@@ -40,6 +40,7 @@ interface Notification {
 
 interface HeaderProps {
   user: { name?: string; lastName?: string | null; email?: string; role: string; avatar?: string | null }
+  canCreateProduct?: boolean
 }
 
 const NAV_ITEMS: Array<{
@@ -54,7 +55,7 @@ const NAV_ITEMS: Array<{
   { label: 'Пользователи', href: '/users', icon: Users, adminOnly: true },
 ]
 
-export function Header({ user }: HeaderProps) {
+export function Header({ user, canCreateProduct = true }: HeaderProps) {
   const [profileUser, setProfileUser] = useState(user)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
@@ -215,21 +216,9 @@ export function Header({ user }: HeaderProps) {
 
   const totalBadge = counts.mentions + counts.overdue + counts.risk
   const handleOpenCreateProduct = () => {
-    const params = new URLSearchParams()
-    params.set('create', '1')
-    const nextQuery = params.toString()
-
     if (typeof window !== 'undefined') {
-      window.sessionStorage.setItem('product-admin:open-create-modal', '1')
       window.dispatchEvent(new CustomEvent('product-admin:open-create-modal'))
     }
-
-    if (pathname === '/products') {
-      router.replace(nextQuery ? `/products?${nextQuery}` : '/products', { scroll: false })
-      return
-    }
-
-    router.push(nextQuery ? `/products?${nextQuery}` : '/products')
   }
 
   return (
@@ -280,14 +269,16 @@ export function Header({ user }: HeaderProps) {
           </div>
 
           <div className="ml-auto flex flex-shrink-0 items-center gap-2">
-            <button
-              type="button"
-              onClick={handleOpenCreateProduct}
-              className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200/80 bg-white/90 text-slate-950 transition hover:border-slate-300 hover:bg-slate-50"
-              aria-label="Создать продукт"
-            >
-              <Plus className="h-[18px] w-[18px]" />
-            </button>
+            {canCreateProduct && (
+              <button
+                type="button"
+                onClick={handleOpenCreateProduct}
+                className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200/80 bg-white/90 text-slate-950 transition hover:border-slate-300 hover:bg-slate-50"
+                aria-label="Создать продукт"
+              >
+                <Plus className="h-[18px] w-[18px]" />
+              </button>
+            )}
 
             <div className="relative" ref={notificationsRef}>
               <button

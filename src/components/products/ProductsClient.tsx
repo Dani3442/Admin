@@ -521,14 +521,8 @@ export function ProductsClient({
             type="button"
             onClick={() => {
               if (typeof window !== 'undefined') {
-                window.sessionStorage.setItem('product-admin:open-create-modal', '1')
                 window.dispatchEvent(new CustomEvent('product-admin:open-create-modal'))
               }
-
-              const params = new URLSearchParams(searchParams.toString())
-              params.set('create', '1')
-              const nextQuery = params.toString()
-              router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false })
             }}
             className="btn-primary"
           >
