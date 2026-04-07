@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getCommentDisplayText } from '@/lib/comment-mentions'
 
 export async function POST(req: NextRequest) {
   const session = await auth()
@@ -21,9 +22,15 @@ export async function POST(req: NextRequest) {
       productStageId: productStageId || null,
     },
     include: {
-      author: { select: { id: true, name: true } },
+      author: { select: { id: true, name: true, lastName: true, avatar: true } },
     },
   })
 
-  return NextResponse.json(comment, { status: 201 })
+  return NextResponse.json(
+    {
+      ...comment,
+      displayContent: getCommentDisplayText(comment.content),
+    },
+    { status: 201 }
+  )
 }

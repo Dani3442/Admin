@@ -45,14 +45,14 @@ async function getProduct(id: string) {
           },
           responsible: { select: { id: true, name: true } },
           comments: {
-            include: { author: { select: { id: true, name: true } } },
+            include: { author: { select: { id: true, name: true, lastName: true, avatar: true } } },
             orderBy: { createdAt: 'desc' },
           },
         },
       },
       comments: {
         where: { productStageId: null },
-        include: { author: { select: { id: true, name: true } } },
+        include: { author: { select: { id: true, name: true, lastName: true, avatar: true } } },
         orderBy: { createdAt: 'desc' },
       },
       automations: { where: { isActive: true } },
@@ -78,7 +78,7 @@ async function getProduct(id: string) {
 async function getUsers() {
   return prisma.user.findMany({
     where: { isActive: true },
-    select: { id: true, name: true },
+    select: { id: true, name: true, lastName: true, avatar: true },
     orderBy: { name: 'asc' },
   })
 }

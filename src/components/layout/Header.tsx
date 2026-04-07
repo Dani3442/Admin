@@ -10,6 +10,7 @@ import {
   AlertTriangle,
   Clock,
   History,
+  MessageCircle,
   X,
   ChevronDown,
   ChevronRight,
@@ -28,11 +29,12 @@ import { buildProductHref, getRouteWithSearch } from '@/lib/navigation'
 
 interface Notification {
   id: string
-  type: 'change' | 'overdue' | 'risk'
+  type: 'mention' | 'change' | 'overdue' | 'risk'
   title: string
   description: string
   productId: string | null
   createdAt: string
+  href?: string | null
 }
 
 interface HeaderProps {
@@ -56,7 +58,7 @@ export function Header({ user }: HeaderProps) {
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const [notifications, setNotifications] = useState<Notification[]>([])
-  const [counts, setCounts] = useState({ overdue: 0, risk: 0, changes: 0, total: 0 })
+  const [counts, setCounts] = useState({ mentions: 0, overdue: 0, risk: 0, changes: 0, total: 0 })
   const [loading, setLoading] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const notificationsRef = useRef<HTMLDivElement>(null)
@@ -152,13 +154,23 @@ export function Header({ user }: HeaderProps) {
   }
 
   const handleClickNotification = (notification: Notification) => {
-    if (!notification.productId) return
-    router.push(buildProductHref(notification.productId, currentRoute))
+    if (notification.href) {
+      const href = notification.href.includes('returnTo=')
+        ? notification.href
+        : `${notification.href}${notification.href.includes('?') ? '&' : '?'}returnTo=${encodeURIComponent(currentRoute)}`
+      router.push(href)
+    } else if (notification.productId) {
+      router.push(buildProductHref(notification.productId, currentRoute))
+    } else {
+      return
+    }
     setNotificationsOpen(false)
   }
 
   const getIcon = (type: string) => {
     switch (type) {
+      case 'mention':
+        return <MessageCircle className="h-3.5 w-3.5 text-brand-600" />
       case 'overdue':
         return <Clock className="h-3.5 w-3.5 text-red-500" />
       case 'risk':
@@ -172,6 +184,8 @@ export function Header({ user }: HeaderProps) {
 
   const getBg = (type: string) => {
     switch (type) {
+      case 'mention':
+        return 'bg-brand-50 hover:bg-brand-100/70'
       case 'overdue':
         return 'bg-red-50 hover:bg-red-100/70'
       case 'risk':
@@ -194,7 +208,7 @@ export function Header({ user }: HeaderProps) {
     return `${diffDay} дн. назад`
   }
 
-  const totalBadge = counts.overdue + counts.risk
+  const totalBadge = counts.mentions + counts.overdue + counts.risk
 
   return (
     <header className="relative z-[60] flex-shrink-0 px-4 pb-2 pt-5 sm:px-6 lg:px-8">
@@ -288,8 +302,13 @@ export function Header({ user }: HeaderProps) {
                       </div>
                     </div>
 
-                    {(counts.overdue > 0 || counts.risk > 0 || counts.changes > 0) && (
+                    {(counts.mentions > 0 || counts.overdue > 0 || counts.risk > 0 || counts.changes > 0) && (
                       <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-4 py-2.5">
+                        {counts.mentions > 0 && (
+                          <span className="rounded-full bg-brand-100 px-2 py-0.5 text-[11px] font-medium text-brand-700">
+                            {counts.mentions} упоминаний
+                          </span>
+                        )}
                         {counts.overdue > 0 && (
                           <span className="rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-medium text-red-700">
                             {counts.overdue} просрочено

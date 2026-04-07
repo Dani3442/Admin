@@ -1,13 +1,15 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeft, CheckCircle2, Circle, AlertTriangle, MessageCircle, Clock, History, Zap, ExternalLink, Edit2, Save, Pencil, ChevronUp, ChevronDown, X, Plus, Trash2 } from 'lucide-react'
+import { ArrowLeft, AtSign, CheckCircle2, Circle, AlertTriangle, MessageCircle, Clock, History, Zap, ExternalLink, Edit2, Save, Pencil, ChevronUp, ChevronDown, X, Plus, Trash2, SendHorizontal, PanelLeft } from 'lucide-react'
 import { cn, getStatusColor, getStatusLabel, getPriorityColor, getPriorityLabel, formatDate, detectStageOverlaps, formatStageOverlap } from '@/lib/utils'
 import { DatePicker } from '@/components/ui/DatePicker'
 import { resolveBackNavigation } from '@/lib/navigation'
+import { UserAvatar } from '@/components/users/UserAvatar'
+import { encodeCommentMentions, getCommentSegments } from '@/lib/comment-mentions'
 // Types are string-based (no Prisma enums needed)
 
 const AUTOMATION_ACTIONS = [
@@ -20,7 +22,7 @@ const AUTOMATION_ACTIONS = [
 
 interface ProductCardClientProps {
   product: any
-  users: Array<{ id: string; name: string }>
+  users: Array<{ id: string; name: string; lastName?: string | null; avatar?: string | null }>
   currentUser: { id: string; name: string; role: string }
 }
 
@@ -33,10 +35,16 @@ const TABS = [
 
 export function ProductCardClient({ product: initial, users, currentUser }: ProductCardClientProps) {
   const router = useRouter()
+  const pathname = usePathname()
   const searchParams = useSearchParams()
   const [product, setProduct] = useState(initial)
-  const [tab, setTab] = useState('stages')
+  const [tab, setTab] = useState(() => {
+    const nextTab = searchParams.get('tab')
+    return TABS.some((item) => item.id === nextTab) ? nextTab! : 'stages'
+  })
   const [newComment, setNewComment] = useState('')
+  const [selectedMentions, setSelectedMentions] = useState<Record<string, string>>({})
+  const [mentionState, setMentionState] = useState<{ query: string; start: number; end: number } | null>(null)
   const [savingComment, setSavingComment] = useState(false)
   const [editingStageId, setEditingStageId] = useState<string | null>(null)
   const [stageEditValues, setStageEditValues] = useState<Record<string, any>>({})
@@ -59,6 +67,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
   const [automationDesc, setAutomationDesc] = useState('')
   const [savingAutomation, setSavingAutomation] = useState(false)
   const [deletingProduct, setDeletingProduct] = useState(false)
+  const commentInputRef = useRef<HTMLTextAreaElement>(null)
 
   // Close context menu on outside click
   useEffect(() => {
@@ -72,26 +81,147 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
   }, [stageMenu])
 
   const canEdit = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUser?.role)
+  const canComment = Boolean(currentUser?.id)
   const canDeleteProduct = ['ADMIN', 'DIRECTOR'].includes(currentUser?.role)
   const backNavigation = resolveBackNavigation(searchParams.get('returnTo'))
+  const mentionableUsers = useMemo(
+    () =>
+      users
+        .map((user) => ({
+          ...user,
+          displayName: [user.name, user.lastName].filter(Boolean).join(' ').trim() || user.name,
+        }))
+        .sort((left, right) => left.displayName.localeCompare(right.displayName, 'ru')),
+    [users]
+  )
+  const activeMentionSuggestions = useMemo(() => {
+    if (!mentionState) return []
+
+    const query = mentionState.query.trim().toLowerCase()
+    return mentionableUsers
+      .filter((user) => {
+        if (user.id === currentUser.id) return false
+        if (!query) return true
+        return user.displayName.toLowerCase().includes(query)
+      })
+      .slice(0, 6)
+  }, [currentUser.id, mentionState, mentionableUsers])
+  const commentFeed = useMemo(
+    () =>
+      [...product.comments].sort(
+        (left: any, right: any) =>
+          new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime()
+      ),
+    [product.comments]
+  )
+  const commentParticipants = useMemo(() => {
+    const seen = new Map<string, any>()
+    for (const comment of commentFeed) {
+      if (comment.author?.id && !seen.has(comment.author.id)) {
+        seen.set(comment.author.id, comment.author)
+      }
+    }
+    return [...seen.values()]
+  }, [commentFeed])
+
+  useEffect(() => {
+    const nextTab = searchParams.get('tab')
+    if (nextTab && TABS.some((item) => item.id === nextTab) && nextTab !== tab) {
+      setTab(nextTab)
+    } else if (!nextTab && tab !== 'stages') {
+      setTab('stages')
+    }
+  }, [searchParams, tab])
 
   const now = new Date()
   const completedStages = product.stages.filter((s: any) => s.isCompleted).length
   const totalStages = product.stages.length
   const progress = totalStages > 0 ? Math.round((completedStages / totalStages) * 100) : 0
 
+  const syncCommentMentionState = (value: string, caretPosition: number) => {
+    const beforeCaret = value.slice(0, caretPosition)
+    const match = beforeCaret.match(/(^|\s)@([^\s@]*)$/u)
+
+    if (!match) {
+      setMentionState(null)
+      return
+    }
+
+    const query = match[2]
+    const start = beforeCaret.lastIndexOf(`@${query}`)
+    setMentionState({ query, start, end: caretPosition })
+  }
+
+  const handleCommentChange = (value: string, caretPosition: number) => {
+    setNewComment(value)
+    syncCommentMentionState(value, caretPosition)
+  }
+
+  const insertMention = (user: { id: string; displayName: string }) => {
+    if (!mentionState) return
+
+    const beforeMention = newComment.slice(0, mentionState.start)
+    const afterMention = newComment.slice(mentionState.end)
+    const insertedText = `@${user.displayName} `
+    const nextComment = `${beforeMention}${insertedText}${afterMention}`
+    const nextCaret = beforeMention.length + insertedText.length
+
+    setNewComment(nextComment)
+    setSelectedMentions((current) => ({ ...current, [user.displayName]: user.id }))
+    setMentionState(null)
+
+    requestAnimationFrame(() => {
+      if (!commentInputRef.current) return
+      commentInputRef.current.focus()
+      commentInputRef.current.setSelectionRange(nextCaret, nextCaret)
+    })
+  }
+
+  const updateActiveTab = (nextTab: string) => {
+    setTab(nextTab)
+    const params = new URLSearchParams(searchParams.toString())
+
+    if (nextTab === 'stages') {
+      params.delete('tab')
+    } else {
+      params.set('tab', nextTab)
+    }
+
+    const nextQuery = params.toString()
+    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false })
+  }
+
+  const formatCommentTimestamp = (date: Date | string) =>
+    new Intl.DateTimeFormat('ru-RU', {
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(new Date(date))
+
   const addComment = async () => {
     if (!newComment.trim()) return
     setSavingComment(true)
     try {
+      const content = encodeCommentMentions(
+        newComment,
+        Object.entries(selectedMentions).map(([label, id]) => ({ label, id }))
+      )
       const res = await fetch('/api/comments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: newComment, productId: product.id }),
+        body: JSON.stringify({ content, productId: product.id }),
       })
       const comment = await res.json()
+      if (!res.ok) {
+        throw new Error(comment?.error || 'Не удалось добавить комментарий')
+      }
       setProduct((p: any) => ({ ...p, comments: [comment, ...p.comments] }))
       setNewComment('')
+      setSelectedMentions({})
+      setMentionState(null)
+    } catch (error: any) {
+      alert(error.message || 'Не удалось добавить комментарий')
     } finally {
       setSavingComment(false)
     }
@@ -416,6 +546,29 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
     }
   }
 
+  const renderCommentContent = (content: string, ownMessage = false) =>
+    getCommentSegments(content).map((segment, index) => {
+      if (segment.type === 'mention') {
+        return (
+          <span
+            key={`${segment.userId}-${index}`}
+            className={cn(
+              'rounded-full px-2 py-0.5 font-medium',
+              ownMessage ? 'bg-white/20 text-white' : 'bg-brand-50 text-brand-700'
+            )}
+          >
+            {segment.text}
+          </span>
+        )
+      }
+
+      return (
+        <span key={`text-${index}`} className="whitespace-pre-wrap">
+          {segment.text}
+        </span>
+      )
+    })
+
   return (
     <div className="space-y-5 animate-fade-in">
       {/* Back */}
@@ -485,377 +638,459 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="surface-panel overflow-hidden">
-        <div className="flex border-b border-slate-100 px-1 pt-1">
-          {TABS.map((t) => {
-            const Icon = t.icon
-            return (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                className={cn(
-                      'relative flex items-center gap-2 rounded-t-[20px] px-4 py-3 text-sm font-medium transition-colors',
-                  tab === t.id
-                    ? 'text-brand-700 bg-brand-50/50'
-                    : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
-                )}
-              >
-                {tab === t.id && (
-                  <motion.span
-                    layoutId="product-tab-indicator"
-                    className="absolute inset-x-0 bottom-0 h-0.5 bg-brand-600"
-                    transition={{ type: 'spring', stiffness: 420, damping: 34 }}
-                  />
-                )}
-                <Icon className="relative z-10 w-3.5 h-3.5" />
-                <span className="relative z-10">{t.label}</span>
-              </button>
-            )
-          })}
-        </div>
-
-        <div className="p-5">
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.div
-              key={tab}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-            >
-          {/* STAGES TAB */}
-          {tab === 'stages' && (
-            <div className="space-y-2">
-              {canEdit && (
-                <div className="mb-3 flex items-center justify-end gap-3">
-                  <button
-                    onClick={() => {
-                      setShowAddStageForm((prev) => {
-                        const next = !prev
-                        if (!next) {
-                          setNewStageName('')
-                          setNewStageDate(null)
-                          setNewStageAutoshift(true)
-                        }
-                        return next
-                      })
-                    }}
-                    className="btn-primary text-sm"
-                    disabled={saving}
-                  >
-                    <Plus className="w-4 h-4" />
-                    Добавить этап
-                  </button>
-                </div>
-              )}
-              {canEdit && showAddStageForm && (
-                <div className="mb-3 flex items-center gap-2 rounded-[24px] bg-slate-50 p-3">
-                  <input
-                    type="text"
-                    value={newStageName}
-                    onChange={(e) => setNewStageName(e.target.value)}
-                    className="input text-sm flex-1"
-                    placeholder="Название нового этапа"
-                    autoFocus
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleAddStage()
-                      if (e.key === 'Escape') {
-                        setShowAddStageForm(false)
-                        setNewStageName('')
-                        setNewStageDate(null)
-                        setNewStageAutoshift(true)
-                      }
-                    }}
-                  />
-                  <DatePicker
-                    value={newStageDate}
-                    onChange={setNewStageDate}
-                    inputClassName="h-11 w-56 text-sm"
-                    panelClassName="w-[360px]"
-                    placeholder="Дата этапа"
-                  />
-                  <label className="flex h-11 items-center gap-2 rounded-[18px] bg-white px-3 text-sm text-slate-600">
-                    <span className="whitespace-nowrap">Автосдвиг</span>
-                    <input
-                      type="checkbox"
-                      checked={newStageAutoshift}
-                      onChange={(e) => setNewStageAutoshift(e.target.checked)}
-                      className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
-                    />
-                  </label>
-                  <button onClick={handleAddStage} className="btn-primary text-sm" disabled={!newStageName.trim() || saving}>
-                    <Save className="w-4 h-4" />
-                    Сохранить
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowAddStageForm(false)
-                      setNewStageName('')
-                      setNewStageDate(null)
-                      setNewStageAutoshift(true)
-                    }}
-                    className="btn-secondary text-sm"
-                    disabled={saving}
-                  >
-                    Отмена
-                  </button>
-                </div>
-              )}
-              {overlaps.length > 0 && (
-                <div className="mb-3 flex items-start gap-2 rounded-[24px] bg-orange-50 p-3">
-                  <AlertTriangle className="w-4 h-4 text-orange-500 mt-0.5 flex-shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-orange-800">Обнаружены пересечения дат</p>
-                    <ul className="mt-2 space-y-2">
-                      {overlaps.map((o, i) => (
-                        <li key={i} className="flex items-start justify-between gap-3 rounded-[16px] bg-white/70 px-3 py-2 text-xs text-orange-700">
-                          <span>{formatStageOverlap(o)}{o.dateLabel ? ` (${o.dateLabel})` : ''}</span>
-                          {canEdit && (
-                            <button
-                              type="button"
-                              onClick={() => handleAcceptOverlap(o.stageIds)}
-                              className="flex-shrink-0 rounded-[14px] px-2.5 py-1 font-medium text-orange-700 transition hover:bg-orange-100"
-                              disabled={saving}
-                            >
-                              Принять
-                            </button>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              )}
-              {product.stages.map((stage: any, idx: number) => {
-                const hasOverlap = overlappingIds.has(stage.id)
-                const isEditing = editingStageId === stage.id
-                const vals = stageEditValues[stage.id] || {}
-                const cellStyle = getStageCellStyle(stage)
+      {/* Workspace */}
+      <div className="surface-panel overflow-hidden p-0">
+        <div className="grid lg:grid-cols-[220px,minmax(0,1fr)]">
+          <aside className="border-b border-slate-100 bg-slate-50/80 p-3 lg:border-b-0 lg:border-r">
+            <div className="space-y-1">
+              {TABS.map((t) => {
+                const Icon = t.icon
+                const active = tab === t.id
 
                 return (
-                  <div
-                    key={stage.id}
-                    onContextMenu={(e) => handleStageContextMenu(e, stage)}
+                  <button
+                    key={t.id}
+                    onClick={() => updateActiveTab(t.id)}
                     className={cn(
-                      'flex items-center gap-3 rounded-[24px] p-3 transition-all',
-                      hasOverlap ? 'bg-orange-50/60 ring-1 ring-orange-200' :
-                      stage.isCompleted ? 'bg-emerald-50/40' : 'bg-slate-50/70 hover:bg-slate-100/80'
+                      'relative flex w-full items-center gap-3 rounded-[20px] px-4 py-3 text-left text-sm font-medium transition-colors',
+                      active ? 'text-white' : 'text-slate-500 hover:bg-white hover:text-slate-800'
                     )}
                   >
-                    {/* Checkbox */}
-                    {canEdit ? (
-                      <button onClick={() => toggleStageComplete(stage)} className="flex-shrink-0">
-                        {stage.isCompleted
-                          ? <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                          : <Circle className="w-5 h-5 text-slate-300 hover:text-slate-400" />
-                        }
-                      </button>
-                    ) : (
-                      <div className="flex-shrink-0">
-                        {stage.isCompleted
-                          ? <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                          : <Circle className="w-5 h-5 text-slate-200" />
-                        }
-                      </div>
+                    {active && (
+                      <motion.span
+                        layoutId="product-tab-indicator"
+                        className="absolute inset-0 rounded-[20px] bg-brand-950"
+                        transition={{ type: 'spring', stiffness: 390, damping: 34 }}
+                      />
                     )}
-
-                    {/* Order */}
-                    <div className="w-6 text-xs text-slate-400 text-center flex-shrink-0">{idx + 1}</div>
-
-                    {/* Name */}
-                    <div className="flex-1 min-w-0">
-                      {renamingStageId === stage.id ? (
-                        <input
-                          type="text"
-                          value={renameValue}
-                          onChange={(e) => setRenameValue(e.target.value)}
-                          className="input text-sm w-full py-1"
-                          autoFocus
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleRenameStage(stage.id)
-                            if (e.key === 'Escape') setRenamingStageId(null)
-                          }}
-                          onBlur={() => handleRenameStage(stage.id)}
-                        />
-                      ) : (
-                        <p className={cn('text-sm font-medium', stage.isCompleted ? 'line-through text-slate-400' : 'text-slate-700')}>
-                          {stage.stageName}
-                          {stage.isCritical && <span className="ml-1.5 text-xs text-red-500 font-semibold">КРИТИЧНЫЙ</span>}
-                          {stage.participatesInAutoshift === false && (
-                            <span className="ml-1.5 text-xs text-slate-500 font-semibold">АВТОСДВИГ ВЫКЛ.</span>
-                          )}
-                          {hasOverlap && <span className="ml-1.5 text-xs text-orange-600 font-semibold" title="Даты пересекаются с соседним этапом">⚠ ПЕРЕСЕЧЕНИЕ</span>}
-                        </p>
-                      )}
-                      {stage.comment && !isEditing && renamingStageId !== stage.id && (
-                        <p className="text-xs text-slate-400 mt-0.5 truncate">{stage.comment}</p>
-                      )}
-                    </div>
-
-                    {/* Date */}
-                    <div className="flex-shrink-0">
-                      {isEditing ? (
-                        <DatePicker
-                          value={stageEditValues[stage.id]?.dateValue ?? (stage.dateValue ? new Date(stage.dateValue) : null)}
-                          onChange={(nextDate) => setStageEditValues((prev) => ({
-                            ...prev,
-                            [stage.id]: { ...prev[stage.id], dateValue: nextDate }
-                          }))}
-                          inputClassName="h-10 w-48 text-xs"
-                          panelClassName="w-[360px]"
-                        />
-                      ) : (
-                        <div className={cn('rounded-[16px] px-2.5 py-1.5 text-xs font-medium', cellStyle)}>
-                          {stage.dateValue
-                            ? formatDate(stage.dateValue)
-                            : stage.dateRaw || '—'}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Duration */}
-                    {stage.stageTemplate?.durationText && (
-                      <div className="text-xs text-slate-400 flex-shrink-0 w-16 text-center">
-                        {stage.stageTemplate.durationText}
-                      </div>
-                    )}
-
-                    {/* Actions */}
-                    {canEdit && (
-                      <div className="flex-shrink-0 flex items-center gap-1">
-                        {isEditing ? (
-                          <>
-                            <button
-                              onClick={() => updateStage(stage.id)}
-                              disabled={saving}
-                              className="btn-primary py-1 px-2 text-xs"
-                            >
-                              <Save className="w-3 h-3" />
-                            </button>
-                            <button
-                              onClick={() => setEditingStageId(null)}
-                              className="btn-secondary py-1 px-2 text-xs"
-                            >
-                              Отмена
-                            </button>
-                          </>
-                        ) : (
-                          <button
-                            onClick={() => setEditingStageId(stage.id)}
-                            className="p-1.5 text-slate-300 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                    <Icon className="relative z-10 h-4 w-4" />
+                    <span className="relative z-10">{t.label}</span>
+                  </button>
                 )
               })}
             </div>
-          )}
+          </aside>
 
-          {/* COMMENTS TAB */}
-          {tab === 'comments' && (
-            <div className="space-y-4">
-              {canEdit && (
-                <div className="space-y-2">
-                  <textarea
-                    value={newComment}
-                    onChange={(e) => setNewComment(e.target.value)}
-                    placeholder="Добавить комментарий..."
-                    className="input resize-none h-20"
-                  />
-                  <button
-                    onClick={addComment}
-                    disabled={!newComment.trim() || savingComment}
-                    className="btn-primary"
-                  >
-                    {savingComment ? 'Сохраняем...' : 'Добавить комментарий'}
-                  </button>
-                </div>
-              )}
-
-              <div className="space-y-3">
-                {product.comments.length === 0 ? (
-                  <p className="text-center text-slate-400 text-sm py-8">Комментариев пока нет</p>
-                ) : (
-                  product.comments.map((comment: any) => (
-                    <div key={comment.id} className="flex gap-3 p-3 bg-slate-50 rounded-lg">
-                      <div className="w-7 h-7 rounded-full bg-brand-100 flex items-center justify-center text-brand-700 text-xs font-semibold flex-shrink-0">
-                        {comment.author.name.charAt(0)}
+          <div className="min-w-0 p-5">
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={tab}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+              >
+                {tab === 'stages' && (
+                  <div className="space-y-2">
+                    {canEdit && (
+                      <div className="mb-3 flex items-center justify-end gap-3">
+                        <button
+                          onClick={() => {
+                            setShowAddStageForm((prev) => {
+                              const next = !prev
+                              if (!next) {
+                                setNewStageName('')
+                                setNewStageDate(null)
+                                setNewStageAutoshift(true)
+                              }
+                              return next
+                            })
+                          }}
+                          className="btn-primary text-sm"
+                          disabled={saving}
+                        >
+                          <Plus className="w-4 h-4" />
+                          Добавить этап
+                        </button>
                       </div>
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs font-semibold text-slate-700">{comment.author.name}</span>
-                          <span className="text-xs text-slate-400">{formatDate(comment.createdAt)}</span>
+                    )}
+                    {canEdit && showAddStageForm && (
+                      <div className="mb-3 flex items-center gap-2 rounded-[24px] bg-slate-50 p-3">
+                        <input
+                          type="text"
+                          value={newStageName}
+                          onChange={(e) => setNewStageName(e.target.value)}
+                          className="input flex-1 text-sm"
+                          placeholder="Название нового этапа"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleAddStage()
+                            if (e.key === 'Escape') {
+                              setShowAddStageForm(false)
+                              setNewStageName('')
+                              setNewStageDate(null)
+                              setNewStageAutoshift(true)
+                            }
+                          }}
+                        />
+                        <DatePicker
+                          value={newStageDate}
+                          onChange={setNewStageDate}
+                          inputClassName="h-11 w-56 text-sm"
+                          panelClassName="w-[360px]"
+                          placeholder="Дата этапа"
+                        />
+                        <label className="flex h-11 items-center gap-2 rounded-[18px] bg-white px-3 text-sm text-slate-600">
+                          <span className="whitespace-nowrap">Автосдвиг</span>
+                          <input
+                            type="checkbox"
+                            checked={newStageAutoshift}
+                            onChange={(e) => setNewStageAutoshift(e.target.checked)}
+                            className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                          />
+                        </label>
+                        <button onClick={handleAddStage} className="btn-primary text-sm" disabled={!newStageName.trim() || saving}>
+                          <Save className="w-4 h-4" />
+                          Сохранить
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowAddStageForm(false)
+                            setNewStageName('')
+                            setNewStageDate(null)
+                            setNewStageAutoshift(true)
+                          }}
+                          className="btn-secondary text-sm"
+                          disabled={saving}
+                        >
+                          Отмена
+                        </button>
+                      </div>
+                    )}
+                    {overlaps.length > 0 && (
+                      <div className="mb-3 flex items-start gap-2 rounded-[24px] bg-orange-50 p-3">
+                        <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-orange-500" />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-orange-800">Обнаружены пересечения дат</p>
+                          <ul className="mt-2 space-y-2">
+                            {overlaps.map((o, i) => (
+                              <li key={i} className="flex items-start justify-between gap-3 rounded-[16px] bg-white/70 px-3 py-2 text-xs text-orange-700">
+                                <span>{formatStageOverlap(o)}{o.dateLabel ? ` (${o.dateLabel})` : ''}</span>
+                                {canEdit && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAcceptOverlap(o.stageIds)}
+                                    className="flex-shrink-0 rounded-[14px] px-2.5 py-1 font-medium text-orange-700 transition hover:bg-orange-100"
+                                    disabled={saving}
+                                  >
+                                    Принять
+                                  </button>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
                         </div>
-                        <p className="text-sm text-slate-600">{comment.content}</p>
                       </div>
-                    </div>
-                  ))
+                    )}
+                    {product.stages.map((stage: any, idx: number) => {
+                      const hasOverlap = overlappingIds.has(stage.id)
+                      const isEditing = editingStageId === stage.id
+                      const cellStyle = getStageCellStyle(stage)
+
+                      return (
+                        <div
+                          key={stage.id}
+                          onContextMenu={(e) => handleStageContextMenu(e, stage)}
+                          className={cn(
+                            'flex items-center gap-3 rounded-[24px] p-3 transition-all',
+                            hasOverlap ? 'bg-orange-50/60 ring-1 ring-orange-200' :
+                            stage.isCompleted ? 'bg-emerald-50/40' : 'bg-slate-50/70 hover:bg-slate-100/80'
+                          )}
+                        >
+                          {canEdit ? (
+                            <button onClick={() => toggleStageComplete(stage)} className="flex-shrink-0">
+                              {stage.isCompleted
+                                ? <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                                : <Circle className="h-5 w-5 text-slate-300 hover:text-slate-400" />
+                              }
+                            </button>
+                          ) : (
+                            <div className="flex-shrink-0">
+                              {stage.isCompleted
+                                ? <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                                : <Circle className="h-5 w-5 text-slate-200" />
+                              }
+                            </div>
+                          )}
+
+                          <div className="w-6 flex-shrink-0 text-center text-xs text-slate-400">{idx + 1}</div>
+
+                          <div className="min-w-0 flex-1">
+                            {renamingStageId === stage.id ? (
+                              <input
+                                type="text"
+                                value={renameValue}
+                                onChange={(e) => setRenameValue(e.target.value)}
+                                className="input w-full py-1 text-sm"
+                                autoFocus
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') handleRenameStage(stage.id)
+                                  if (e.key === 'Escape') setRenamingStageId(null)
+                                }}
+                                onBlur={() => handleRenameStage(stage.id)}
+                              />
+                            ) : (
+                              <p className={cn('text-sm font-medium', stage.isCompleted ? 'line-through text-slate-400' : 'text-slate-700')}>
+                                {stage.stageName}
+                                {stage.isCritical && <span className="ml-1.5 text-xs font-semibold text-red-500">КРИТИЧНЫЙ</span>}
+                                {stage.participatesInAutoshift === false && (
+                                  <span className="ml-1.5 text-xs font-semibold text-slate-500">АВТОСДВИГ ВЫКЛ.</span>
+                                )}
+                                {hasOverlap && <span className="ml-1.5 text-xs font-semibold text-orange-600">⚠ ПЕРЕСЕЧЕНИЕ</span>}
+                              </p>
+                            )}
+                            {stage.comment && !isEditing && renamingStageId !== stage.id && (
+                              <p className="mt-0.5 truncate text-xs text-slate-400">{stage.comment}</p>
+                            )}
+                          </div>
+
+                          <div className="flex-shrink-0">
+                            {isEditing ? (
+                              <DatePicker
+                                value={stageEditValues[stage.id]?.dateValue ?? (stage.dateValue ? new Date(stage.dateValue) : null)}
+                                onChange={(nextDate) => setStageEditValues((prev) => ({
+                                  ...prev,
+                                  [stage.id]: { ...prev[stage.id], dateValue: nextDate }
+                                }))}
+                                inputClassName="h-10 w-48 text-xs"
+                                panelClassName="w-[360px]"
+                              />
+                            ) : (
+                              <div className={cn('rounded-[16px] px-2.5 py-1.5 text-xs font-medium', cellStyle)}>
+                                {stage.dateValue ? formatDate(stage.dateValue) : stage.dateRaw || '—'}
+                              </div>
+                            )}
+                          </div>
+
+                          {stage.stageTemplate?.durationText && (
+                            <div className="w-16 flex-shrink-0 text-center text-xs text-slate-400">
+                              {stage.stageTemplate.durationText}
+                            </div>
+                          )}
+
+                          {canEdit && (
+                            <div className="flex flex-shrink-0 items-center gap-1">
+                              {isEditing ? (
+                                <>
+                                  <button onClick={() => updateStage(stage.id)} disabled={saving} className="btn-primary px-2 py-1 text-xs">
+                                    <Save className="h-3 w-3" />
+                                  </button>
+                                  <button onClick={() => setEditingStageId(null)} className="btn-secondary px-2 py-1 text-xs">
+                                    Отмена
+                                  </button>
+                                </>
+                              ) : (
+                                <button
+                                  onClick={() => setEditingStageId(stage.id)}
+                                  className="rounded-lg p-1.5 text-slate-300 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                                >
+                                  <Edit2 className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
                 )}
-              </div>
-            </div>
-          )}
 
-          {/* HISTORY TAB */}
-          {tab === 'history' && (
-            <div className="space-y-2">
-              {product.changeHistory.length === 0 ? (
-                <p className="text-center text-slate-400 text-sm py-8">История изменений пуста</p>
-              ) : (
-                product.changeHistory.map((h: any) => (
-                  <div key={h.id} className="flex items-start gap-3 py-2 border-b border-slate-50 last:border-0">
-                    <div className="w-1.5 h-1.5 rounded-full bg-brand-400 mt-2 flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 text-xs text-slate-500">
-                        <span className="font-medium text-slate-700">{h.changedBy.name}</span>
-                        <span>изменил(а)</span>
-                        <span className="font-medium text-slate-700">{h.field}</span>
-                        <span className="ml-auto text-slate-400">{formatDate(h.createdAt)}</span>
-                      </div>
-                      {h.oldValue && h.newValue && (
-                        <div className="text-xs text-slate-400 mt-0.5">
-                          <span className="line-through">{h.oldValue.slice(0, 30)}</span> → <span className="text-slate-600">{h.newValue.slice(0, 30)}</span>
+                {tab === 'comments' && (
+                  <div className="grid gap-5 xl:grid-cols-[280px,minmax(0,1fr)]">
+                    <div className="space-y-4">
+                      <div className="rounded-[28px] bg-slate-50 p-4">
+                        <div className="mb-3 flex items-center gap-2">
+                          <PanelLeft className="h-4 w-4 text-brand-600" />
+                          <h3 className="text-sm font-semibold text-slate-800">Обсуждение продукта</h3>
                         </div>
-                      )}
-                      {h.reason && <div className="text-xs text-slate-400 italic mt-0.5">{h.reason}</div>}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
+                        <div className="space-y-3 text-sm text-slate-500">
+                          <div className="flex items-center justify-between rounded-[18px] bg-white px-3 py-2">
+                            <span>Комментариев</span>
+                            <span className="font-semibold text-slate-800">{product.comments.length}</span>
+                          </div>
+                          <div className="flex items-center justify-between rounded-[18px] bg-white px-3 py-2">
+                            <span>Участников</span>
+                            <span className="font-semibold text-slate-800">{commentParticipants.length || 1}</span>
+                          </div>
+                        </div>
+                      </div>
 
-          {/* AUTOMATIONS TAB */}
-          {tab === 'automations' && (
-            <div className="space-y-3">
-              <p className="text-sm text-slate-500 mb-4">Активные автоматизации для этого продукта:</p>
-              {product.automations.length === 0 ? (
-                <div className="text-center py-8">
-                  <Zap className="w-8 h-8 text-slate-200 mx-auto mb-2" />
-                  <p className="text-sm text-slate-400">Нет активных автоматизаций</p>
-                  <Link href="/automations" className="text-xs text-brand-600 hover:text-brand-700 mt-1 inline-block">
-                    Настроить автоматизации →
-                  </Link>
-                </div>
-              ) : (
-                product.automations.map((a: any) => (
-                  <div key={a.id} className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Zap className="w-4 h-4 text-amber-600" />
-                      <span className="text-sm font-semibold text-amber-800">{a.name}</span>
+                      <div className="rounded-[28px] bg-slate-50 p-4">
+                        <div className="mb-3 flex items-center gap-2">
+                          <AtSign className="h-4 w-4 text-brand-600" />
+                          <h3 className="text-sm font-semibold text-slate-800">Кого можно отметить</h3>
+                        </div>
+                        <div className="space-y-2">
+                          {mentionableUsers.slice(0, 8).map((user) => (
+                            <div key={user.id} className="flex items-center gap-2 rounded-[18px] bg-white px-3 py-2">
+                              <UserAvatar user={user} size="sm" />
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-medium text-slate-700">{user.displayName}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
-                    <p className="text-xs text-amber-700">{a.description}</p>
+
+                    <div className="rounded-[28px] bg-slate-50 p-4">
+                      <div className="flex min-h-[560px] flex-col overflow-hidden rounded-[24px] bg-white shadow-[inset_0_0_0_1px_rgba(226,232,240,0.7)]">
+                        <div className="border-b border-slate-100 px-4 py-3">
+                          <h3 className="text-sm font-semibold text-slate-800">Комментарии по продукту</h3>
+                          <p className="mt-1 text-xs text-slate-400">Пиши сообщения, отмечай коллег через `@` и обсуждай изменения прямо в карточке продукта.</p>
+                        </div>
+
+                        <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
+                          {commentFeed.length === 0 ? (
+                            <div className="flex h-full min-h-[280px] items-center justify-center rounded-[20px] border border-dashed border-slate-200 bg-slate-50/80 text-center">
+                              <div>
+                                <MessageCircle className="mx-auto mb-2 h-8 w-8 text-slate-300" />
+                                <p className="text-sm font-medium text-slate-500">Комментариев пока нет</p>
+                                <p className="mt-1 text-xs text-slate-400">Начни обсуждение прямо отсюда.</p>
+                              </div>
+                            </div>
+                          ) : (
+                            commentFeed.map((comment: any) => {
+                              const ownMessage = comment.author?.id === currentUser.id
+                              const authorName = comment.author?.lastName
+                                ? `${comment.author.name} ${comment.author.lastName}`
+                                : comment.author?.name
+
+                              return (
+                                <div key={comment.id} className={cn('flex gap-3', ownMessage ? 'justify-end' : 'justify-start')}>
+                                  {!ownMessage && <UserAvatar user={comment.author} size="sm" className="mt-7" />}
+                                  <div className="max-w-[80%] space-y-1">
+                                    <div className={cn('flex items-center gap-2 text-xs text-slate-400', ownMessage && 'justify-end')}>
+                                      <span className="font-semibold text-slate-700">{authorName}</span>
+                                      <span>{formatCommentTimestamp(comment.createdAt)}</span>
+                                    </div>
+                                    <div
+                                      className={cn(
+                                        'rounded-[22px] px-4 py-3 text-sm leading-6 shadow-sm',
+                                        ownMessage ? 'bg-brand-950 text-white' : 'bg-slate-50 text-slate-700'
+                                      )}
+                                    >
+                                      <div className="flex flex-wrap items-center gap-1.5">
+                                        {renderCommentContent(comment.content || comment.displayContent || '', ownMessage)}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  {ownMessage && <UserAvatar user={comment.author} size="sm" className="mt-7" />}
+                                </div>
+                              )
+                            })
+                          )}
+                        </div>
+
+                        {canComment && (
+                          <div className="border-t border-slate-100 px-4 py-4">
+                            <div className="relative">
+                              <textarea
+                                ref={commentInputRef}
+                                value={newComment}
+                                onChange={(e) => handleCommentChange(e.target.value, e.target.selectionStart)}
+                                onClick={(e) => syncCommentMentionState(e.currentTarget.value, e.currentTarget.selectionStart)}
+                                onKeyUp={(e) => syncCommentMentionState(e.currentTarget.value, e.currentTarget.selectionStart)}
+                                placeholder="Напиши комментарий или отметь коллегу через @..."
+                                className="input min-h-[112px] resize-none pr-14"
+                              />
+                              {mentionState && activeMentionSuggestions.length > 0 && (
+                                <div className="absolute bottom-[calc(100%+10px)] left-0 z-20 w-full max-w-sm overflow-hidden rounded-[22px] border border-slate-200 bg-white p-2 shadow-[0_22px_60px_-32px_rgba(15,23,42,0.45)]">
+                                  <div className="mb-1 px-2 text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">
+                                    Выбери пользователя
+                                  </div>
+                                  <div className="space-y-1">
+                                    {activeMentionSuggestions.map((user) => (
+                                      <button
+                                        key={user.id}
+                                        type="button"
+                                        onClick={() => insertMention(user)}
+                                        className="flex w-full items-center gap-2 rounded-[16px] px-3 py-2.5 text-left transition-colors hover:bg-slate-50"
+                                      >
+                                        <UserAvatar user={user} size="sm" />
+                                        <div className="min-w-0">
+                                          <p className="truncate text-sm font-medium text-slate-700">{user.displayName}</p>
+                                          <p className="text-xs text-slate-400">@{user.name}</p>
+                                        </div>
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                            <div className="mt-3 flex items-center justify-between gap-3">
+                              <div className="text-xs text-slate-400">
+                                {Object.keys(selectedMentions).length > 0
+                                  ? `Подготовлено упоминаний: ${Object.keys(selectedMentions).length}`
+                                  : 'Используй @, чтобы отметить сотрудника и отправить ему уведомление.'}
+                              </div>
+                              <button onClick={addComment} disabled={!newComment.trim() || savingComment} className="btn-primary">
+                                <SendHorizontal className="h-4 w-4" />
+                                {savingComment ? 'Сохраняем...' : 'Отправить'}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                ))
-              )}
-            </div>
-          )}
-            </motion.div>
-          </AnimatePresence>
+                )}
+
+                {tab === 'history' && (
+                  <div className="space-y-2">
+                    {product.changeHistory.length === 0 ? (
+                      <p className="py-8 text-center text-sm text-slate-400">История изменений пуста</p>
+                    ) : (
+                      product.changeHistory.map((h: any) => (
+                        <div key={h.id} className="flex items-start gap-3 border-b border-slate-50 py-2 last:border-0">
+                          <div className="mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-brand-400" />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 text-xs text-slate-500">
+                              <span className="font-medium text-slate-700">{h.changedBy.name}</span>
+                              <span>изменил(а)</span>
+                              <span className="font-medium text-slate-700">{h.field}</span>
+                              <span className="ml-auto text-slate-400">{formatDate(h.createdAt)}</span>
+                            </div>
+                            {h.oldValue && h.newValue && (
+                              <div className="mt-0.5 text-xs text-slate-400">
+                                <span className="line-through">{h.oldValue.slice(0, 30)}</span> → <span className="text-slate-600">{h.newValue.slice(0, 30)}</span>
+                              </div>
+                            )}
+                            {h.reason && <div className="mt-0.5 text-xs italic text-slate-400">{h.reason}</div>}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+
+                {tab === 'automations' && (
+                  <div className="space-y-3">
+                    <p className="mb-4 text-sm text-slate-500">Активные автоматизации для этого продукта:</p>
+                    {product.automations.length === 0 ? (
+                      <div className="py-8 text-center">
+                        <Zap className="mx-auto mb-2 h-8 w-8 text-slate-200" />
+                        <p className="text-sm text-slate-400">Нет активных автоматизаций</p>
+                        <Link href="/automations" className="mt-1 inline-block text-xs text-brand-600 hover:text-brand-700">
+                          Настроить автоматизации →
+                        </Link>
+                      </div>
+                    ) : (
+                      product.automations.map((a: any) => (
+                        <div key={a.id} className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                          <div className="mb-1 flex items-center gap-2">
+                            <Zap className="h-4 w-4 text-amber-600" />
+                            <span className="text-sm font-semibold text-amber-800">{a.name}</span>
+                          </div>
+                          <p className="text-xs text-amber-700">{a.description}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </motion.div>
+            </AnimatePresence>
+          </div>
         </div>
       </div>
 

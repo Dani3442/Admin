@@ -279,20 +279,29 @@ export function ProductsWorkspace({
           </div>
 
           <div className="flex flex-wrap gap-2">
-            {QUICK_VIEW_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                onClick={() => setQuickView(option.value)}
-                className={cn(
-                  'rounded-full px-3.5 py-2 text-sm font-medium transition-colors',
-                  quickView === option.value
-                    ? 'bg-brand-950 text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-800'
-                )}
-              >
-                {option.label}
-              </button>
-            ))}
+            {QUICK_VIEW_OPTIONS.map((option) => {
+              const active = quickView === option.value
+
+              return (
+                <button
+                  key={option.value}
+                  onClick={() => setQuickView(option.value)}
+                  className={cn(
+                    'relative rounded-full px-3.5 py-2 text-sm font-medium transition-colors',
+                    active ? 'text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-800'
+                  )}
+                >
+                  {active && (
+                    <motion.span
+                      layoutId="products-quick-view-pill"
+                      className="absolute inset-0 rounded-full bg-brand-950"
+                      transition={{ type: 'spring', stiffness: 390, damping: 34 }}
+                    />
+                  )}
+                  <span className="relative z-10">{option.label}</span>
+                </button>
+              )
+            })}
           </div>
 
           <AnimatePresence initial={false}>
