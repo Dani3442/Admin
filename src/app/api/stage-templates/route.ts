@@ -293,6 +293,12 @@ export async function DELETE(req: NextRequest) {
         }
       }
 
+      await tx.productTemplateStage.deleteMany({
+        where: {
+          stageTemplateId: id,
+        },
+      })
+
       await tx.stageTemplate.delete({
         where: { id },
         select: { id: true },
