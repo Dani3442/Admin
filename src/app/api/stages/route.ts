@@ -236,8 +236,9 @@ export async function PATCH(req: NextRequest) {
       where: {
         productId,
         stageTemplateId,
+        stageOrder,
       },
-      orderBy: [{ stageOrder: 'asc' }, { createdAt: 'asc' }],
+      orderBy: [{ createdAt: 'asc' }],
       select: {
         id: true,
         productId: true,
@@ -247,6 +248,24 @@ export async function PATCH(req: NextRequest) {
         dateValue: true,
       },
     })
+
+    if (!existingStage) {
+      existingStage = await prisma.productStage.findFirst({
+        where: {
+          productId,
+          stageTemplateId,
+        },
+        orderBy: [{ stageOrder: 'asc' }, { createdAt: 'asc' }],
+        select: {
+          id: true,
+          productId: true,
+          stageOrder: true,
+          stageTemplateId: true,
+          stageName: true,
+          dateValue: true,
+        },
+      })
+    }
 
     if (!existingStage) {
       const stageOrderMatch = await prisma.productStage.findFirst({

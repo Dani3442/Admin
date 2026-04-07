@@ -164,6 +164,9 @@ export function ProductsWorkspace({
   const [showNewProductModal, setShowNewProductModal] = useState(Boolean(createToken))
 
   const openCreateModal = () => {
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.setItem('product-admin:open-create-modal', '1')
+    }
     setShowNewProductModal(true)
     const params = new URLSearchParams(searchParams.toString())
     params.set('create', String(Date.now()))
@@ -215,6 +218,23 @@ export function ProductsWorkspace({
   useEffect(() => {
     setShowNewProductModal(Boolean(createToken))
   }, [createToken])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const shouldOpenFromStorage = window.sessionStorage.getItem('product-admin:open-create-modal') === '1'
+    if (shouldOpenFromStorage) {
+      window.sessionStorage.removeItem('product-admin:open-create-modal')
+      setShowNewProductModal(true)
+    }
+
+    const handleOpenCreateModal = () => {
+      setShowNewProductModal(true)
+    }
+
+    window.addEventListener('product-admin:open-create-modal', handleOpenCreateModal)
+    return () => window.removeEventListener('product-admin:open-create-modal', handleOpenCreateModal)
+  }, [])
 
   useEffect(() => {
     const params = new URLSearchParams(searchParams.toString())
