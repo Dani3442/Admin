@@ -3,6 +3,7 @@ import { auth, hasPermission, Permission } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { applyAutomation, ensureDefaultShiftFollowingAutomation } from '@/lib/automation'
 import { recalculateProductRisk } from '@/lib/risk'
+import { supportsProductStageAutoshiftColumn } from '@/lib/schema-compat'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -33,6 +34,32 @@ export async function PATCH(req: NextRequest) {
 
   const body = await req.json()
   const { stageId, stageIds, updates, applyAutomations = true, swapWithStageId, productId, stageTemplateId, stageOrder, stageName } = body
+  const hasAutoshiftColumn = await supportsProductStageAutoshiftColumn()
+  const stageResponseSelect: Record<string, boolean> = {
+    id: true,
+    stageTemplateId: true,
+    stageOrder: true,
+    stageName: true,
+    dateValue: true,
+    dateRaw: true,
+    dateEnd: true,
+    status: true,
+    isCompleted: true,
+    isCritical: true,
+    affectsFinalDate: true,
+    responsibleId: true,
+    comment: true,
+    priority: true,
+    plannedDate: true,
+    actualDate: true,
+    daysDeviation: true,
+    createdAt: true,
+    updatedAt: true,
+  }
+
+  if (hasAutoshiftColumn) {
+    stageResponseSelect.participatesInAutoshift = true
+  }
 
   if (Array.isArray(stageIds) && stageIds.length > 0) {
     const stagesToUpdate = await prisma.productStage.findMany({
@@ -70,12 +97,32 @@ export async function PATCH(req: NextRequest) {
     const stages = await prisma.productStage.findMany({
       where: { productId: targetProductId },
       orderBy: { stageOrder: 'asc' },
+      select: stageResponseSelect,
     })
 
-    return NextResponse.json({ stages, product: updatedProduct })
+    return NextResponse.json({
+      stages: stages.map((stage) => ({
+        ...stage,
+        participatesInAutoshift: hasAutoshiftColumn ? (stage as any).participatesInAutoshift ?? true : true,
+        overlapAccepted: false,
+      })),
+      product: updatedProduct,
+    })
   }
 
-  let existingStage = stageId ? await prisma.productStage.findUnique({ where: { id: stageId } }) : null
+  let existingStage = stageId
+    ? await prisma.productStage.findUnique({
+        where: { id: stageId },
+        select: {
+          id: true,
+          productId: true,
+          stageOrder: true,
+          stageTemplateId: true,
+          stageName: true,
+          dateValue: true,
+        },
+      })
+    : null
 
   if (!existingStage && productId && stageTemplateId && typeof stageOrder === 'number') {
     const product = await prisma.product.findUnique({
@@ -92,6 +139,14 @@ export async function PATCH(req: NextRequest) {
         stageOrder,
       },
       orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        productId: true,
+        stageOrder: true,
+        stageTemplateId: true,
+        stageName: true,
+        dateValue: true,
+      },
     })
 
     if (!existingStage) {
@@ -101,6 +156,14 @@ export async function PATCH(req: NextRequest) {
           stageTemplateId,
         },
         orderBy: { createdAt: 'asc' },
+        select: {
+          id: true,
+          productId: true,
+          stageOrder: true,
+          stageTemplateId: true,
+          stageName: true,
+          dateValue: true,
+        },
       })
 
       if (exactTemplateMatch) {
@@ -141,8 +204,15 @@ export async function PATCH(req: NextRequest) {
             stageName: typeof stageName === 'string' && stageName.trim() ? stageName.trim() : template.name,
             isCritical: template.isCritical,
             affectsFinalDate: template.affectsFinalDate,
-            participatesInAutoshift: true,
             status: 'NOT_STARTED',
+          },
+          select: {
+            id: true,
+            productId: true,
+            stageOrder: true,
+            stageTemplateId: true,
+            stageName: true,
+            dateValue: true,
           },
         })
       })
@@ -199,27 +269,8 @@ export async function PATCH(req: NextRequest) {
     where: { id: existingStage.id },
     data: normalizedUpdates,
     select: {
-      id: true,
       productId: true,
-      stageTemplateId: true,
-      stageOrder: true,
-      stageName: true,
-      dateValue: true,
-      dateRaw: true,
-      dateEnd: true,
-      status: true,
-      isCompleted: true,
-      isCritical: true,
-      participatesInAutoshift: true,
-      affectsFinalDate: true,
-      responsibleId: true,
-      comment: true,
-      priority: true,
-      plannedDate: true,
-      actualDate: true,
-      daysDeviation: true,
-      createdAt: true,
-      updatedAt: true,
+      ...stageResponseSelect,
     },
   })
 
@@ -265,34 +316,20 @@ export async function PATCH(req: NextRequest) {
   const stages = await prisma.productStage.findMany({
     where: { productId: existingStage.productId },
     orderBy: { stageOrder: 'asc' },
-    select: {
-      id: true,
-      productId: true,
-      stageTemplateId: true,
-      stageOrder: true,
-      stageName: true,
-      dateValue: true,
-      dateRaw: true,
-      dateEnd: true,
-      status: true,
-      isCompleted: true,
-      isCritical: true,
-      participatesInAutoshift: true,
-      affectsFinalDate: true,
-      responsibleId: true,
-      comment: true,
-      priority: true,
-      plannedDate: true,
-      actualDate: true,
-      daysDeviation: true,
-      createdAt: true,
-      updatedAt: true,
-    },
+    select: stageResponseSelect,
   })
 
   return NextResponse.json({
-    stage: { ...updatedStage, overlapAccepted: false },
-    stages: stages.map((stage) => ({ ...stage, overlapAccepted: false })),
+    stage: {
+      ...updatedStage,
+      participatesInAutoshift: hasAutoshiftColumn ? (updatedStage as any).participatesInAutoshift ?? true : true,
+      overlapAccepted: false,
+    },
+    stages: stages.map((stage) => ({
+      ...stage,
+      participatesInAutoshift: hasAutoshiftColumn ? (stage as any).participatesInAutoshift ?? true : true,
+      overlapAccepted: false,
+    })),
     automationResult,
     product: updatedProduct,
   })

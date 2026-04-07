@@ -1,5 +1,6 @@
 import { prisma } from './prisma'
 import { addDays, differenceInDays } from 'date-fns'
+import { supportsProductStageAutoshiftColumn } from './schema-compat'
 
 const DEFAULT_SHIFT_AUTOMATION = {
   name: 'Сдвиг всех следующих этапов',
@@ -81,29 +82,48 @@ export async function applyAutomation(
   const automation = selectEffectiveAutomation(automations)
 
   if (!automation) return null
-
-  const product = await prisma.product.findUnique({
-    where: { id: productId },
-    select: {
-      id: true,
-      finalDate: true,
-      stages: {
-        orderBy: { stageOrder: 'asc' },
+  const hasAutoshiftColumn = await supportsProductStageAutoshiftColumn()
+  const product = hasAutoshiftColumn
+    ? await prisma.product.findUnique({
+        where: { id: productId },
         select: {
           id: true,
-          stageOrder: true,
-          dateValue: true,
-          plannedDate: true,
-          participatesInAutoshift: true,
+          finalDate: true,
+          stages: {
+            orderBy: { stageOrder: 'asc' },
+            select: {
+              id: true,
+              stageOrder: true,
+              dateValue: true,
+              plannedDate: true,
+              participatesInAutoshift: true,
+            },
+          },
         },
-      },
-    },
-  })
+      })
+    : await prisma.product.findUnique({
+        where: { id: productId },
+        select: {
+          id: true,
+          finalDate: true,
+          stages: {
+            orderBy: { stageOrder: 'asc' },
+            select: {
+              id: true,
+              stageOrder: true,
+              dateValue: true,
+              plannedDate: true,
+            },
+          },
+        },
+      })
   if (!product) return null
 
-  const laterStages = product.stages.filter(
-    (s) => s.stageOrder > changedStageOrder && s.participatesInAutoshift
-  )
+  const laterStages = product.stages.filter((s) => {
+    if (s.stageOrder <= changedStageOrder) return false
+    if (!hasAutoshiftColumn) return true
+    return (s as { participatesInAutoshift?: boolean }).participatesInAutoshift !== false
+  })
   const excludeOrders: number[] = JSON.parse(automation.excludeStageOrders || '[]')
   const stageTemplates = await prisma.stageTemplate.findMany({
     where: {
