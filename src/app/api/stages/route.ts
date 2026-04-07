@@ -215,15 +215,24 @@ export async function PATCH(req: NextRequest) {
       }
 
       await prisma.$transaction(async (tx) => {
-        await tx.productStage.updateMany({
+        const affectedStages = await tx.productStage.findMany({
           where: {
             productId,
             stageOrder: { gte: stageOrder },
           },
-          data: {
-            stageOrder: { increment: 1 },
+          orderBy: { stageOrder: 'desc' },
+          select: {
+            id: true,
+            stageOrder: true,
           },
         })
+
+        for (const affectedStage of affectedStages) {
+          await tx.productStage.update({
+            where: { id: affectedStage.id },
+            data: { stageOrder: affectedStage.stageOrder + 1 },
+          })
+        }
 
         const createdStage = await createProductStageCompat(tx as any, {
           productId,
