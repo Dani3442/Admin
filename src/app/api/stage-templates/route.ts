@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth, hasPermission, Permission } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { recalculateProductRisk } from '@/lib/risk'
+import { createProductStageCompat } from '@/lib/product-stage-compat'
 
 async function updateProductProgress(productId: string) {
   const stages = await prisma.productStage.findMany({
@@ -80,30 +81,15 @@ export async function POST(req: NextRequest) {
           },
         })
 
-        const createdStage = await tx.productStage.create({
-          data: {
-            productId: product.id,
-            stageTemplateId: template.id,
-            stageOrder: newOrder,
-            stageName: template.name,
-            isCritical: template.isCritical,
-            affectsFinalDate: template.affectsFinalDate,
-            participatesInAutoshift: body?.participatesInAutoshift !== false,
-            status: 'NOT_STARTED',
-          },
-          select: {
-            id: true,
-            productId: true,
-            stageTemplateId: true,
-            stageOrder: true,
-            stageName: true,
-            dateValue: true,
-            dateRaw: true,
-            isCompleted: true,
-            isCritical: true,
-            status: true,
-            participatesInAutoshift: true,
-          },
+        const createdStage = await createProductStageCompat(tx as any, {
+          productId: product.id,
+          stageTemplateId: template.id,
+          stageOrder: newOrder,
+          stageName: template.name,
+          isCritical: template.isCritical,
+          affectsFinalDate: template.affectsFinalDate,
+          participatesInAutoshift: body?.participatesInAutoshift !== false,
+          status: 'NOT_STARTED',
         })
 
         productStages.push(createdStage)

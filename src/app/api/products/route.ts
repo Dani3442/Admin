@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth, hasPermission, Permission } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { createProductStageCompat } from '@/lib/product-stage-compat'
+import { getFinalDateFromStages } from '@/lib/product-derived-fields'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -163,13 +165,7 @@ export async function POST(req: NextRequest) {
             participatesInAutoshift: true,
           }))
 
-      const finalDateFromTemplate = templateStages
-        .map((stage) => stage.dateValue)
-        .filter((date): date is Date => Boolean(date))
-        .sort((left, right) => left.getTime() - right.getTime())
-        .at(-1) ?? null
-
-      return tx.product.create({
+      const createdProduct = await tx.product.create({
         data: {
           name: name.trim(),
           country,
@@ -180,13 +176,44 @@ export async function POST(req: NextRequest) {
           notes,
           productTemplateId: selectedTemplate?.id ?? null,
           sortOrder: (sortOrderAggregate._max.sortOrder ?? -1) + 1,
-          finalDate: finalDateFromTemplate,
-          stages: {
-            create: templateStages,
-          },
+          finalDate: null,
         },
         select: { id: true },
       })
+
+      for (const stage of templateStages) {
+        await createProductStageCompat(tx as any, {
+          productId: createdProduct.id,
+          stageTemplateId: stage.stageTemplateId,
+          stageOrder: stage.stageOrder,
+          stageName: stage.stageName,
+          dateValue: stage.dateValue,
+          plannedDate: stage.dateValue,
+          isCritical: stage.isCritical,
+          affectsFinalDate: stage.affectsFinalDate,
+          participatesInAutoshift: stage.participatesInAutoshift,
+          status: 'NOT_STARTED',
+        })
+      }
+
+      const finalDate = getFinalDateFromStages(
+        templateStages.map((stage) => ({
+          stageOrder: stage.stageOrder,
+          isCompleted: false,
+          dateValue: stage.dateValue,
+          plannedDate: stage.dateValue,
+        }))
+      )
+
+      await tx.product.update({
+        where: { id: createdProduct.id },
+        data: {
+          finalDate,
+          progressPercent: 0,
+        },
+      })
+
+      return createdProduct
     })
 
     return NextResponse.json({ id: product.id }, { status: 201 })

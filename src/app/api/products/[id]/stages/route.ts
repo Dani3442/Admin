@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { recalculateProductRisk } from '@/lib/risk'
 import { recalculateProductDerivedFields } from '@/lib/product-derived-fields'
+import { createProductStageCompat } from '@/lib/product-stage-compat'
 
 async function getProductStageSnapshot(productId: string) {
   const product = await prisma.product.findUnique({
@@ -138,18 +139,17 @@ export async function POST(
       return NextResponse.json({ error: 'Не найден базовый шаблон этапа' }, { status: 400 })
     }
 
-    await prisma.productStage.create({
-      data: {
-        productId,
-        stageTemplateId: fallbackTemplateId,
-        stageOrder: product.stages.length,
-        stageName,
-        isCritical: false,
-        affectsFinalDate: false,
-        participatesInAutoshift,
-        status: 'NOT_STARTED',
-        dateValue,
-      },
+    await createProductStageCompat(prisma as any, {
+      productId,
+      stageTemplateId: fallbackTemplateId,
+      stageOrder: product.stages.length,
+      stageName,
+      isCritical: false,
+      affectsFinalDate: false,
+      participatesInAutoshift,
+      status: 'NOT_STARTED',
+      dateValue,
+      plannedDate: dateValue,
     })
 
     const derivedProduct = await recalculateProductDerivedFields(productId)

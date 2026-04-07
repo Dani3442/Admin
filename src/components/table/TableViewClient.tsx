@@ -985,7 +985,7 @@ export function TableViewClient({
       {/* New stage modal */}
       {showNewStageForm && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/20 backdrop-blur-md"
           onClick={() => {
             setShowNewStageForm(false)
             setNewStageAutoshift(true)

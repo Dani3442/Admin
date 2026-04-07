@@ -5,6 +5,7 @@ import { applyAutomation, ensureDefaultShiftFollowingAutomation } from '@/lib/au
 import { recalculateProductRisk } from '@/lib/risk'
 import { supportsProductStageAutoshiftColumn, supportsProductStageOverlapAcceptedColumn } from '@/lib/schema-compat'
 import { recalculateProductDerivedFields } from '@/lib/product-derived-fields'
+import { createProductStageCompat } from '@/lib/product-stage-compat'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -220,25 +221,24 @@ export async function PATCH(req: NextRequest) {
           },
         })
 
-        existingStage = await tx.productStage.create({
-          data: {
-            productId,
-            stageTemplateId,
-            stageOrder,
-            stageName: typeof stageName === 'string' && stageName.trim() ? stageName.trim() : template.name,
-            isCritical: template.isCritical,
-            affectsFinalDate: template.affectsFinalDate,
-            status: 'NOT_STARTED',
-          },
-          select: {
-            id: true,
-            productId: true,
-            stageOrder: true,
-            stageTemplateId: true,
-            stageName: true,
-            dateValue: true,
-          },
+        const createdStage = await createProductStageCompat(tx as any, {
+          productId,
+          stageTemplateId,
+          stageOrder,
+          stageName: typeof stageName === 'string' && stageName.trim() ? stageName.trim() : template.name,
+          isCritical: template.isCritical,
+          affectsFinalDate: template.affectsFinalDate,
+          status: 'NOT_STARTED',
         })
+
+        existingStage = {
+          id: (createdStage as any).id,
+          productId,
+          stageOrder,
+          stageTemplateId,
+          stageName: typeof stageName === 'string' && stageName.trim() ? stageName.trim() : template.name,
+          dateValue: null,
+        }
       })
     }
   }
