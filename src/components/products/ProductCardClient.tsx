@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeft, AtSign, CalendarDays, CheckCircle2, Circle, AlertTriangle, MessageCircle, Clock, History, Zap, ExternalLink, Edit2, Save, Pencil, ChevronUp, ChevronDown, X, Plus, Trash2, SendHorizontal, PanelLeft } from 'lucide-react'
+import { ArrowLeft, CalendarDays, CheckCircle2, Circle, AlertTriangle, MessageCircle, Clock, History, Zap, ExternalLink, Edit2, Save, Pencil, ChevronUp, ChevronDown, X, Plus, Trash2, SendHorizontal } from 'lucide-react'
 import { cn, getStatusColor, getStatusLabel, getPriorityColor, getPriorityLabel, formatDate, detectStageOverlaps, formatStageOverlap } from '@/lib/utils'
 import { DatePicker } from '@/components/ui/DatePicker'
 import { resolveBackNavigation } from '@/lib/navigation'
@@ -67,7 +67,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
   const [automationDesc, setAutomationDesc] = useState('')
   const [savingAutomation, setSavingAutomation] = useState(false)
   const [deletingProduct, setDeletingProduct] = useState(false)
-  const commentInputRef = useRef<HTMLInputElement>(null)
+  const commentInputRef = useRef<HTMLTextAreaElement>(null)
   const commentsScrollRef = useRef<HTMLDivElement>(null)
   const markedSeenProductRef = useRef<string | null>(null)
 
@@ -116,16 +116,6 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
       ),
     [product.comments]
   )
-  const commentParticipants = useMemo(() => {
-    const seen = new Map<string, any>()
-    for (const comment of commentFeed) {
-      if (comment.author?.id && !seen.has(comment.author.id)) {
-        seen.set(comment.author.id, comment.author)
-      }
-    }
-    return [...seen.values()]
-  }, [commentFeed])
-
   useEffect(() => {
     const nextTab = searchParams.get('tab')
     if (nextTab && TABS.some((item) => item.id === nextTab) && nextTab !== tab) {
@@ -233,6 +223,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
 
     requestAnimationFrame(() => {
       if (!commentInputRef.current) return
+      resizeCommentInput(commentInputRef.current)
       commentInputRef.current.focus()
       commentInputRef.current.setSelectionRange(nextCaret, nextCaret)
     })
@@ -243,8 +234,12 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
     addComment()
   }
 
-  const handleCommentKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleCommentKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key !== 'Enter') return
+
+    if (event.shiftKey) {
+      return
+    }
 
     event.preventDefault()
 
@@ -302,6 +297,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
       setNewComment('')
       setSelectedMentions({})
       setMentionState(null)
+      requestAnimationFrame(() => resizeCommentInput(commentInputRef.current))
     } catch (error: any) {
       alert(error.message || 'Не удалось добавить комментарий')
     } finally {
@@ -991,48 +987,14 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                 )}
 
                 {tab === 'comments' && (
-                  <div className="grid gap-5 xl:grid-cols-[280px,minmax(0,1fr)] xl:items-start">
-                    <div className="space-y-4">
-                      <div className="rounded-[28px] bg-slate-50 p-4">
-                        <div className="mb-3 flex items-center gap-2">
-                          <PanelLeft className="h-4 w-4 text-brand-600" />
-                          <h3 className="text-sm font-semibold text-slate-800">Обсуждение продукта</h3>
-                        </div>
-                        <div className="space-y-3 text-sm text-slate-500">
-                          <div className="flex items-center justify-between rounded-[18px] bg-white px-3 py-2">
-                            <span>Комментариев</span>
-                            <span className="font-semibold text-slate-800">{product.comments.length}</span>
-                          </div>
-                          <div className="flex items-center justify-between rounded-[18px] bg-white px-3 py-2">
-                            <span>Участников</span>
-                            <span className="font-semibold text-slate-800">{commentParticipants.length || 1}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="rounded-[28px] bg-slate-50 p-4">
-                        <div className="mb-3 flex items-center gap-2">
-                          <AtSign className="h-4 w-4 text-brand-600" />
-                          <h3 className="text-sm font-semibold text-slate-800">Кого можно отметить</h3>
-                        </div>
-                        <div className="space-y-2">
-                          {mentionableUsers.slice(0, 8).map((user) => (
-                            <div key={user.id} className="flex items-center gap-2 rounded-[18px] bg-white px-3 py-2">
-                              <UserAvatar user={user} size="sm" />
-                              <div className="min-w-0">
-                                <p className="truncate text-sm font-medium text-slate-700">{user.displayName}</p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
+                  <div>
                     <div className="rounded-[28px] bg-slate-50 p-4">
                       <div className="flex h-[min(72vh,760px)] min-h-[480px] flex-col overflow-hidden rounded-[24px] bg-white shadow-[inset_0_0_0_1px_rgba(226,232,240,0.7)]">
                         <div className="border-b border-slate-100 px-4 py-3">
-                          <h3 className="text-sm font-semibold text-slate-800">Комментарии по продукту</h3>
-                          <p className="mt-1 text-xs text-slate-400">Пиши сообщения, отмечай коллег через `@` и обсуждай изменения прямо в карточке продукта.</p>
+                          <div className="flex items-center justify-between gap-3">
+                            <h3 className="text-sm font-semibold text-slate-800">Комментарии</h3>
+                            <span className="text-xs font-medium text-slate-400">{product.comments.length}</span>
+                          </div>
                         </div>
 
                         <div ref={commentsScrollRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
@@ -1080,16 +1042,19 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                         {canComment && (
                           <div className="border-t border-slate-100 px-4 py-4">
                             <div className="relative">
-                              <input
+                              <textarea
                                 ref={commentInputRef}
-                                type="text"
+                                rows={1}
                                 value={newComment}
-                                onChange={(e) => handleCommentChange(e.target.value, e.target.selectionStart ?? e.target.value.length)}
+                                onChange={(e) => {
+                                  handleCommentChange(e.target.value, e.target.selectionStart ?? e.target.value.length)
+                                  resizeCommentInput(e.currentTarget)
+                                }}
                                 onClick={(e) => syncCommentMentionState(e.currentTarget.value, e.currentTarget.selectionStart ?? e.currentTarget.value.length)}
                                 onKeyUp={(e) => syncCommentMentionState(e.currentTarget.value, e.currentTarget.selectionStart ?? e.currentTarget.value.length)}
                                 onKeyDown={handleCommentKeyDown}
                                 placeholder="Напиши комментарий или отметь коллегу через @..."
-                                className="input h-12 pr-14"
+                                className="input min-h-[52px] resize-none pr-14 py-3 leading-6"
                               />
                               {mentionState && activeMentionSuggestions.length > 0 && (
                                 <div className="absolute bottom-[calc(100%+10px)] left-0 z-20 w-full max-w-sm overflow-hidden rounded-[22px] border border-slate-200 bg-white p-2 shadow-[0_22px_60px_-32px_rgba(15,23,42,0.45)]">
@@ -1122,13 +1087,6 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                               >
                                 <SendHorizontal className="h-4 w-4" />
                               </button>
-                            </div>
-                            <div className="mt-3 flex items-center justify-between gap-3">
-                              <div className="text-xs text-slate-400">
-                                {Object.keys(selectedMentions).length > 0
-                                  ? `Подготовлено упоминаний: ${Object.keys(selectedMentions).length}`
-                                  : 'Используй @, чтобы отметить сотрудника и отправить ему уведомление.'}
-                              </div>
                             </div>
                           </div>
                         )}
@@ -1376,3 +1334,8 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
     </div>
   )
 }
+  const resizeCommentInput = (element: HTMLTextAreaElement | null) => {
+    if (!element) return
+    element.style.height = '0px'
+    element.style.height = `${Math.min(element.scrollHeight, 144)}px`
+  }
