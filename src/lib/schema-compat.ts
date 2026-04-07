@@ -38,6 +38,10 @@ export async function supportsProductStageOverlapAcceptedColumn() {
   return hasDbColumn('product_stages', 'overlapAccepted')
 }
 
+export async function supportsProductStageAffectsFinalDateColumn() {
+  return hasDbColumn('product_stages', 'affectsFinalDate')
+}
+
 export async function supportsProductTemplateReferenceColumn() {
   return hasDbColumn('products', 'productTemplateId')
 }

@@ -117,7 +117,6 @@ export async function POST(req: NextRequest) {
             durationText: true,
             durationDays: true,
             isCritical: true,
-            affectsFinalDate: true,
             createdAt: true,
           },
           orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
@@ -137,7 +136,6 @@ export async function POST(req: NextRequest) {
                       select: {
                         id: true,
                         isCritical: true,
-                        affectsFinalDate: true,
                       },
                     },
                   },
@@ -183,7 +181,7 @@ export async function POST(req: NextRequest) {
             stageName: override?.stageName || stage.stageName,
             dateValue: override?.dateValue ?? stage.plannedDate,
             isCritical: stage.stageTemplate.isCritical,
-            affectsFinalDate: stage.stageTemplate.affectsFinalDate,
+            affectsFinalDate: true,
             participatesInAutoshift: override?.participatesInAutoshift ?? true,
           }
         })
@@ -193,7 +191,7 @@ export async function POST(req: NextRequest) {
             stageName: template.name,
             dateValue: null,
             isCritical: template.isCritical,
-            affectsFinalDate: template.affectsFinalDate,
+            affectsFinalDate: true,
             participatesInAutoshift: true,
           }))
 

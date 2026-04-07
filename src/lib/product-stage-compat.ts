@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto'
 import {
+  supportsProductStageAffectsFinalDateColumn,
   supportsProductStageAutoshiftColumn,
   supportsProductStageOverlapAcceptedColumn,
 } from './schema-compat'
@@ -37,7 +38,8 @@ export async function createProductStageCompat(
   db: ProductStageDbClient,
   input: ProductStageCompatCreateInput
 ) {
-  const [hasAutoshiftColumn, hasOverlapAcceptedColumn] = await Promise.all([
+  const [hasAffectsFinalDateColumn, hasAutoshiftColumn, hasOverlapAcceptedColumn] = await Promise.all([
+    supportsProductStageAffectsFinalDateColumn(),
     supportsProductStageAutoshiftColumn(),
     supportsProductStageOverlapAcceptedColumn(),
   ])
@@ -79,7 +81,6 @@ export async function createProductStageCompat(
     'status',
     'isCompleted',
     'isCritical',
-    'affectsFinalDate',
     'responsibleId',
     'comment',
     'priority',
@@ -102,7 +103,6 @@ export async function createProductStageCompat(
     data.status,
     data.isCompleted,
     data.isCritical,
-    data.affectsFinalDate,
     data.responsibleId,
     data.comment,
     data.priority,
@@ -116,6 +116,12 @@ export async function createProductStageCompat(
   if (hasAutoshiftColumn) {
     columns.push('participatesInAutoshift')
     values.push(data.participatesInAutoshift)
+  }
+
+  if (hasAffectsFinalDateColumn) {
+    const insertIndex = columns.indexOf('responsibleId')
+    columns.splice(insertIndex, 0, 'affectsFinalDate')
+    values.splice(insertIndex, 0, data.affectsFinalDate)
   }
 
   if (hasOverlapAcceptedColumn) {
