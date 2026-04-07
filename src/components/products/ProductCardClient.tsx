@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { AnimatePresence, motion } from 'framer-motion'
+import { createPortal } from 'react-dom'
 import { ArrowLeft, CalendarDays, CheckCircle2, Circle, AlertTriangle, MessageCircle, Clock, History, Zap, ExternalLink, Edit2, Save, Pencil, ChevronUp, ChevronDown, X, Plus, Trash2, SendHorizontal } from 'lucide-react'
 import { cn, getStatusColor, getStatusLabel, getPriorityColor, getPriorityLabel, formatDate, detectStageOverlaps, formatStageOverlap } from '@/lib/utils'
 import { DatePicker } from '@/components/ui/DatePicker'
@@ -1246,9 +1247,9 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
 
       {/* Automation Modal */}
       <AnimatePresence>
-      {automationModal && (
+      {automationModal && typeof document !== 'undefined' && createPortal(
         <motion.div
-          className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/20 backdrop-blur-md"
+          className="modal-backdrop flex items-center justify-center px-4"
           onClick={() => setAutomationModal(null)}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -1328,7 +1329,8 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
               </button>
             </div>
           </motion.div>
-        </motion.div>
+        </motion.div>,
+        document.body
       )}
       </AnimatePresence>
     </div>

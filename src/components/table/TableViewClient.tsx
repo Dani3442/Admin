@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Search, CheckCircle2, AlertTriangle, Plus, ChevronLeft, ChevronRight, Pencil, X, Trash2, Filter } from 'lucide-react'
@@ -983,9 +984,9 @@ export function TableViewClient({
       )}
 
       {/* New stage modal */}
-      {showNewStageForm && (
+      {showNewStageForm && typeof document !== 'undefined' && createPortal(
         <div
-          className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/20 backdrop-blur-md"
+          className="modal-backdrop flex items-center justify-center px-4"
           onClick={() => {
             setShowNewStageForm(false)
             setNewStageAutoshift(true)
@@ -1050,7 +1051,8 @@ export function TableViewClient({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

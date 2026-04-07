@@ -136,6 +136,12 @@
   .floating-island {
     @apply rounded-[28px] border border-white/80 bg-white/90 shadow-[0_22px_44px_-28px_rgba(15,23,42,0.32)] backdrop-blur-xl;
   }
+
+  .modal-backdrop {
+    @apply fixed left-0 right-0 z-[140] bg-slate-950/20 backdrop-blur-md;
+    top: -96px;
+    bottom: -96px;
+  }
 }
 
 @layer utilities {

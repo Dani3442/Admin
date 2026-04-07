@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { Plus, Shield, Trash2, UserCheck, UserX, X } from 'lucide-react'
 import { FilterSelect } from '@/components/ui/FilterSelect'
@@ -104,8 +105,8 @@ export function UsersClient({ users: initial, currentUserRole }: { users: any[];
         )}
       </div>
 
-      {showForm && canCreateUsers && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/20 px-4 backdrop-blur-md">
+      {showForm && canCreateUsers && typeof document !== 'undefined' && createPortal(
+        <div className="modal-backdrop flex items-center justify-center px-4">
           <div className="surface-panel w-full max-w-2xl animate-fade-in p-6">
             <div className="mb-5 flex items-center justify-between gap-3">
               <div>
@@ -149,7 +150,8 @@ export function UsersClient({ users: initial, currentUserRole }: { users: any[];
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       <div className="card overflow-hidden p-0">

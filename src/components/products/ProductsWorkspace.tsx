@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { AnimatePresence, motion } from 'framer-motion'
+import { createPortal } from 'react-dom'
 import { Filter, LayoutList, Plus, Search, Table2, X } from 'lucide-react'
 import { NewProductForm } from '@/components/products/NewProductForm'
 import { ProductsClient } from '@/components/products/ProductsClient'
@@ -415,9 +416,9 @@ export function ProductsWorkspace({
       </div>
 
       <AnimatePresence>
-        {showNewProductModal && (
+        {showNewProductModal && typeof document !== 'undefined' && createPortal(
           <motion.div
-            className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/20 px-4 backdrop-blur-md"
+            className="modal-backdrop flex items-center justify-center px-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -450,7 +451,8 @@ export function ProductsWorkspace({
                 />
               </div>
             </motion.div>
-          </motion.div>
+          </motion.div>,
+          document.body
         )}
       </AnimatePresence>
     </div>
