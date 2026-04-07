@@ -26,16 +26,28 @@ export function formatDateInputValue(date: Date | string | null | undefined): st
   }
 }
 
+export function maskDateInputValue(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 8)
+  const day = digits.slice(0, 2)
+  const month = digits.slice(2, 4)
+  const year = digits.slice(4, 8)
+
+  if (digits.length <= 2) return day
+  if (digits.length <= 4) return `${day}.${month}`
+  return `${day}.${month}.${year}`
+}
+
 export function parseDateInputValue(value: string): Date | null {
   const trimmed = value.trim()
   if (!trimmed) return null
 
   const normalized = trimmed.replace(/\//g, '.').replace(/-/g, '.')
+  if (!/^\d{2}\.\d{2}\.\d{4}$/.test(normalized)) return null
   const formats = ['dd.MM.yyyy', 'd.M.yyyy', 'yyyy.MM.dd']
 
   for (const pattern of formats) {
     const parsed = parse(normalized, pattern, new Date())
-    if (isValid(parsed)) return parsed
+    if (isValid(parsed) && format(parsed, 'dd.MM.yyyy') === normalized) return parsed
   }
 
   return null

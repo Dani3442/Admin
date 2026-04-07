@@ -17,7 +17,7 @@ import {
 } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { CalendarDays, ChevronLeft, ChevronRight, X } from 'lucide-react'
-import { cn, formatDateInputValue, parseDateInputValue } from '@/lib/utils'
+import { cn, formatDateInputValue, maskDateInputValue, parseDateInputValue } from '@/lib/utils'
 
 interface DatePickerProps {
   value: Date | null
@@ -80,8 +80,16 @@ export function DatePicker({
     if (!element) return
 
     const rect = element.getBoundingClientRect()
+    const panelHeight = panelRef.current?.offsetHeight ?? 340
+    const spaceBelow = window.innerHeight - rect.bottom - 12
+    const spaceAbove = rect.top - 12
+    const shouldOpenUp = spaceBelow < panelHeight && spaceAbove > spaceBelow
+    const top = shouldOpenUp
+      ? Math.max(12, rect.top - panelHeight - 8)
+      : Math.max(12, rect.bottom + 8)
+
     setPosition({
-      top: rect.bottom + 8,
+      top,
       left: Math.max(12, Math.min(rect.left, window.innerWidth - 316)),
       width: Math.max(rect.width, 240),
     })
@@ -120,6 +128,13 @@ export function DatePicker({
       document.removeEventListener('pointerdown', handlePointerDown)
     }
   }, [isOpen, syncPosition])
+
+  useEffect(() => {
+    if (!isOpen) return
+
+    const frame = window.requestAnimationFrame(() => syncPosition())
+    return () => window.cancelAnimationFrame(frame)
+  }, [isOpen, syncPosition, viewDate])
 
   useEffect(() => {
     if (autoFocus) inputRef.current?.focus()
@@ -164,7 +179,7 @@ export function DatePicker({
       ref={panelRef}
       onPointerDown={(event) => event.stopPropagation()}
       className={cn(
-        'fixed z-[80] rounded-xl border border-slate-200 bg-white p-3 shadow-[0_20px_60px_-30px_rgba(15,23,42,0.45)]',
+        'fixed z-[180] rounded-xl border border-slate-200 bg-white p-3 shadow-[0_20px_60px_-30px_rgba(15,23,42,0.45)]',
         panelClassName
       )}
       style={{ top: position.top, left: position.left, width: Math.max(position.width, 308) }}
@@ -277,10 +292,12 @@ export function DatePicker({
             type="text"
             value={displayValue}
             placeholder={placeholder}
+            inputMode="numeric"
+            maxLength={10}
             onPointerDown={(event) => event.stopPropagation()}
             onFocus={openCalendar}
             onClick={openCalendar}
-            onChange={(event) => setDisplayValue(event.target.value)}
+            onChange={(event) => setDisplayValue(maskDateInputValue(event.target.value))}
             onKeyDown={(event) => {
               if (event.key === 'Enter') {
                 event.preventDefault()
@@ -293,6 +310,13 @@ export function DatePicker({
               if (event.key === 'ArrowDown') {
                 event.preventDefault()
                 openCalendar()
+              }
+              if (
+                event.key.length === 1 &&
+                !/\d/.test(event.key) &&
+                !['Backspace', 'Delete', 'Tab'].includes(event.key)
+              ) {
+                event.preventDefault()
               }
             }}
             className={cn(
