@@ -164,7 +164,10 @@ export function ProductsWorkspace({
   const [showNewProductModal, setShowNewProductModal] = useState(createQueryOpen)
 
   const openCreateModal = () => {
-    setShowNewProductModal(true)
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('create', '1')
+    const nextQuery = params.toString()
+    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false })
   }
 
   const closeCreateModal = () => {
@@ -221,12 +224,12 @@ export function ProductsWorkspace({
     }
 
     const handleOpenCreateModal = () => {
-      setShowNewProductModal(true)
+      openCreateModal()
     }
 
     window.addEventListener('product-admin:open-create-modal', handleOpenCreateModal)
     return () => window.removeEventListener('product-admin:open-create-modal', handleOpenCreateModal)
-  }, [])
+  }, [openCreateModal])
 
   useEffect(() => {
     if (createQueryOpen) {

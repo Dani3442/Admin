@@ -215,16 +215,20 @@ export function Header({ user }: HeaderProps) {
 
   const totalBadge = counts.mentions + counts.overdue + counts.risk
   const handleOpenCreateProduct = () => {
+    const params = new URLSearchParams()
+    params.set('create', '1')
+    const nextQuery = params.toString()
+
     if (typeof window !== 'undefined') {
       window.sessionStorage.setItem('product-admin:open-create-modal', '1')
     }
 
     if (pathname === '/products') {
-      window.dispatchEvent(new Event('product-admin:open-create-modal'))
+      router.replace(nextQuery ? `/products?${nextQuery}` : '/products', { scroll: false })
       return
     }
 
-    router.push('/products?create=1')
+    router.push(nextQuery ? `/products?${nextQuery}` : '/products')
   }
 
   return (

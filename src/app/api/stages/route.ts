@@ -222,6 +222,7 @@ export async function PATCH(req: NextRequest) {
         },
       })
     : null
+  let createdMissingStage = false
 
   if (!existingStage && productId && stageTemplateId && typeof stageOrder === 'number') {
     const product = await prisma.product.findUnique({
@@ -344,6 +345,7 @@ export async function PATCH(req: NextRequest) {
           stageName: typeof stageName === 'string' && stageName.trim() ? stageName.trim() : template.name,
           dateValue: initialDateValue,
         }
+        createdMissingStage = true
       })
     }
   }
@@ -370,11 +372,11 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ stages: updatedStages })
   }
 
-  const oldDate = existingStage.dateValue
+  const oldDate = createdMissingStage ? null : existingStage.dateValue
   const newDate = updates.dateValue ? new Date(updates.dateValue) : null
 
   // Log change
-  if (oldDate !== newDate && oldDate) {
+  if (oldDate && newDate && oldDate.getTime() !== newDate.getTime()) {
     await prisma.changeHistory.create({
       data: {
         productId: existingStage.productId,
@@ -407,14 +409,22 @@ export async function PATCH(req: NextRequest) {
     ...safeUpdates,
   }
 
-  const updatedStage = await prisma.productStage.update({
-    where: { id: existingStage.id },
-    data: normalizedUpdates,
-    select: {
-      productId: true,
-      ...stageResponseSelect,
-    },
-  })
+  const updatedStage = createdMissingStage
+    ? await prisma.productStage.findUniqueOrThrow({
+        where: { id: existingStage.id },
+        select: {
+          productId: true,
+          ...stageResponseSelect,
+        },
+      })
+    : await prisma.productStage.update({
+        where: { id: existingStage.id },
+        data: normalizedUpdates,
+        select: {
+          productId: true,
+          ...stageResponseSelect,
+        },
+      })
 
   // Apply automation if date changed
   let automationResult = null
