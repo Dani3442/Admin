@@ -234,7 +234,9 @@ export function ProductsWorkspace({
   }, [openCreateModal])
 
   useEffect(() => {
-    setShowNewProductModal(createQueryOpen)
+    if (createQueryOpen) {
+      setShowNewProductModal(true)
+    }
   }, [createQueryOpen])
 
   useEffect(() => {
