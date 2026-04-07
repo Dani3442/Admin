@@ -138,6 +138,10 @@ export function Header({ user }: HeaderProps) {
     fetchNotifications()
   }, [])
 
+  useEffect(() => {
+    fetchNotifications()
+  }, [pathname, searchParams])
+
   const handleToggleNotifications = () => {
     const nextOpen = !notificationsOpen
     setNotificationsOpen(nextOpen)

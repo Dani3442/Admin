@@ -90,7 +90,17 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json()
-    const { name, country, category, sku, priority, responsibleId, notes, productTemplateId } = body
+    const {
+      name,
+      country,
+      category,
+      sku,
+      priority,
+      responsibleId,
+      notes,
+      productTemplateId,
+      templateStagesOverride,
+    } = body
 
     if (!name?.trim()) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 })
@@ -145,16 +155,36 @@ export async function POST(req: NextRequest) {
         normalizedOrder: index,
       }))
 
+      const safeTemplateOverrides = Array.isArray(templateStagesOverride)
+        ? templateStagesOverride
+            .map((stage: any, index: number) => ({
+              stageTemplateId: String(stage?.stageTemplateId || ''),
+              stageOrder: typeof stage?.stageOrder === 'number' ? stage.stageOrder : index,
+              stageName: String(stage?.stageName || '').trim(),
+              dateValue: stage?.plannedDate ? new Date(stage.plannedDate) : null,
+              participatesInAutoshift: stage?.participatesInAutoshift !== false,
+            }))
+            .filter((stage: any) => stage.stageTemplateId && stage.stageName)
+        : []
+
       const templateStages = selectedTemplate
-        ? selectedTemplate.stages.map((stage, index) => ({
+        ? selectedTemplate.stages.map((stage, index) => {
+            const override = safeTemplateOverrides.find(
+              (candidate: any) =>
+                candidate.stageTemplateId === stage.stageTemplateId &&
+                candidate.stageOrder === index
+            )
+
+            return {
             stageTemplateId: stage.stageTemplateId,
             stageOrder: index,
-            stageName: stage.stageName,
-            dateValue: stage.plannedDate,
+            stageName: override?.stageName || stage.stageName,
+            dateValue: override?.dateValue ?? stage.plannedDate,
             isCritical: stage.stageTemplate.isCritical,
             affectsFinalDate: stage.stageTemplate.affectsFinalDate,
-            participatesInAutoshift: true,
-          }))
+            participatesInAutoshift: override?.participatesInAutoshift ?? true,
+          }
+        })
         : normalizedStageTemplates.map((template) => ({
             stageTemplateId: template.id,
             stageOrder: template.normalizedOrder,

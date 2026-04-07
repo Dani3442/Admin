@@ -69,6 +69,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
   const [deletingProduct, setDeletingProduct] = useState(false)
   const commentInputRef = useRef<HTMLInputElement>(null)
   const commentsScrollRef = useRef<HTMLDivElement>(null)
+  const markedSeenProductRef = useRef<string | null>(null)
 
   // Close context menu on outside click
   useEffect(() => {
@@ -138,10 +139,16 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
     if (tab !== 'comments') return
 
     let cancelled = false
+    let firstSync = true
 
     const syncComments = async () => {
       try {
-        const res = await fetch(`/api/comments?productId=${encodeURIComponent(product.id)}`, {
+        const params = new URLSearchParams({ productId: product.id })
+        if (firstSync || markedSeenProductRef.current !== product.id) {
+          params.set('markSeen', '1')
+        }
+
+        const res = await fetch(`/api/comments?${params.toString()}`, {
           cache: 'no-store',
           credentials: 'include',
         })
@@ -150,10 +157,15 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
         const data = await res.json()
         if (cancelled) return
 
+        if (firstSync || markedSeenProductRef.current !== product.id) {
+          markedSeenProductRef.current = product.id
+        }
+
         setProduct((prev: any) => ({
           ...prev,
           comments: data.comments || prev.comments,
         }))
+        firstSync = false
       } catch {
         // Silent polling failure keeps chat responsive.
       }

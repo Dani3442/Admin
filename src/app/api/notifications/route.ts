@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
 
   const mentionToken = `](${currentUserId})`
 
-  const [recentChanges, overdueStages, riskProducts, recentMentions] = await Promise.all([
+  const [recentChanges, overdueStages, riskProducts, recentMentions, mentionSeenEntries] = await Promise.all([
     // Recent changes (last 7 days)
     prisma.changeHistory.findMany({
       where: { createdAt: { gte: sevenDaysAgo } },
@@ -67,7 +67,34 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: 'desc' },
       take: 10,
     }),
+
+    prisma.changeHistory.findMany({
+      where: {
+        changedById: currentUserId,
+        field: 'mentionsSeenAt',
+      },
+      select: {
+        productId: true,
+        newValue: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    }),
   ])
+
+  const seenAtByProductId = new Map<string, Date>()
+  for (const entry of mentionSeenEntries) {
+    if (!entry.productId || seenAtByProductId.has(entry.productId)) continue
+    const parsed = entry.newValue ? new Date(entry.newValue) : entry.createdAt
+    if (!Number.isNaN(parsed.getTime())) {
+      seenAtByProductId.set(entry.productId, parsed)
+    }
+  }
+
+  const unreadMentions = recentMentions.filter((comment) => {
+    const seenAt = seenAtByProductId.get(comment.product.id)
+    return !seenAt || comment.createdAt > seenAt
+  })
 
   const notifications: Array<{
     id: string
@@ -79,7 +106,7 @@ export async function GET(req: NextRequest) {
     href?: string | null
   }> = []
 
-  for (const comment of recentMentions) {
+  for (const comment of unreadMentions) {
     notifications.push({
       id: `mention-${comment.id}`,
       type: 'mention',
@@ -135,11 +162,11 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     notifications: notifications.slice(0, 20),
     counts: {
-      mentions: recentMentions.length,
+      mentions: unreadMentions.length,
       overdue: overdueStages.length,
       risk: riskProducts.length,
       changes: recentChanges.length,
-      total: recentMentions.length + overdueStages.length + riskProducts.length + recentChanges.length,
+      total: unreadMentions.length + overdueStages.length + riskProducts.length + recentChanges.length,
     },
   })
 }

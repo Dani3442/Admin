@@ -1,12 +1,11 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Layers3, Plus, Save, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import { DatePicker } from '@/components/ui/DatePicker'
-import { formatDate } from '@/lib/utils'
-import type { ProductTemplateData } from '@/types'
+import type { ProductTemplateData, ProductTemplateStageData } from '@/types'
 
 const PRIORITIES = [
   { value: 'CRITICAL', label: 'Критический' },
@@ -21,6 +20,8 @@ interface TemplateDraftStage {
   plannedDate: Date | null
   participatesInAutoshift: boolean
 }
+
+interface SelectedTemplateStageOverride extends ProductTemplateStageData {}
 
 interface NewProductFormProps {
   users: Array<{ id: string; name: string }>
@@ -60,6 +61,7 @@ export function NewProductForm({
   const [templateDraftName, setTemplateDraftName] = useState('')
   const [templateDraftDescription, setTemplateDraftDescription] = useState('')
   const [templateStages, setTemplateStages] = useState<TemplateDraftStage[]>([createDraftStage()])
+  const [selectedTemplateStages, setSelectedTemplateStages] = useState<SelectedTemplateStageOverride[]>([])
 
   const [form, setForm] = useState({
     name: '',
@@ -77,12 +79,35 @@ export function NewProductForm({
     [form.productTemplateId, templates]
   )
 
+  useEffect(() => {
+    if (!selectedTemplate) {
+      setSelectedTemplateStages([])
+      return
+    }
+
+    setSelectedTemplateStages(
+      selectedTemplate.stages.map((stage) => ({
+        ...stage,
+        plannedDate: stage.plannedDate ? new Date(stage.plannedDate) : null,
+      }))
+    )
+  }, [selectedTemplate])
+
   const update = (field: string, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }))
   }
 
   const updateTemplateStage = (stageId: string, patch: Partial<TemplateDraftStage>) => {
     setTemplateStages((prev) =>
+      prev.map((stage) => (stage.id === stageId ? { ...stage, ...patch } : stage))
+    )
+  }
+
+  const updateSelectedTemplateStage = (
+    stageId: string,
+    patch: Partial<SelectedTemplateStageOverride>
+  ) => {
+    setSelectedTemplateStages((prev) =>
       prev.map((stage) => (stage.id === stageId ? { ...stage, ...patch } : stage))
     )
   }
@@ -179,6 +204,14 @@ export function NewProductForm({
         body: JSON.stringify({
           ...form,
           productTemplateId: form.productTemplateId || null,
+          templateStagesOverride: selectedTemplateStages.map((stage) => ({
+            id: stage.id,
+            stageTemplateId: stage.stageTemplateId,
+            stageOrder: stage.stageOrder,
+            stageName: stage.stageName,
+            plannedDate: stage.plannedDate ? stage.plannedDate.toISOString() : null,
+            participatesInAutoshift: stage.participatesInAutoshift,
+          })),
           responsibleId: form.responsibleId || null,
           country: form.country || null,
           category: form.category || null,
@@ -285,16 +318,20 @@ export function NewProductForm({
                 <div className="text-xs text-slate-400">{selectedTemplate.stages.length} этапов</div>
               </div>
               <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                {selectedTemplate.stages.map((stage, index) => (
+                {selectedTemplateStages.map((stage, index) => (
                   <div key={stage.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 px-3 py-2">
                     <div className="min-w-0">
                       <div className="text-sm font-medium text-slate-700">
                         {index + 1}. {stage.stageName}
                       </div>
                     </div>
-                    <div className="text-xs text-slate-500 whitespace-nowrap">
-                      {stage.plannedDate ? formatDate(stage.plannedDate) : 'Без даты'}
-                    </div>
+                    <DatePicker
+                      value={stage.plannedDate}
+                      onChange={(date) => updateSelectedTemplateStage(stage.id, { plannedDate: date })}
+                      inputClassName="h-9 w-36 text-xs"
+                      panelClassName="w-[320px]"
+                      placeholder="Без даты"
+                    />
                   </div>
                 ))}
               </div>
