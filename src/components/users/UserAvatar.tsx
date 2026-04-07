@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { cn, getUserInitials } from '@/lib/utils'
 
 interface UserAvatarProps {
@@ -20,10 +21,21 @@ const sizeClasses = {
 }
 
 export function UserAvatar({ user, size = 'md', className }: UserAvatarProps) {
-  if (user.avatar) {
+  const [hasImageError, setHasImageError] = useState(false)
+
+  useEffect(() => {
+    setHasImageError(false)
+  }, [user.avatar])
+
+  if (user.avatar && !hasImageError) {
     return (
       <div className={cn('overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200', sizeClasses[size], className)}>
-        <img src={user.avatar} alt="Аватар пользователя" className="h-full w-full object-cover" />
+        <img
+          src={user.avatar}
+          alt="Аватар пользователя"
+          className="h-full w-full object-cover"
+          onError={() => setHasImageError(true)}
+        />
       </div>
     )
   }

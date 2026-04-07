@@ -677,7 +677,7 @@ export function TableViewClient({
             <thead className="sticky top-0 z-10">
               <tr>
                 <th
-                  className="sticky left-0 z-20 bg-brand-900 text-slate-100 text-xs px-4 py-2 text-left border-r border-brand-800 relative"
+                  className="sticky left-0 z-20 bg-brand-900 px-4 py-3 text-left text-[18px] font-semibold leading-[1.2] text-slate-100 border-r border-brand-800 relative"
                   style={{ width: columnWidths.__product, minWidth: 120 }}
                 >
                   Продукт
@@ -687,7 +687,7 @@ export function TableViewClient({
                   />
                 </th>
                 <th
-                  className="bg-brand-900 text-slate-100 text-xs px-2 py-2 text-center border-r border-brand-800 relative"
+                  className="bg-brand-900 px-2 py-3 text-center text-[17px] font-semibold leading-[1.2] text-slate-100 border-r border-brand-800 relative"
                   style={{ width: columnWidths.__progress, minWidth: 60 }}
                 >
                   Прогресс
@@ -699,7 +699,7 @@ export function TableViewClient({
                 {stages.map((stage, idx) => (
                   <th
                     key={stage.id}
-                    className="bg-brand-900 text-slate-100 text-xs py-2 px-1.5 text-center border-r border-brand-800 relative group"
+                    className="bg-brand-900 py-3 px-2 text-center text-slate-100 border-r border-brand-800 relative group"
                     style={{ width: columnWidths[stage.id], minWidth: 60 }}
                     title={`ПКМ: управление этапом\n${stage.name}`}
                     onContextMenu={(e) => handleStageHeaderClick(e, stage)}
@@ -720,12 +720,12 @@ export function TableViewClient({
                         />
                       </div>
                     ) : (
-                      <div className="leading-tight break-words whitespace-normal cursor-context-menu">
+                      <div className="cursor-context-menu break-words whitespace-normal text-[18px] font-semibold leading-[1.15]">
                         {stage.name}
                       </div>
                     )}
                     {stage.durationText && !renamingStage && (
-                      <div className="text-slate-300/80 font-normal text-[10px] mt-0.5">{stage.durationText}</div>
+                      <div className="mt-1 text-[13px] font-normal leading-4 text-slate-300/80">{stage.durationText}</div>
                     )}
                     <div
                       className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-brand-500/50 transition-colors"
@@ -772,11 +772,11 @@ export function TableViewClient({
                       style={{ width: columnWidths.__product, minWidth: 120, maxWidth: columnWidths.__product }}
                     >
                       <Link href={buildProductHref(product.id, currentRoute)} className="block">
-                        <div className="text-xs font-medium text-slate-800 hover:text-brand-700 truncate" title={product.name}>
+                        <div className="truncate text-[18px] font-semibold leading-[1.2] text-slate-800 hover:text-brand-700" title={product.name}>
                           {product.name}
                         </div>
                         <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-[10px] text-slate-400">{product.responsible?.name || '—'}</span>
+                          <span className="text-[14px] leading-5 text-slate-400">{product.responsible?.name || '—'}</span>
                           {product.riskScore >= 40 && (
                             <AlertTriangle className="w-2.5 h-2.5 text-amber-500" />
                           )}
@@ -786,7 +786,7 @@ export function TableViewClient({
 
                     {/* Progress */}
                     <td className="border-r border-slate-100 px-2 py-2 text-center" style={{ width: columnWidths.__progress, minWidth: 60 }}>
-                      <div className="text-xs font-semibold text-slate-700">{product.progressPercent}%</div>
+                      <div className="text-[15px] font-semibold leading-5 text-slate-700">{product.progressPercent}%</div>
                       <div className="progress-bar mt-1 mx-auto w-16">
                         <div
                           className={cn(
@@ -823,7 +823,7 @@ export function TableViewClient({
                                 onChange={setEditValue}
                                 onCommit={saveEdit}
                                 onCancel={() => setEditingCell(null)}
-                                inputClassName="h-8 w-full min-w-0 text-[11px] px-2"
+                                inputClassName="h-8 w-full min-w-0 text-[12px] px-2"
                                 panelClassName="w-[292px]"
                                 showTriggerButton={false}
                                 autoFocus

@@ -202,7 +202,7 @@
 
 /* Stage date cell */
 .stage-cell {
-  @apply cursor-pointer select-none rounded-[12px] px-2 py-2 text-center text-[15px] font-medium leading-6 transition-colors;
+  @apply cursor-pointer select-none rounded-[12px] px-2 py-2 text-center text-[13px] font-medium leading-5 transition-colors;
   min-width: 90px;
 }
 

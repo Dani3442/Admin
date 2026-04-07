@@ -52,6 +52,7 @@ const NAV_ITEMS: Array<{
 ]
 
 export function Header({ user }: HeaderProps) {
+  const [profileUser, setProfileUser] = useState(user)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const [notifications, setNotifications] = useState<Notification[]>([])
@@ -65,6 +66,41 @@ export function Header({ user }: HeaderProps) {
   const searchParams = useSearchParams()
   const currentRoute = getRouteWithSearch(pathname, searchParams.toString())
   const isAdmin = ['ADMIN', 'DIRECTOR'].includes(user.role)
+
+  useEffect(() => {
+    setProfileUser(user)
+  }, [user])
+
+  useEffect(() => {
+    let isMounted = true
+
+    const fetchProfileUser = async () => {
+      try {
+        const res = await fetch('/api/profile', { cache: 'no-store' })
+        if (!res.ok) return
+
+        const profile = await res.json()
+        if (!isMounted) return
+
+        setProfileUser((current) => ({
+          ...current,
+          name: profile?.name ?? current.name,
+          lastName: profile?.lastName ?? current.lastName,
+          email: profile?.email ?? current.email,
+          role: profile?.role ?? current.role,
+          avatar: profile?.avatar ?? current.avatar,
+        }))
+      } catch {
+        // Keep header stable even if profile prefetch fails.
+      }
+    }
+
+    fetchProfileUser()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   useEffect(() => {
     const handlePointerDown = (event: MouseEvent) => {
@@ -315,10 +351,10 @@ export function Header({ user }: HeaderProps) {
                 className="inline-flex h-10 items-center gap-2 rounded-full border border-slate-200/80 bg-white/90 pl-1.5 pr-3 text-left transition hover:border-slate-300"
                 aria-label="Открыть меню профиля"
               >
-                <UserAvatar user={user} size="sm" />
+                <UserAvatar user={profileUser} size="sm" />
                 <div className="hidden min-w-0 text-left sm:block">
-                  <p className="max-w-[140px] truncate text-[15px] font-medium leading-6 text-slate-800">{getUserDisplayName(user)}</p>
-                  <p className="truncate text-[15px] leading-6 text-slate-500">{getRoleLabel(user.role)}</p>
+                  <p className="max-w-[170px] truncate text-[16px] font-semibold leading-5 text-slate-800">{getUserDisplayName(profileUser)}</p>
+                  <p className="truncate text-[14px] leading-5 text-slate-500">{getRoleLabel(profileUser.role)}</p>
                 </div>
                 <ChevronDown className={cn('h-4 w-4 text-slate-400 transition-transform', profileOpen && 'rotate-180')} />
               </button>
@@ -333,11 +369,11 @@ export function Header({ user }: HeaderProps) {
                     transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
                   >
                     <div className="mb-2 flex items-center gap-3 rounded-[24px] bg-slate-50 px-3 py-3">
-                      <UserAvatar user={user} size="md" />
+                      <UserAvatar user={profileUser} size="md" />
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold text-slate-900">{getUserDisplayName(user)}</p>
-                        <p className="truncate text-xs text-slate-500">{user.email}</p>
-                        <p className="mt-1 text-[11px] text-slate-400">{getRoleLabel(user.role)}</p>
+                        <p className="truncate text-[16px] font-semibold leading-5 text-slate-900">{getUserDisplayName(profileUser)}</p>
+                        <p className="truncate text-[14px] leading-5 text-slate-500">{profileUser.email}</p>
+                        <p className="mt-1 text-[13px] leading-5 text-slate-400">{getRoleLabel(profileUser.role)}</p>
                       </div>
                     </div>
 
