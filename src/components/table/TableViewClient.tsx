@@ -723,29 +723,29 @@ export function TableViewClient({
             <thead className="sticky top-0 z-10">
               <tr>
                 <th
-                  className="sticky left-0 z-20 bg-brand-950 px-4 py-3 text-left text-[17px] font-medium leading-[1.2] text-slate-100 border-r border-brand-900 relative"
+                  className="sticky left-0 z-20 bg-slate-50 px-4 py-3 text-left text-[15px] font-medium leading-6 text-slate-500 border-b border-r border-slate-200 relative"
                   style={{ width: columnWidths.__product, minWidth: 120 }}
                 >
                   Продукт
                   <div
-                    className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-brand-500/50 transition-colors"
+                    className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-slate-300/70 transition-colors"
                     onMouseDown={(e) => handleResizeStart(e, '__product')}
                   />
                 </th>
                 <th
-                  className="bg-brand-950 px-2 py-3 text-center text-[17px] font-medium leading-[1.2] text-slate-100 border-r border-brand-900 relative"
+                  className="bg-slate-50 px-2 py-3 text-center text-[15px] font-medium leading-6 text-slate-500 border-b border-r border-slate-200 relative"
                   style={{ width: columnWidths.__progress, minWidth: 60 }}
                 >
                   Прогресс
                   <div
-                    className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-brand-500/50 transition-colors"
+                    className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-slate-300/70 transition-colors"
                     onMouseDown={(e) => handleResizeStart(e, '__progress')}
                   />
                 </th>
                 {stages.map((stage, idx) => (
                   <th
                     key={stage.id}
-                    className="bg-brand-950 py-3 px-2 text-center text-slate-100 border-r border-brand-900 relative group"
+                    className="bg-slate-50 px-2 py-3 text-center text-slate-500 border-b border-r border-slate-200 relative group"
                     style={{ width: columnWidths[stage.id], minWidth: 60 }}
                     title={`ПКМ: управление этапом\n${stage.name}`}
                     onContextMenu={(e) => handleStageHeaderClick(e, stage)}
@@ -766,15 +766,15 @@ export function TableViewClient({
                         />
                       </div>
                     ) : (
-                      <div className="cursor-context-menu break-words whitespace-normal text-[17px] font-medium leading-[1.18]">
+                      <div className="cursor-context-menu break-words whitespace-normal text-[15px] font-medium leading-6 text-slate-500">
                         {stage.name}
                       </div>
                     )}
                     {stage.durationText && !renamingStage && (
-                      <div className="mt-1 text-[13px] font-normal leading-4 text-slate-300/80">{stage.durationText}</div>
+                      <div className="mt-0.5 text-[12px] font-normal leading-4 text-slate-400">{stage.durationText}</div>
                     )}
                     <div
-                      className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-brand-500/50 transition-colors"
+                      className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-slate-300/70 transition-colors"
                       onMouseDown={(e) => handleResizeStart(e, stage.id)}
                     />
                   </th>
@@ -782,13 +782,13 @@ export function TableViewClient({
 
                 {/* Add new stage column */}
                 <th
-                  className="bg-brand-950 border-r border-brand-900 text-center align-middle"
+                  className="bg-slate-50 border-b border-r border-slate-200 text-center align-middle"
                   style={{ width: addColumnWidth, minWidth: addColumnWidth }}
                 >
                   {canEditTable && (
                     <button
                       onClick={() => setShowNewStageForm(true)}
-                      className="w-7 h-7 mx-auto rounded-md bg-brand-900 text-blue-100 hover:bg-brand-800 hover:text-white transition-colors flex items-center justify-center"
+                      className="mx-auto flex h-7 w-7 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-200 hover:text-slate-700"
                       title="Добавить новый этап"
                     >
                       <Plus className="w-4 h-4" />

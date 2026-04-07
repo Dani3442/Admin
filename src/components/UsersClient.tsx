@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, Shield, Trash2, UserCheck, UserX, X } from 'lucide-react'
+import { FilterSelect } from '@/components/ui/FilterSelect'
 import { UserAvatar } from '@/components/users/UserAvatar'
 import { cn, formatDate, getRoleLabel, getUserDisplayName, getVerificationStatusColor, getVerificationStatusLabel } from '@/lib/utils'
 import type { UserRole } from '@/types'
@@ -30,6 +31,10 @@ export function UsersClient({ users: initial, currentUserRole }: { users: any[];
   const roleOptions = currentUserRole === 'DIRECTOR'
     ? ROLE_OPTIONS.filter((role) => !['ADMIN', 'DIRECTOR'].includes(role))
     : ROLE_OPTIONS
+  const roleSelectOptions = roleOptions.map((role) => ({
+    value: role,
+    label: getRoleLabel(role),
+  }))
   const canDeleteUser = (user: any) => {
     if (currentUserRole === 'ADMIN') return true
     if (currentUserRole === 'DIRECTOR') {
@@ -130,11 +135,12 @@ export function UsersClient({ users: initial, currentUserRole }: { users: any[];
               </div>
               <div className="md:col-span-2">
                 <label className="label">Роль</label>
-                <select value={form.role} onChange={(e) => setForm(p => ({...p, role: e.target.value}))} className="input">
-                  {roleOptions.map((r) => (
-                    <option key={r} value={r}>{getRoleLabel(r)}</option>
-                  ))}
-                </select>
+                <FilterSelect
+                  value={form.role}
+                  onChange={(value) => setForm((p) => ({ ...p, role: value as UserRole }))}
+                  options={roleSelectOptions}
+                  placeholder="Выберите роль"
+                />
               </div>
               {error && <div className="md:col-span-2 rounded-[20px] bg-red-50 p-3 text-sm text-red-600">{error}</div>}
               <div className="md:col-span-2 flex flex-wrap gap-3">
