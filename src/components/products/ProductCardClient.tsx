@@ -998,7 +998,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                           </div>
                         </div>
 
-                        <div ref={commentsScrollRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
+                        <div ref={commentsScrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
                           {commentFeed.length === 0 ? (
                             <div className="flex h-full min-h-[280px] items-center justify-center rounded-[20px] border border-dashed border-slate-200 bg-slate-50/80 text-center">
                               <div>
@@ -1008,35 +1008,37 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                               </div>
                             </div>
                           ) : (
-                            commentFeed.map((comment: any) => {
-                              const ownMessage = comment.author?.id === currentUser.id
-                              const authorName = comment.author?.lastName
-                                ? `${comment.author.name} ${comment.author.lastName}`
-                                : comment.author?.name
+                            <div className="flex min-h-full flex-col justify-end gap-4">
+                              {commentFeed.map((comment: any) => {
+                                const ownMessage = comment.author?.id === currentUser.id
+                                const authorName = comment.author?.lastName
+                                  ? `${comment.author.name} ${comment.author.lastName}`
+                                  : comment.author?.name
 
-                              return (
-                                <div key={comment.id} className={cn('flex gap-3', ownMessage ? 'justify-end' : 'justify-start')}>
-                                  {!ownMessage && <UserAvatar user={comment.author} size="sm" className="mt-7" />}
-                                  <div className="max-w-[62%] space-y-1">
-                                    <div className={cn('flex items-center gap-2 text-xs text-slate-400', ownMessage && 'justify-end')}>
-                                      <span className="font-semibold text-slate-700">{authorName}</span>
-                                      <span>{formatCommentTimestamp(comment.createdAt)}</span>
-                                    </div>
-                                    <div
-                                      className={cn(
-                                        'px-0.5 py-0.5 text-sm leading-6',
-                                        ownMessage ? 'text-slate-800' : 'text-slate-600'
-                                      )}
-                                    >
-                                      <div className={cn('flex flex-wrap items-center gap-1.5', ownMessage && 'justify-end')}>
-                                        {renderCommentContent(comment.content || comment.displayContent || '', ownMessage)}
+                                return (
+                                  <div key={comment.id} className={cn('flex gap-3', ownMessage ? 'justify-end' : 'justify-start')}>
+                                    {!ownMessage && <UserAvatar user={comment.author} size="sm" className="mt-7" />}
+                                    <div className="max-w-[62%] space-y-1">
+                                      <div className={cn('flex items-center gap-2 text-xs text-slate-400', ownMessage && 'justify-end')}>
+                                        <span className="font-semibold text-slate-700">{authorName}</span>
+                                        <span>{formatCommentTimestamp(comment.createdAt)}</span>
+                                      </div>
+                                      <div
+                                        className={cn(
+                                          'px-0.5 py-0.5 text-sm leading-6',
+                                          ownMessage ? 'text-slate-800' : 'text-slate-600'
+                                        )}
+                                      >
+                                        <div className={cn('flex flex-wrap items-center gap-1.5', ownMessage && 'justify-end')}>
+                                          {renderCommentContent(comment.content || comment.displayContent || '', ownMessage)}
+                                        </div>
                                       </div>
                                     </div>
+                                    {ownMessage && <UserAvatar user={comment.author} size="sm" className="mt-7" />}
                                   </div>
-                                  {ownMessage && <UserAvatar user={comment.author} size="sm" className="mt-7" />}
-                                </div>
-                              )
-                            })
+                                )
+                              })}
+                            </div>
                           )}
                         </div>
 

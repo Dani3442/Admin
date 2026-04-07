@@ -160,7 +160,7 @@ export function ProductsWorkspace({
   const [sortDirection, setSortDirection] = useState<ProductListSortDirection>(searchParams.get('dir') === 'desc' ? 'desc' : 'asc')
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(searchParams.get('advanced') === '1')
   const [onlyWithOverlaps, setOnlyWithOverlaps] = useState(searchParams.get('overlaps') === '1')
-  const [showNewProductModal, setShowNewProductModal] = useState(false)
+  const [showNewProductModal, setShowNewProductModal] = useState(searchParams.get('create') === '1')
 
   const updateLayout = (nextLayout: ProductsLayoutMode) => {
     const params = new URLSearchParams(searchParams.toString())
@@ -196,12 +196,18 @@ export function ProductsWorkspace({
   )
 
   useEffect(() => {
+    setShowNewProductModal(searchParams.get('create') === '1')
+  }, [searchParams])
+
+  useEffect(() => {
     const params = new URLSearchParams(searchParams.toString())
     ;['search', 'status', 'responsible', 'priority', 'country', 'view', 'sort', 'dir', 'advanced', 'overlaps'].forEach((key) => {
       params.delete(key)
     })
 
     if (layout === 'table') params.set('layout', 'table')
+    if (showNewProductModal) params.set('create', '1')
+    else params.delete('create')
     if (search) params.set('search', search)
     if (statusFilter) params.set('status', statusFilter)
     if (responsibleFilter) params.set('responsible', responsibleFilter)
@@ -215,7 +221,7 @@ export function ProductsWorkspace({
 
     const nextQuery = params.toString()
     router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false })
-  }, [countryFilter, layout, onlyWithOverlaps, pathname, priorityFilter, quickView, responsibleFilter, router, search, searchParams, showAdvancedFilters, sortDirection, sortField, statusFilter])
+  }, [countryFilter, layout, onlyWithOverlaps, pathname, priorityFilter, quickView, responsibleFilter, router, search, searchParams, showAdvancedFilters, showNewProductModal, sortDirection, sortField, statusFilter])
 
   const resetFilters = () => {
     setSearch('')
