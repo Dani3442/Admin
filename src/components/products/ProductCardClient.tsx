@@ -282,8 +282,8 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
     }
   }
 
-  const updateStage = async (stageId: string) => {
-    const vals = stageEditValues[stageId]
+  const updateStage = async (stageId: string, overrideValues?: Record<string, any>) => {
+    const vals = overrideValues ?? stageEditValues[stageId]
     if (!vals) return
     setSaving(true)
     try {
@@ -913,7 +913,12 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                                   ...prev,
                                   [stage.id]: { ...prev[stage.id], dateValue: nextDate }
                                 }))}
-                                onCommit={() => updateStage(stage.id)}
+                                onCommit={(nextDate) =>
+                                  updateStage(stage.id, {
+                                    ...(stageEditValues[stage.id] ?? {}),
+                                    dateValue: nextDate,
+                                  })
+                                }
                                 onCancel={() => setEditingStageId(null)}
                                 inputClassName="h-10 w-48 text-xs"
                                 panelClassName="w-[360px]"
