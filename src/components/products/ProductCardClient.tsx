@@ -1080,7 +1080,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                                 onKeyUp={(e) => syncCommentMentionState(e.currentTarget.value, e.currentTarget.selectionStart ?? e.currentTarget.value.length)}
                                 onKeyDown={handleCommentKeyDown}
                                 placeholder="Напиши комментарий или отметь коллегу через @..."
-                                className="input min-h-[52px] resize-none pr-14 py-3 leading-6"
+                                className="input min-h-[52px] resize-none pr-16 py-3 leading-6"
                               />
                               {mentionState && activeMentionSuggestions.length > 0 && (
                                 <div className="absolute bottom-[calc(100%+10px)] left-0 z-20 w-full max-w-sm overflow-hidden rounded-[22px] border border-slate-200 bg-white p-2 shadow-[0_22px_60px_-32px_rgba(15,23,42,0.45)]">
@@ -1120,7 +1120,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                                     ? { duration: 0.9, repeat: Infinity, ease: 'easeInOut' }
                                     : { duration: 0.2, ease: [0.22, 1, 0.36, 1] }
                                 }
-                                className="absolute right-2 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-brand-950 text-white transition hover:bg-brand-900 disabled:cursor-not-allowed disabled:opacity-45"
+                                className="absolute bottom-2 right-2 inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand-950 text-white transition hover:bg-brand-900 disabled:cursor-not-allowed disabled:opacity-45"
                               >
                                 <motion.span
                                   animate={savingComment ? { x: [0, 1.5, 0], y: [0, -1, 0] } : { x: 0, y: 0 }}
