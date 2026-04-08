@@ -1,5 +1,6 @@
 'use client'
 
+import { createPortal } from 'react-dom'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -447,7 +448,7 @@ export function ProductsWorkspace({
       </div>
 
       <AnimatePresence>
-        {createModalOpen && (
+        {createModalOpen && typeof document !== 'undefined' && createPortal((
           <motion.div
             className="modal-backdrop fixed inset-0 flex items-center justify-center px-4"
             initial={{ opacity: 0 }}
@@ -483,7 +484,7 @@ export function ProductsWorkspace({
               </div>
             </motion.div>
           </motion.div>
-        )}
+        ), document.body)}
       </AnimatePresence>
 
     </div>
