@@ -49,3 +49,11 @@ export async function supportsStageTemplateAffectsFinalDateColumn() {
 export async function supportsProductTemplateReferenceColumn() {
   return hasDbColumn('products', 'productTemplateId')
 }
+
+export async function supportsCommentProductStageIdColumn() {
+  return hasDbColumn('comments', 'productStageId')
+}
+
+export async function supportsChangeHistoryProductStageIdColumn() {
+  return hasDbColumn('change_history', 'productStageId')
+}

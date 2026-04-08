@@ -3,7 +3,11 @@ import { auth, hasPermission, Permission } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { recalculateProductRisk } from '@/lib/risk'
 import { createProductStageCompat } from '@/lib/product-stage-compat'
-import { supportsStageTemplateAffectsFinalDateColumn } from '@/lib/schema-compat'
+import {
+  supportsChangeHistoryProductStageIdColumn,
+  supportsCommentProductStageIdColumn,
+  supportsStageTemplateAffectsFinalDateColumn,
+} from '@/lib/schema-compat'
 
 async function updateProductProgress(productId: string) {
   const stages = await prisma.productStage.findMany({
@@ -292,6 +296,10 @@ export async function DELETE(req: NextRequest) {
 
   try {
     const hasStageTemplateAffectsFinalDateColumn = await supportsStageTemplateAffectsFinalDateColumn()
+    const [hasCommentProductStageIdColumn, hasChangeHistoryProductStageIdColumn] = await Promise.all([
+      supportsCommentProductStageIdColumn(),
+      supportsChangeHistoryProductStageIdColumn(),
+    ])
     const { searchParams } = new URL(req.url)
     const id = searchParams.get('id')
 
@@ -324,17 +332,21 @@ export async function DELETE(req: NextRequest) {
       affectedProductIds = [...new Set(productStages.map((stage) => stage.productId))]
 
       if (productStageIds.length > 0) {
-        await tx.comment.deleteMany({
-          where: {
-            productStageId: { in: productStageIds },
-          },
-        })
+        if (hasCommentProductStageIdColumn) {
+          await tx.comment.deleteMany({
+            where: {
+              productStageId: { in: productStageIds },
+            },
+          })
+        }
 
-        await tx.changeHistory.deleteMany({
-          where: {
-            productStageId: { in: productStageIds },
-          },
-        })
+        if (hasChangeHistoryProductStageIdColumn) {
+          await tx.changeHistory.deleteMany({
+            where: {
+              productStageId: { in: productStageIds },
+            },
+          })
+        }
 
         await tx.productStage.deleteMany({
           where: {
@@ -372,39 +384,24 @@ export async function DELETE(req: NextRequest) {
       }
     })
 
-    await Promise.all(
+    await Promise.allSettled(
       affectedProductIds.map(async (productId) => {
         await updateProductProgress(productId)
         await recalculateProductRisk(productId)
       })
     )
 
-    const all = hasStageTemplateAffectsFinalDateColumn
-      ? await prisma.stageTemplate.findMany({
-          select: {
-            id: true,
-            name: true,
-            order: true,
-            durationText: true,
-            durationDays: true,
-            isCritical: true,
-            affectsFinalDate: true,
-            createdAt: true,
-          },
-          orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
-        })
-      : await prisma.stageTemplate.findMany({
-          select: {
-            id: true,
-            name: true,
-            order: true,
-            durationText: true,
-            durationDays: true,
-            isCritical: true,
-            createdAt: true,
-          },
-          orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
-        })
+    const all = await prisma.stageTemplate.findMany({
+      select: {
+        id: true,
+        name: true,
+        order: true,
+        durationText: true,
+        isCritical: true,
+        createdAt: true,
+      },
+      orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+    })
     return NextResponse.json(all.map((stage) => ({ ...stage, participatesInAutoshift: true })))
   } catch (error) {
     console.error('[stage-templates:delete] Failed to delete stage template', error)

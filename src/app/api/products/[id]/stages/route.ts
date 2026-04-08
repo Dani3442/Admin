@@ -4,7 +4,11 @@ import { prisma } from '@/lib/prisma'
 import { recalculateProductRisk } from '@/lib/risk'
 import { recalculateProductDerivedFields } from '@/lib/product-derived-fields'
 import { createProductStageCompat } from '@/lib/product-stage-compat'
-import { supportsStageTemplateAffectsFinalDateColumn } from '@/lib/schema-compat'
+import {
+  supportsChangeHistoryProductStageIdColumn,
+  supportsCommentProductStageIdColumn,
+  supportsStageTemplateAffectsFinalDateColumn,
+} from '@/lib/schema-compat'
 
 async function normalizeRemainingProductStages(
   tx: {
@@ -237,6 +241,10 @@ export async function DELETE(
   }
 
   try {
+    const [hasCommentProductStageIdColumn, hasChangeHistoryProductStageIdColumn] = await Promise.all([
+      supportsCommentProductStageIdColumn(),
+      supportsChangeHistoryProductStageIdColumn(),
+    ])
     const { searchParams } = new URL(req.url)
     const stageId = searchParams.get('stageId')
 
@@ -254,13 +262,17 @@ export async function DELETE(
     }
 
     await prisma.$transaction(async (tx) => {
-      await tx.comment.deleteMany({
-        where: { productStageId: stageId },
-      })
+      if (hasCommentProductStageIdColumn) {
+        await tx.comment.deleteMany({
+          where: { productStageId: stageId },
+        })
+      }
 
-      await tx.changeHistory.deleteMany({
-        where: { productStageId: stageId },
-      })
+      if (hasChangeHistoryProductStageIdColumn) {
+        await tx.changeHistory.deleteMany({
+          where: { productStageId: stageId },
+        })
+      }
 
       await tx.productStage.delete({
         where: { id: stageId },
@@ -269,9 +281,9 @@ export async function DELETE(
       await normalizeRemainingProductStages(tx as any, productId)
     })
 
-    const derivedProduct = await recalculateProductDerivedFields(productId)
-    await recalculateProductRisk(productId)
-    const snapshot = await getProductStageSnapshot(productId)
+    const derivedProduct = await recalculateProductDerivedFields(productId).catch(() => null)
+    await recalculateProductRisk(productId).catch(() => null)
+    const snapshot = await getProductStageSnapshot(productId).catch(() => null)
 
     return NextResponse.json({
       stages: (snapshot?.stages || []).map((stage) => ({
