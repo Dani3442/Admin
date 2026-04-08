@@ -3,7 +3,11 @@ import { auth, hasPermission, Permission } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { applyAutomation, ensureDefaultShiftFollowingAutomation } from '@/lib/automation'
 import { recalculateProductRisk } from '@/lib/risk'
-import { supportsProductStageAutoshiftColumn, supportsProductStageOverlapAcceptedColumn } from '@/lib/schema-compat'
+import {
+  supportsProductStageAutoshiftColumn,
+  supportsProductStageOverlapAcceptedColumn,
+  supportsStageTemplateAffectsFinalDateColumn,
+} from '@/lib/schema-compat'
 import { recalculateProductDerivedFields } from '@/lib/product-derived-fields'
 import { createProductStageCompat } from '@/lib/product-stage-compat'
 import { getOverlapAcceptedMap, persistOverlapAccepted } from '@/lib/overlap-acceptance'
@@ -83,18 +87,31 @@ export async function GET(req: NextRequest) {
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   await ensureDefaultShiftFollowingAutomation()
-  const stages = await prisma.stageTemplate.findMany({
-    select: {
-      id: true,
-      name: true,
-      order: true,
-      durationText: true,
-      durationDays: true,
-      isCritical: true,
-      affectsFinalDate: true,
-    },
-    orderBy: { order: 'asc' },
-  })
+  const hasStageTemplateAffectsFinalDateColumn = await supportsStageTemplateAffectsFinalDateColumn()
+  const stages = hasStageTemplateAffectsFinalDateColumn
+    ? await prisma.stageTemplate.findMany({
+        select: {
+          id: true,
+          name: true,
+          order: true,
+          durationText: true,
+          durationDays: true,
+          isCritical: true,
+          affectsFinalDate: true,
+        },
+        orderBy: { order: 'asc' },
+      })
+    : await prisma.stageTemplate.findMany({
+        select: {
+          id: true,
+          name: true,
+          order: true,
+          durationText: true,
+          durationDays: true,
+          isCritical: true,
+        },
+        orderBy: { order: 'asc' },
+      })
   return NextResponse.json(stages.map((stage) => ({ ...stage, participatesInAutoshift: true })))
 }
 
@@ -108,9 +125,10 @@ export async function PATCH(req: NextRequest) {
   const body = await req.json()
   const { stageId, stageIds, updates, applyAutomations = true, swapWithStageId, productId, stageTemplateId, stageOrder, stageName } = body
   const userId = (session.user as any).id
-  const [hasAutoshiftColumn, hasOverlapAcceptedColumn] = await Promise.all([
+  const [hasAutoshiftColumn, hasOverlapAcceptedColumn, hasStageTemplateAffectsFinalDateColumn] = await Promise.all([
     supportsProductStageAutoshiftColumn(),
     supportsProductStageOverlapAcceptedColumn(),
+    supportsStageTemplateAffectsFinalDateColumn(),
   ])
   const stageResponseSelect: Record<string, boolean> = {
     id: true,
@@ -302,15 +320,24 @@ export async function PATCH(req: NextRequest) {
     }
 
     if (!existingStage) {
-      const template = await prisma.stageTemplate.findUnique({
-        where: { id: stageTemplateId },
-        select: {
-          id: true,
-          name: true,
-          isCritical: true,
-          affectsFinalDate: true,
-        },
-      })
+      const template = hasStageTemplateAffectsFinalDateColumn
+        ? await prisma.stageTemplate.findUnique({
+            where: { id: stageTemplateId },
+            select: {
+              id: true,
+              name: true,
+              isCritical: true,
+              affectsFinalDate: true,
+            },
+          })
+        : await prisma.stageTemplate.findUnique({
+            where: { id: stageTemplateId },
+            select: {
+              id: true,
+              name: true,
+              isCritical: true,
+            },
+          })
       if (!template) {
         return NextResponse.json({ error: 'Stage template not found' }, { status: 404 })
       }
@@ -331,7 +358,7 @@ export async function PATCH(req: NextRequest) {
           dateValue: initialDateValue,
           plannedDate: initialDateValue,
           isCritical: template.isCritical,
-          affectsFinalDate: template.affectsFinalDate,
+          affectsFinalDate: hasStageTemplateAffectsFinalDateColumn ? (template as any).affectsFinalDate ?? true : true,
           status: 'NOT_STARTED',
         })
 
