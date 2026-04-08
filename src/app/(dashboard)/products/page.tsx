@@ -90,6 +90,9 @@ export default async function ProductsPage({
   const returnToValue = Array.isArray(resolvedSearchParams.returnTo)
     ? resolvedSearchParams.returnTo[0]
     : resolvedSearchParams.returnTo
+  const createValue = Array.isArray(resolvedSearchParams.create)
+    ? resolvedSearchParams.create[0]
+    : resolvedSearchParams.create
 
   return (
     <ProductsWorkspace
@@ -110,6 +113,7 @@ export default async function ProductsPage({
       })) as any}
       stageSuggestions={data.stageSuggestions}
       currentUserRole={(session?.user as any)?.role || 'VIEWER'}
+      createOpen={createValue === '1'}
       createReturnTo={typeof returnToValue === 'string' ? returnToValue : null}
     />
   )

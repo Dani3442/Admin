@@ -58,6 +58,7 @@ interface ProductsWorkspaceProps {
   productTemplates: any[]
   stageSuggestions: Array<{ id: string; name: string }>
   currentUserRole: string
+  createOpen?: boolean
   createReturnTo?: string | null
 }
 
@@ -147,6 +148,7 @@ export function ProductsWorkspace({
   productTemplates,
   stageSuggestions,
   currentUserRole,
+  createOpen = false,
   createReturnTo = null,
 }: ProductsWorkspaceProps) {
   const router = useRouter()
@@ -163,7 +165,7 @@ export function ProductsWorkspace({
   const [sortDirection, setSortDirection] = useState<ProductListSortDirection>(searchParams.get('dir') === 'desc' ? 'desc' : 'asc')
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(searchParams.get('advanced') === '1')
   const [onlyWithOverlaps, setOnlyWithOverlaps] = useState(searchParams.get('overlaps') === '1')
-  const createModalOpen = searchParams.get('create') === '1'
+  const createModalOpen = createOpen
   const createProductHref = useMemo(() => {
     const params = new URLSearchParams(searchParams.toString())
     params.delete('create')
