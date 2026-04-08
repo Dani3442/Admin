@@ -396,9 +396,13 @@ export function ProductsWorkspace({
 
           <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
             <div>{layoutSwitcher}</div>
-            <Link href={createProductHref} className="btn-primary self-start">
+            <button
+              type="button"
+              onClick={() => router.push(createProductHref, { scroll: false })}
+              className="btn-primary self-start"
+            >
               <Plus className="h-4 w-4" /> Новый продукт
-            </Link>
+            </button>
           </div>
         </div>
       </div>
