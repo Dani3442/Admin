@@ -5,6 +5,13 @@ import { createProductStageCompat } from '@/lib/product-stage-compat'
 import { getFinalDateFromStages } from '@/lib/product-derived-fields'
 import { supportsProductTemplateReferenceColumn } from '@/lib/schema-compat'
 
+function normalizeNullableString(value: unknown) {
+  if (typeof value !== 'string') return value ?? null
+
+  const trimmed = value.trim()
+  return trimmed ? trimmed : null
+}
+
 export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -197,18 +204,18 @@ export async function POST(req: NextRequest) {
 
       const productCreateData: any = {
         name: name.trim(),
-        country,
-        category,
-        sku,
+        country: normalizeNullableString(country),
+        category: normalizeNullableString(category),
+        sku: normalizeNullableString(sku),
         priority: priority || 'MEDIUM',
-        responsibleId,
-        notes,
+        responsibleId: normalizeNullableString(responsibleId),
+        notes: normalizeNullableString(notes),
         sortOrder: (sortOrderAggregate._max.sortOrder ?? -1) + 1,
         finalDate: null,
       }
 
       if (hasProductTemplateReferenceColumn) {
-        productCreateData.productTemplateId = selectedTemplate?.id ?? null
+        productCreateData.productTemplateId = normalizeNullableString(selectedTemplate?.id ?? null)
       }
 
       const createdProduct = await tx.product.create({
