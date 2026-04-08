@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { ProductsWorkspace } from '@/components/products/ProductsWorkspace'
@@ -82,11 +83,25 @@ export default async function ProductsPage({
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>
 }) {
-  const [data, session] = await Promise.all([
+  const [resolvedSearchParamsRaw, data, session] = await Promise.all([
+    searchParams ?? Promise.resolve({}),
     getProductsWorkspaceData(),
     auth(),
   ])
-  await searchParams
+  const resolvedSearchParams = resolvedSearchParamsRaw as Record<string, string | string[] | undefined>
+
+  const rawCreate = resolvedSearchParams?.create
+  const createRequested = Array.isArray(rawCreate) ? rawCreate[0] === '1' : rawCreate === '1'
+
+  if (createRequested) {
+    const rawReturnTo = resolvedSearchParams?.returnTo
+    const returnTo =
+      typeof rawReturnTo === 'string' && rawReturnTo.trim()
+        ? rawReturnTo
+        : '/products'
+
+    redirect(`/products/new?returnTo=${encodeURIComponent(returnTo)}`)
+  }
 
   return (
     <ProductsWorkspace

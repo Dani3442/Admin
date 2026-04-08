@@ -39,7 +39,6 @@ interface Notification {
 
 interface HeaderProps {
   user: { name?: string; lastName?: string | null; email?: string; role: string; avatar?: string | null }
-  canCreateProduct?: boolean
 }
 
 const NAV_ITEMS: Array<{
@@ -54,7 +53,7 @@ const NAV_ITEMS: Array<{
   { label: 'Пользователи', href: '/users', icon: Users, adminOnly: true },
 ]
 
-export function Header({ user, canCreateProduct = true }: HeaderProps) {
+export function Header({ user }: HeaderProps) {
   const [profileUser, setProfileUser] = useState(user)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)

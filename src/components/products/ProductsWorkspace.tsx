@@ -161,12 +161,10 @@ export function ProductsWorkspace({
   const [onlyWithOverlaps, setOnlyWithOverlaps] = useState(searchParams.get('overlaps') === '1')
   const createProductHref = useMemo(() => {
     const params = new URLSearchParams(searchParams.toString())
-    params.delete('create')
-    params.delete('returnTo')
     const currentRoute = `${pathname}${params.toString() ? `?${params.toString()}` : ''}`
-    params.set('create', '1')
-    params.set('returnTo', currentRoute)
-    return `${pathname}?${params.toString()}`
+    const nextParams = new URLSearchParams()
+    nextParams.set('returnTo', currentRoute)
+    return `/products/new?${nextParams.toString()}`
   }, [pathname, searchParams])
   const currentRoute = useMemo(() => {
     const params = new URLSearchParams(searchParams.toString())

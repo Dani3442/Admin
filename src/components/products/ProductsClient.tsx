@@ -146,9 +146,9 @@ export function ProductsClient({
     params.delete('create')
     params.delete('returnTo')
     const returnTo = `${pathname}${params.toString() ? `?${params.toString()}` : ''}`
-    params.set('create', '1')
-    params.set('returnTo', returnTo)
-    return `${pathname}?${params.toString()}`
+    const nextParams = new URLSearchParams()
+    nextParams.set('returnTo', returnTo)
+    return `/products/new?${nextParams.toString()}`
   }, [pathname, searchParams])
 
   useEffect(() => {
