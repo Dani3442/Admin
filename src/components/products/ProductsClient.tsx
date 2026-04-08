@@ -743,14 +743,21 @@ export function ProductsClient({
                         <GripVertical className="w-4 h-4" />
                       </button>
                     </td>
-                    <td className={cn('table-cell', isDragging && 'bg-white')}>
+                    <td
+                      className={cn('table-cell', isDragging && 'bg-white')}
+                      onContextMenu={(event) => handleOpenContextMenu(event, product.id)}
+                    >
                       <div className="flex items-start gap-3">
                           <div className="mt-0.5 flex items-center gap-1">
                           <Pin className={cn('w-3.5 h-3.5', product.isPinned ? 'text-slate-700 fill-slate-200' : 'text-slate-300')} />
                           <Star className={cn('w-3.5 h-3.5', product.isFavorite ? 'text-slate-700 fill-slate-200' : 'text-slate-300')} />
                         </div>
                         <div className="min-w-0">
-                          <Link href={buildProductHref(product.id, currentRoute)} className="text-[19px] font-medium leading-[1.25] tracking-normal text-slate-800 hover:text-brand-700 transition-colors">
+                          <Link
+                            href={buildProductHref(product.id, currentRoute)}
+                            onContextMenu={(event) => handleOpenContextMenu(event, product.id)}
+                            className="text-[19px] font-medium leading-[1.25] tracking-normal text-slate-800 hover:text-brand-700 transition-colors"
+                          >
                             {product.name.length > 70 ? `${product.name.slice(0, 70)}…` : product.name}
                           </Link>
                           <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[15px] leading-6 text-slate-400">
