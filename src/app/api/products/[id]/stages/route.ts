@@ -6,6 +6,36 @@ import { recalculateProductDerivedFields } from '@/lib/product-derived-fields'
 import { createProductStageCompat } from '@/lib/product-stage-compat'
 import { supportsStageTemplateAffectsFinalDateColumn } from '@/lib/schema-compat'
 
+async function normalizeRemainingProductStages(
+  tx: {
+    productStage: {
+      findMany: (args: Record<string, unknown>) => Promise<Array<{ id: string }>>
+      update: (args: Record<string, unknown>) => Promise<unknown>
+    }
+  },
+  productId: string
+) {
+  const remainingStages = await tx.productStage.findMany({
+    where: { productId },
+    orderBy: [{ stageOrder: 'asc' }, { createdAt: 'asc' }],
+    select: { id: true },
+  })
+
+  for (const [index, remainingStage] of remainingStages.entries()) {
+    await tx.productStage.update({
+      where: { id: remainingStage.id },
+      data: { stageOrder: -(index + 1) },
+    })
+  }
+
+  for (const [index, remainingStage] of remainingStages.entries()) {
+    await tx.productStage.update({
+      where: { id: remainingStage.id },
+      data: { stageOrder: index },
+    })
+  }
+}
+
 async function getProductStageSnapshot(productId: string) {
   const hasStageTemplateAffectsFinalDateColumn = await supportsStageTemplateAffectsFinalDateColumn()
   const product = await prisma.product.findUnique({
@@ -236,18 +266,7 @@ export async function DELETE(
         where: { id: stageId },
       })
 
-      const remainingStages = await tx.productStage.findMany({
-        where: { productId },
-        orderBy: { stageOrder: 'asc' },
-        select: { id: true },
-      })
-
-      for (const [index, remainingStage] of remainingStages.entries()) {
-        await tx.productStage.update({
-          where: { id: remainingStage.id },
-          data: { stageOrder: index },
-        })
-      }
+      await normalizeRemainingProductStages(tx as any, productId)
     })
 
     const derivedProduct = await recalculateProductDerivedFields(productId)

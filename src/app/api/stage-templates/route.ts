@@ -22,6 +22,36 @@ async function updateProductProgress(productId: string) {
   })
 }
 
+async function normalizeRemainingProductStages(
+  tx: {
+    productStage: {
+      findMany: (args: Record<string, unknown>) => Promise<Array<{ id: string }>>
+      update: (args: Record<string, unknown>) => Promise<unknown>
+    }
+  },
+  productId: string
+) {
+  const remainingStages = await tx.productStage.findMany({
+    where: { productId },
+    orderBy: [{ stageOrder: 'asc' }, { createdAt: 'asc' }],
+    select: { id: true },
+  })
+
+  for (const [index, remainingStage] of remainingStages.entries()) {
+    await tx.productStage.update({
+      where: { id: remainingStage.id },
+      data: { stageOrder: -(index + 1) },
+    })
+  }
+
+  for (const [index, remainingStage] of remainingStages.entries()) {
+    await tx.productStage.update({
+      where: { id: remainingStage.id },
+      data: { stageOrder: index },
+    })
+  }
+}
+
 // Create a new stage template
 export async function POST(req: NextRequest) {
   const session = await auth()
@@ -313,18 +343,7 @@ export async function DELETE(req: NextRequest) {
         })
 
         for (const productId of affectedProductIds) {
-          const remainingStages = await tx.productStage.findMany({
-            where: { productId },
-            orderBy: [{ stageOrder: 'asc' }, { createdAt: 'asc' }],
-            select: { id: true },
-          })
-
-          for (const [index, remainingStage] of remainingStages.entries()) {
-            await tx.productStage.update({
-              where: { id: remainingStage.id },
-              data: { stageOrder: index },
-            })
-          }
+          await normalizeRemainingProductStages(tx as any, productId)
         }
       }
 
