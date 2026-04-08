@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { Plus, Shield, Trash2, UserCheck, UserX, X } from 'lucide-react'
 import { FilterSelect } from '@/components/ui/FilterSelect'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { UserAvatar } from '@/components/users/UserAvatar'
 import { cn, formatDate, getRoleLabel, getUserDisplayName, getVerificationStatusColor, getVerificationStatusLabel } from '@/lib/utils'
 import type { UserRole } from '@/types'
@@ -27,6 +28,7 @@ export function UsersClient({ users: initial, currentUserRole }: { users: any[];
   const [form, setForm] = useState({ name: '', lastName: '', email: '', password: '', role: 'EMPLOYEE' })
   const [saving, setSaving] = useState(false)
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null)
+  const [pendingDeleteUser, setPendingDeleteUser] = useState<any | null>(null)
   const [error, setError] = useState('')
   const canCreateUsers = ['ADMIN', 'DIRECTOR'].includes(currentUserRole)
   const roleOptions = currentUserRole === 'DIRECTOR'
@@ -71,18 +73,21 @@ export function UsersClient({ users: initial, currentUserRole }: { users: any[];
   }
 
   const handleDeleteUser = async (user: any) => {
-    const confirmed = window.confirm(`Удалить сотрудника «${getUserDisplayName(user)}»?`)
-    if (!confirmed) return
+    setPendingDeleteUser(user)
+  }
 
-    setDeletingUserId(user.id)
+  const confirmDeleteUser = async () => {
+    if (!pendingDeleteUser) return
+    setDeletingUserId(pendingDeleteUser.id)
     try {
-      const res = await fetch(`/api/users/${user.id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/users/${pendingDeleteUser.id}`, { method: 'DELETE' })
       const data = await res.json().catch(() => null)
       if (!res.ok) {
         throw new Error(data?.error || 'Не удалось удалить сотрудника')
       }
 
-      setUsers((prev) => prev.filter((item) => item.id !== user.id))
+      setUsers((prev) => prev.filter((item) => item.id !== pendingDeleteUser.id))
+      setPendingDeleteUser(null)
     } catch (deleteError: any) {
       window.alert(deleteError.message || 'Не удалось удалить сотрудника')
     } finally {
@@ -226,6 +231,20 @@ export function UsersClient({ users: initial, currentUserRole }: { users: any[];
           </tbody>
         </table>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(pendingDeleteUser)}
+        title="Удалить сотрудника?"
+        description={
+          pendingDeleteUser
+            ? `Сотрудник «${getUserDisplayName(pendingDeleteUser)}» будет удалён из системы. Это действие нельзя отменить.`
+            : ''
+        }
+        confirmLabel="Удалить"
+        loading={Boolean(pendingDeleteUser && deletingUserId === pendingDeleteUser.id)}
+        onCancel={() => setPendingDeleteUser(null)}
+        onConfirm={confirmDeleteUser}
+      />
     </div>
   )
 }

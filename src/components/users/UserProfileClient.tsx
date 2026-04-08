@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, Briefcase, Building2, Camera, Mail, Save, Settings, ShieldCheck, Sparkles, Trash2, UserCircle2, UserCog, X } from 'lucide-react'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { UserAvatar } from '@/components/users/UserAvatar'
 import { resolveBackNavigation } from '@/lib/navigation'
 import {
@@ -72,6 +73,7 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
   const [form, setForm] = useState(() => mapProfileToForm(initialProfile))
   const [activePanel, setActivePanel] = useState<ActivePanel>('none')
   const [saving, setSaving] = useState(false)
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
@@ -172,9 +174,10 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
 
   const handleDeleteUser = async () => {
     if (!permissions.canDeleteUser || isSelf) return
-    const confirmed = window.confirm(`Удалить сотрудника «${getUserDisplayName(profile)}»?`)
-    if (!confirmed) return
+    setConfirmDeleteOpen(true)
+  }
 
+  const confirmDeleteUser = async () => {
     setSaving(true)
     setError('')
     setSuccess('')
@@ -188,6 +191,7 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
         throw new Error(data?.error || 'Не удалось удалить сотрудника')
       }
 
+      setConfirmDeleteOpen(false)
       router.push('/users')
       router.refresh()
     } catch (deleteError: any) {
@@ -223,6 +227,16 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
           {backNavigation.label}
         </Link>
       </div>
+
+      <ConfirmDialog
+        open={confirmDeleteOpen}
+        title="Удалить сотрудника?"
+        description={`Сотрудник «${getUserDisplayName(profile)}» будет удалён из системы. Это действие нельзя отменить.`}
+        confirmLabel="Удалить"
+        loading={saving}
+        onCancel={() => setConfirmDeleteOpen(false)}
+        onConfirm={confirmDeleteUser}
+      />
 
       <div className="surface-panel overflow-hidden">
         <div className="flex flex-col gap-5 p-6 lg:flex-row lg:items-start lg:justify-between">

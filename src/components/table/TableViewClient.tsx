@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { Search, CheckCircle2, AlertTriangle, Plus, ChevronLeft, ChevronRight, Pencil, X, Trash2, Filter } from 'lucide-react'
 import { cn, formatDate, detectStageOverlaps, getPriorityLabel, getStatusLabel } from '@/lib/utils'
 import { DatePicker } from '@/components/ui/DatePicker'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { FilterSelect } from '@/components/ui/FilterSelect'
 import { buildProductHref, getRouteWithSearch } from '@/lib/navigation'
 import { filterProducts, sortProducts, type ProductListFilters, type ProductListSortDirection, type ProductListSortField, type ProductQuickView } from '@/lib/product-list'
@@ -58,6 +59,12 @@ interface EditingCellState {
 type StageMenuState =
   | { kind: 'header'; stageId: string; x: number; y: number }
   | { kind: 'cell'; stageId: string; productId: string; x: number; y: number }
+
+interface ProductMenuState {
+  productId: string
+  x: number
+  y: number
+}
 
 const ALL_STATUSES = ['PLANNED', 'IN_PROGRESS', 'AT_RISK', 'DELAYED', 'COMPLETED', 'CANCELLED'] as const
 const ALL_PRIORITIES = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] as const
@@ -162,6 +169,7 @@ export function TableViewClient({
 
   // Stage management state
   const [stageMenu, setStageMenu] = useState<StageMenuState | null>(null)
+  const [productMenu, setProductMenu] = useState<ProductMenuState | null>(null)
   const [renamingStage, setRenamingStage] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [showNewStageForm, setShowNewStageForm] = useState(false)
@@ -170,6 +178,10 @@ export function TableViewClient({
   const [newStageAutoshift, setNewStageAutoshift] = useState(true)
   const menuRef = useRef<HTMLDivElement>(null)
   const canEditTable = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUserRole)
+  const canDeleteProducts = ['ADMIN', 'DIRECTOR'].includes(currentUserRole)
+  const [deletingProductId, setDeletingProductId] = useState<string | null>(null)
+  const [pendingDeleteStageId, setPendingDeleteStageId] = useState<string | null>(null)
+  const [pendingDeleteProduct, setPendingDeleteProduct] = useState<{ id: string; name: string } | null>(null)
   const userOptions = Array.from(
     new Map(
       products
@@ -198,11 +210,12 @@ export function TableViewClient({
     const handleClick = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setStageMenu(null)
+        setProductMenu(null)
       }
     }
-    if (stageMenu) document.addEventListener('mousedown', handleClick)
+    if (stageMenu || productMenu) document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
-  }, [stageMenu])
+  }, [productMenu, stageMenu])
 
   // Column resize state
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
@@ -347,11 +360,13 @@ export function TableViewClient({
   }
 
   const handleDeleteStage = async (stageId: string) => {
-    const confirmed = window.confirm('Удалить этот этап из таблицы и у всех продуктов?')
-    if (!confirmed) return
+    setPendingDeleteStageId(stageId)
+  }
 
+  const confirmDeleteStage = async () => {
+    if (!pendingDeleteStageId) return
     try {
-      const res = await fetch(`/api/stage-templates?id=${encodeURIComponent(stageId)}`, {
+      const res = await fetch(`/api/stage-templates?id=${encodeURIComponent(pendingDeleteStageId)}`, {
         method: 'DELETE',
       })
 
@@ -360,9 +375,10 @@ export function TableViewClient({
         setStages(allStages)
         setColumnWidths((prev) => {
           const next = { ...prev }
-          delete next[stageId]
+          delete next[pendingDeleteStageId]
           return next
         })
+        setPendingDeleteStageId(null)
         router.refresh()
       } else {
         const data = await res.json().catch(() => null)
@@ -384,6 +400,7 @@ export function TableViewClient({
     if (!canEditTable || !stage) return
     e.preventDefault()
     e.stopPropagation()
+    setProductMenu(null)
     setStageMenu({
       kind: 'cell',
       stageId: stage.id,
@@ -398,6 +415,34 @@ export function TableViewClient({
     setRenamingStage(stage.id)
     setRenameValue(stage.name)
     setStageMenu(null)
+  }
+
+  const handleOpenProductContextMenu = (event: React.MouseEvent, productId: string) => {
+    if (!canDeleteProducts) return
+    event.preventDefault()
+    event.stopPropagation()
+    setStageMenu(null)
+    setProductMenu({ productId, x: event.clientX, y: event.clientY })
+  }
+
+  const handleDeleteProduct = async () => {
+    if (!pendingDeleteProduct) return
+    setDeletingProductId(pendingDeleteProduct.id)
+    setProductMenu(null)
+    try {
+      const response = await fetch(`/api/products/${pendingDeleteProduct.id}`, { method: 'DELETE' })
+      const data = await response.json().catch(() => null)
+      if (!response.ok) {
+        throw new Error(data?.error || 'Не удалось удалить продукт')
+      }
+      setProducts((prev) => prev.filter((product) => product.id !== pendingDeleteProduct.id))
+      setPendingDeleteProduct(null)
+      router.refresh()
+    } catch (error: any) {
+      window.alert(error.message || 'Не удалось удалить продукт')
+    } finally {
+      setDeletingProductId(null)
+    }
   }
 
   const handleToggleStageTemplateAutoshift = async (stage: Stage, nextValue: boolean) => {
@@ -817,6 +862,7 @@ export function TableViewClient({
                     <td
                       className={cn('sticky left-0 z-10 border-r border-slate-100 px-3 py-2', rowIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50')}
                       style={{ width: columnWidths.__product, minWidth: 120, maxWidth: columnWidths.__product }}
+                      onContextMenu={(event) => handleOpenProductContextMenu(event, product.id)}
                     >
                       <Link href={buildProductHref(product.id, currentRoute)} className="block">
                         <div className="truncate text-[17px] font-medium leading-[1.2] text-slate-800 hover:text-brand-700" title={product.name}>
@@ -910,78 +956,145 @@ export function TableViewClient({
         </div>
       </div>
 
-      {/* Context menu for stage management */}
-      {canEditTable && stageMenu && (
-        <div
-          ref={menuRef}
-          className="fixed z-50 bg-white rounded-lg shadow-lg border border-slate-200 py-1 min-w-[180px]"
-          style={{ left: stageMenu.x, top: stageMenu.y }}
-        >
-          {stageMenu.kind === 'header' ? (() => {
-            const stage = stages.find((s) => s.id === stageMenu.stageId)
-            if (!stage) return null
-            const isFirst = stages[0]?.id === stage.id
-            const isLast = stages[stages.length - 1]?.id === stage.id
+      {(stageMenu || productMenu) && typeof document !== 'undefined' && createPortal(
+        <>
+          {canEditTable && stageMenu && (
+            <div
+              ref={menuRef}
+              className="fixed z-[90] min-w-[180px] rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
+              style={{ left: stageMenu.x, top: stageMenu.y }}
+            >
+              {stageMenu.kind === 'header' ? (() => {
+                const stage = stages.find((s) => s.id === stageMenu.stageId)
+                if (!stage) return null
+                const isFirst = stages[0]?.id === stage.id
+                const isLast = stages[stages.length - 1]?.id === stage.id
 
-            return (
-              <>
-                <button
-                  className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
-                  onClick={() => startRename(stage)}
-                >
-                  <Pencil className="w-3.5 h-3.5 text-slate-400" />
-                  Переименовать
-                </button>
-                <button
-                  className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
-                  onClick={() => handleToggleStageTemplateAutoshift(stage, stage.participatesInAutoshift === false)}
-                >
-                  <CheckCircle2 className={cn('w-3.5 h-3.5', stage.participatesInAutoshift === false ? 'text-slate-400' : 'text-emerald-500')} />
-                  {stage.participatesInAutoshift === false ? 'Включить автосдвиг' : 'Отключить автосдвиг'}
-                </button>
-                <button
-                  className={cn('w-full px-3 py-2 text-left text-sm flex items-center gap-2', isFirst ? 'text-slate-300 cursor-not-allowed' : 'text-slate-700 hover:bg-slate-50')}
-                  onClick={() => !isFirst && handleMoveStage(stage.id, 'move-left')}
-                  disabled={isFirst}
-                >
-                  <ChevronLeft className="w-3.5 h-3.5" />
-                  Переместить влево
-                </button>
-                <button
-                  className={cn('w-full px-3 py-2 text-left text-sm flex items-center gap-2', isLast ? 'text-slate-300 cursor-not-allowed' : 'text-slate-700 hover:bg-slate-50')}
-                  onClick={() => !isLast && handleMoveStage(stage.id, 'move-right')}
-                  disabled={isLast}
-                >
-                  <ChevronRight className="w-3.5 h-3.5" />
-                  Переместить вправо
-                </button>
-                <div className="border-t border-slate-100 my-1" />
-                <button
-                  className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                  onClick={() => handleDeleteStage(stage.id)}
-                >
-                  <Trash2 className="w-3.5 h-3.5 text-red-500" />
-                  Удалить этап
-                </button>
-              </>
-            )
-          })() : (() => {
-            const product = products.find((item) => item.id === stageMenu.productId)
-            const stage = product?.stages.find((item) => item.id === stageMenu.stageId)
-            if (!stage || !product) return null
+                return (
+                  <>
+                    <button
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                      onClick={() => startRename(stage)}
+                    >
+                      <Pencil className="h-3.5 w-3.5 text-slate-400" />
+                      Переименовать
+                    </button>
+                    <button
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                      onClick={() => handleToggleStageTemplateAutoshift(stage, stage.participatesInAutoshift === false)}
+                    >
+                      <CheckCircle2 className={cn('h-3.5 w-3.5', stage.participatesInAutoshift === false ? 'text-slate-400' : 'text-emerald-500')} />
+                      {stage.participatesInAutoshift === false ? 'Включить автосдвиг' : 'Отключить автосдвиг'}
+                    </button>
+                    <button
+                      className={cn('flex w-full items-center gap-2 px-3 py-2 text-left text-sm', isFirst ? 'cursor-not-allowed text-slate-300' : 'text-slate-700 hover:bg-slate-50')}
+                      onClick={() => !isFirst && handleMoveStage(stage.id, 'move-left')}
+                      disabled={isFirst}
+                    >
+                      <ChevronLeft className="h-3.5 w-3.5" />
+                      Переместить влево
+                    </button>
+                    <button
+                      className={cn('flex w-full items-center gap-2 px-3 py-2 text-left text-sm', isLast ? 'cursor-not-allowed text-slate-300' : 'text-slate-700 hover:bg-slate-50')}
+                      onClick={() => !isLast && handleMoveStage(stage.id, 'move-right')}
+                      disabled={isLast}
+                    >
+                      <ChevronRight className="h-3.5 w-3.5" />
+                      Переместить вправо
+                    </button>
+                    <div className="my-1 border-t border-slate-100" />
+                    <button
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                      onClick={() => handleDeleteStage(stage.id)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                      Удалить этап
+                    </button>
+                  </>
+                )
+              })() : (() => {
+                const product = products.find((item) => item.id === stageMenu.productId)
+                const stage = product?.stages.find((item) => item.id === stageMenu.stageId)
+                if (!stage || !product) return null
 
-            return (
-              <button
-                className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
-                onClick={() => handleToggleProductStageAutoshift(stage.id, product.id, stage.participatesInAutoshift === false)}
-              >
-                <CheckCircle2 className={cn('w-3.5 h-3.5', stage.participatesInAutoshift === false ? 'text-slate-400' : 'text-emerald-500')} />
-                {stage.participatesInAutoshift === false ? 'Включить автосдвиг' : 'Отключить автосдвиг'}
-              </button>
-            )
-          })()}
-        </div>
+                return (
+                  <button
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                    onClick={() => handleToggleProductStageAutoshift(stage.id, product.id, stage.participatesInAutoshift === false)}
+                  >
+                    <CheckCircle2 className={cn('h-3.5 w-3.5', stage.participatesInAutoshift === false ? 'text-slate-400' : 'text-emerald-500')} />
+                    {stage.participatesInAutoshift === false ? 'Включить автосдвиг' : 'Отключить автосдвиг'}
+                  </button>
+                )
+              })()}
+            </div>
+          )}
+
+          {productMenu && (
+            <div
+              ref={menuRef}
+              className="fixed z-[90] min-w-[200px] rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
+              style={{ left: productMenu.x, top: productMenu.y }}
+            >
+              {(() => {
+                const product = products.find((item) => item.id === productMenu.productId)
+                if (!product) return null
+
+                return (
+                  <>
+                    <button
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                      onClick={() => {
+                        setProductMenu(null)
+                        router.push(buildProductHref(product.id, currentRoute))
+                      }}
+                    >
+                      <Search className="h-4 w-4 text-slate-400" />
+                      Открыть продукт
+                    </button>
+                    {canDeleteProducts && (
+                      <>
+                        <div className="my-1 border-t border-slate-100" />
+                        <button
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                          onClick={() => setPendingDeleteProduct({ id: product.id, name: product.name })}
+                        >
+                          <Trash2 className="h-4 w-4 text-red-500" />
+                          Удалить продукт
+                        </button>
+                      </>
+                    )}
+                  </>
+                )
+              })()}
+            </div>
+          )}
+        </>,
+        document.body
       )}
+
+      <ConfirmDialog
+        open={Boolean(pendingDeleteStageId)}
+        title="Удалить этап?"
+        description="Этап будет удалён из таблицы и у всех продуктов. Это действие нельзя отменить."
+        confirmLabel="Удалить этап"
+        onCancel={() => setPendingDeleteStageId(null)}
+        onConfirm={confirmDeleteStage}
+      />
+
+      <ConfirmDialog
+        open={Boolean(pendingDeleteProduct)}
+        title="Удалить продукт?"
+        description={
+          pendingDeleteProduct
+            ? `Продукт «${pendingDeleteProduct.name}» будет удалён вместе со всеми этапами, комментариями и историей.`
+            : ''
+        }
+        confirmLabel="Удалить продукт"
+        loading={Boolean(pendingDeleteProduct && deletingProductId === pendingDeleteProduct.id)}
+        onCancel={() => setPendingDeleteProduct(null)}
+        onConfirm={handleDeleteProduct}
+      />
 
       {/* New stage modal */}
       {showNewStageForm && typeof document !== 'undefined' && createPortal(

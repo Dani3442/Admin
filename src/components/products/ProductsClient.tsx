@@ -19,6 +19,7 @@ import {
 import { cn, detectStageOverlaps, formatDate, formatStageOverlap, getPriorityColor, getPriorityLabel, getStatusColor, getStatusLabel } from '@/lib/utils'
 import { buildProductHref, getRouteWithSearch } from '@/lib/navigation'
 import { FilterSelect } from '@/components/ui/FilterSelect'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import {
   filterProducts,
   hasActiveProductFilters,
@@ -126,6 +127,7 @@ export function ProductsClient({
   const [onlyWithOverlaps, setOnlyWithOverlaps] = useState(searchParams.get('overlaps') === '1')
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null)
+  const [pendingDeleteProduct, setPendingDeleteProduct] = useState<{ id: string; name: string } | null>(null)
   const [savingProductId, setSavingProductId] = useState<string | null>(null)
   const [draggingProductId, setDraggingProductId] = useState<string | null>(null)
   const [dragOverState, setDragOverState] = useState<{ productId: string; position: 'before' | 'after' } | null>(null)
@@ -305,22 +307,25 @@ export function ProductsClient({
   }
 
   const handleDeleteProduct = async (productId: string, productName: string) => {
-    const confirmed = window.confirm(`Удалить продукт «${productName}»?`)
-    if (!confirmed) return
+    setPendingDeleteProduct({ id: productId, name: productName })
+  }
 
+  const confirmDeleteProduct = async () => {
+    if (!pendingDeleteProduct) return
     const previousProducts = products
-    setDeletingProductId(productId)
+    setDeletingProductId(pendingDeleteProduct.id)
     setContextMenu(null)
-    setProducts((currentProducts) => currentProducts.filter((product) => product.id !== productId))
+    setProducts((currentProducts) => currentProducts.filter((product) => product.id !== pendingDeleteProduct.id))
 
     try {
-      const response = await fetch(`/api/products/${productId}`, { method: 'DELETE' })
+      const response = await fetch(`/api/products/${pendingDeleteProduct.id}`, { method: 'DELETE' })
       const data = await response.json().catch(() => null)
 
       if (!response.ok) {
         throw new Error(data?.error || 'Не удалось удалить продукт')
       }
 
+      setPendingDeleteProduct(null)
       router.refresh()
     } catch (error: any) {
       setProducts(previousProducts)
@@ -901,6 +906,20 @@ export function ProductsClient({
           document.body
         )}
       </AnimatePresence>
+
+      <ConfirmDialog
+        open={Boolean(pendingDeleteProduct)}
+        title="Удалить продукт?"
+        description={
+          pendingDeleteProduct
+            ? `Продукт «${pendingDeleteProduct.name}» будет удалён вместе со всеми связанными этапами, комментариями и историей.`
+            : ''
+        }
+        confirmLabel="Удалить"
+        loading={Boolean(pendingDeleteProduct && deletingProductId === pendingDeleteProduct.id)}
+        onCancel={() => setPendingDeleteProduct(null)}
+        onConfirm={confirmDeleteProduct}
+      />
     </div>
   )
 }

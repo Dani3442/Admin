@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { AnimatePresence, motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
 import { ArrowLeft, CalendarDays, CheckCircle2, Circle, AlertTriangle, MessageCircle, Clock, History, Zap, ExternalLink, Edit2, Save, Pencil, ChevronUp, ChevronDown, X, Plus, Trash2, SendHorizontal } from 'lucide-react'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { cn, getStatusColor, getStatusLabel, getPriorityColor, getPriorityLabel, formatDate, detectStageOverlaps, formatStageOverlap } from '@/lib/utils'
 import { DatePicker } from '@/components/ui/DatePicker'
 import { resolveBackNavigation } from '@/lib/navigation'
@@ -68,6 +69,8 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
   const [automationDesc, setAutomationDesc] = useState('')
   const [savingAutomation, setSavingAutomation] = useState(false)
   const [deletingProduct, setDeletingProduct] = useState(false)
+  const [pendingDeleteStageId, setPendingDeleteStageId] = useState<string | null>(null)
+  const [confirmDeleteProductOpen, setConfirmDeleteProductOpen] = useState(false)
   const commentInputRef = useRef<HTMLTextAreaElement>(null)
   const commentsScrollRef = useRef<HTMLDivElement>(null)
   const markedSeenProductRef = useRef<string | null>(null)
@@ -545,12 +548,14 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
   }
 
   const handleDeleteStage = async (stageId: string) => {
-    const confirmed = window.confirm('Удалить этот этап из продукта?')
-    if (!confirmed) return
+    setPendingDeleteStageId(stageId)
+  }
 
+  const confirmDeleteStage = async () => {
+    if (!pendingDeleteStageId) return
     setSaving(true)
     try {
-      const res = await fetch(`/api/products/${product.id}/stages?stageId=${encodeURIComponent(stageId)}`, {
+      const res = await fetch(`/api/products/${product.id}/stages?stageId=${encodeURIComponent(pendingDeleteStageId)}`, {
         method: 'DELETE',
       })
       const data = await res.json()
@@ -567,6 +572,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
         riskScore: data.riskScore,
         status: data.status,
       }))
+      setPendingDeleteStageId(null)
       setStageMenu(null)
     } catch (error: any) {
       alert(error.message || 'Не удалось удалить этап')
@@ -576,9 +582,10 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
   }
 
   const handleDeleteProduct = async () => {
-    const confirmed = window.confirm(`Удалить продукт «${product.name}»?`)
-    if (!confirmed) return
+    setConfirmDeleteProductOpen(true)
+  }
 
+  const confirmDeleteProduct = async () => {
     setDeletingProduct(true)
     try {
       const res = await fetch(`/api/products/${product.id}`, {
@@ -590,6 +597,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
         throw new Error(data?.error || 'Не удалось удалить продукт')
       }
 
+      setConfirmDeleteProductOpen(false)
       router.push(backNavigation.href)
       router.refresh()
     } catch (error: any) {
@@ -1335,6 +1343,26 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
         document.body
       )}
       </AnimatePresence>
+
+      <ConfirmDialog
+        open={Boolean(pendingDeleteStageId)}
+        title="Удалить этап?"
+        description="Этап будет удалён только из этого продукта. Это действие нельзя отменить."
+        confirmLabel="Удалить этап"
+        loading={saving && Boolean(pendingDeleteStageId)}
+        onCancel={() => setPendingDeleteStageId(null)}
+        onConfirm={confirmDeleteStage}
+      />
+
+      <ConfirmDialog
+        open={confirmDeleteProductOpen}
+        title="Удалить продукт?"
+        description={`Продукт «${product.name}» будет удалён вместе со всеми этапами, комментариями и историей.`}
+        confirmLabel="Удалить продукт"
+        loading={deletingProduct}
+        onCancel={() => setConfirmDeleteProductOpen(false)}
+        onConfirm={confirmDeleteProduct}
+      />
     </div>
   )
 }
