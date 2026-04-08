@@ -4,8 +4,10 @@ import { prisma } from '@/lib/prisma'
 import { recalculateProductRisk } from '@/lib/risk'
 import { recalculateProductDerivedFields } from '@/lib/product-derived-fields'
 import { createProductStageCompat } from '@/lib/product-stage-compat'
+import { supportsStageTemplateAffectsFinalDateColumn } from '@/lib/schema-compat'
 
 async function getProductStageSnapshot(productId: string) {
+  const hasStageTemplateAffectsFinalDateColumn = await supportsStageTemplateAffectsFinalDateColumn()
   const product = await prisma.product.findUnique({
     where: { id: productId },
     select: {
@@ -35,15 +37,24 @@ async function getProductStageSnapshot(productId: string) {
           createdAt: true,
           updatedAt: true,
           stageTemplate: {
-            select: {
-              id: true,
-              name: true,
-              order: true,
-              durationText: true,
-              durationDays: true,
-              isCritical: true,
-              affectsFinalDate: true,
-            },
+            select: hasStageTemplateAffectsFinalDateColumn
+              ? {
+                  id: true,
+                  name: true,
+                  order: true,
+                  durationText: true,
+                  durationDays: true,
+                  isCritical: true,
+                  affectsFinalDate: true,
+                }
+              : {
+                  id: true,
+                  name: true,
+                  order: true,
+                  durationText: true,
+                  durationDays: true,
+                  isCritical: true,
+                },
           },
         },
       },
@@ -74,6 +85,7 @@ export async function POST(
     const stageName = String(body.stageName || '').trim()
     const dateValue = body.dateValue ? new Date(body.dateValue) : null
     const participatesInAutoshift = body.participatesInAutoshift !== false
+    const hasStageTemplateAffectsFinalDateColumn = await supportsStageTemplateAffectsFinalDateColumn()
 
     if (!stageName) {
       return NextResponse.json({ error: 'Укажите название этапа' }, { status: 400 })
@@ -107,15 +119,24 @@ export async function POST(
             createdAt: true,
             updatedAt: true,
             stageTemplate: {
-              select: {
-                id: true,
-                name: true,
-                order: true,
-                durationText: true,
-                durationDays: true,
-                isCritical: true,
-                affectsFinalDate: true,
-              },
+              select: hasStageTemplateAffectsFinalDateColumn
+                ? {
+                    id: true,
+                    name: true,
+                    order: true,
+                    durationText: true,
+                    durationDays: true,
+                    isCritical: true,
+                    affectsFinalDate: true,
+                  }
+                : {
+                    id: true,
+                    name: true,
+                    order: true,
+                    durationText: true,
+                    durationDays: true,
+                    isCritical: true,
+                  },
             },
           },
         },

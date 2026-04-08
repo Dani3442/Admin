@@ -3,6 +3,7 @@ import { auth, hasPermission, Permission } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { recalculateProductRisk } from '@/lib/risk'
 import { createProductStageCompat } from '@/lib/product-stage-compat'
+import { supportsStageTemplateAffectsFinalDateColumn } from '@/lib/schema-compat'
 
 async function updateProductProgress(productId: string) {
   const stages = await prisma.productStage.findMany({
@@ -32,6 +33,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const { name, durationText, isCritical = false } = body
+    const hasStageTemplateAffectsFinalDateColumn = await supportsStageTemplateAffectsFinalDateColumn()
 
     if (!name?.trim()) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 })
@@ -44,24 +46,42 @@ export async function POST(req: NextRequest) {
       })
       const newOrder = (last?.order ?? -1) + 1
 
-      const template = await tx.stageTemplate.create({
-        data: {
-          name: name.trim(),
-          order: newOrder,
-          durationText: durationText || null,
-          isCritical,
-        },
-        select: {
-          id: true,
-          name: true,
-          order: true,
-          durationText: true,
-          durationDays: true,
-          isCritical: true,
-          affectsFinalDate: true,
-          createdAt: true,
-        },
-      })
+      const template = hasStageTemplateAffectsFinalDateColumn
+        ? await tx.stageTemplate.create({
+            data: {
+              name: name.trim(),
+              order: newOrder,
+              durationText: durationText || null,
+              isCritical,
+            },
+            select: {
+              id: true,
+              name: true,
+              order: true,
+              durationText: true,
+              durationDays: true,
+              isCritical: true,
+              affectsFinalDate: true,
+              createdAt: true,
+            },
+          })
+        : await tx.stageTemplate.create({
+            data: {
+              name: name.trim(),
+              order: newOrder,
+              durationText: durationText || null,
+              isCritical,
+            },
+            select: {
+              id: true,
+              name: true,
+              order: true,
+              durationText: true,
+              durationDays: true,
+              isCritical: true,
+              createdAt: true,
+            },
+          })
 
       const products = await tx.product.findMany({
         where: { isArchived: false },
@@ -87,7 +107,7 @@ export async function POST(req: NextRequest) {
           stageOrder: newOrder,
           stageName: template.name,
           isCritical: template.isCritical,
-          affectsFinalDate: template.affectsFinalDate,
+          affectsFinalDate: hasStageTemplateAffectsFinalDateColumn ? (template as any).affectsFinalDate ?? true : true,
           participatesInAutoshift: body?.participatesInAutoshift !== false,
           status: 'NOT_STARTED',
         })
@@ -115,6 +135,7 @@ export async function PATCH(req: NextRequest) {
 
   const body = await req.json()
   const { id, action, name, participatesInAutoshift } = body
+  const hasStageTemplateAffectsFinalDateColumn = await supportsStageTemplateAffectsFinalDateColumn()
 
   if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
 
@@ -198,19 +219,32 @@ export async function PATCH(req: NextRequest) {
       }),
     ])
 
-    const all = await prisma.stageTemplate.findMany({
-      select: {
-        id: true,
-        name: true,
-        order: true,
-        durationText: true,
-        durationDays: true,
-        isCritical: true,
-        affectsFinalDate: true,
-        createdAt: true,
-      },
-      orderBy: { order: 'asc' },
-    })
+    const all = hasStageTemplateAffectsFinalDateColumn
+      ? await prisma.stageTemplate.findMany({
+          select: {
+            id: true,
+            name: true,
+            order: true,
+            durationText: true,
+            durationDays: true,
+            isCritical: true,
+            affectsFinalDate: true,
+            createdAt: true,
+          },
+          orderBy: { order: 'asc' },
+        })
+      : await prisma.stageTemplate.findMany({
+          select: {
+            id: true,
+            name: true,
+            order: true,
+            durationText: true,
+            durationDays: true,
+            isCritical: true,
+            createdAt: true,
+          },
+          orderBy: { order: 'asc' },
+        })
     return NextResponse.json(all.map((stage) => ({ ...stage, participatesInAutoshift: true })))
   }
 
@@ -227,6 +261,7 @@ export async function DELETE(req: NextRequest) {
   }
 
   try {
+    const hasStageTemplateAffectsFinalDateColumn = await supportsStageTemplateAffectsFinalDateColumn()
     const { searchParams } = new URL(req.url)
     const id = searchParams.get('id')
 
@@ -325,19 +360,32 @@ export async function DELETE(req: NextRequest) {
       })
     )
 
-    const all = await prisma.stageTemplate.findMany({
-      select: {
-        id: true,
-        name: true,
-        order: true,
-        durationText: true,
-        durationDays: true,
-        isCritical: true,
-        affectsFinalDate: true,
-        createdAt: true,
-      },
-      orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
-    })
+    const all = hasStageTemplateAffectsFinalDateColumn
+      ? await prisma.stageTemplate.findMany({
+          select: {
+            id: true,
+            name: true,
+            order: true,
+            durationText: true,
+            durationDays: true,
+            isCritical: true,
+            affectsFinalDate: true,
+            createdAt: true,
+          },
+          orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+        })
+      : await prisma.stageTemplate.findMany({
+          select: {
+            id: true,
+            name: true,
+            order: true,
+            durationText: true,
+            durationDays: true,
+            isCritical: true,
+            createdAt: true,
+          },
+          orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+        })
     return NextResponse.json(all.map((stage) => ({ ...stage, participatesInAutoshift: true })))
   } catch (error) {
     console.error('[stage-templates:delete] Failed to delete stage template', error)
