@@ -31,6 +31,7 @@ interface NewProductFormProps {
   onCancel?: () => void
   onCreated?: (productId: string) => void
   returnTo?: string
+  formAction?: (formData: FormData) => void | Promise<void>
 }
 
 function createDraftStage(): TemplateDraftStage {
@@ -50,6 +51,7 @@ export function NewProductForm({
   onCancel,
   onCreated,
   returnTo = '/products',
+  formAction,
 }: NewProductFormProps) {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
@@ -188,6 +190,10 @@ export function NewProductForm({
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
+    if (formAction) {
+      return
+    }
+
     e.preventDefault()
     if (!form.name.trim()) {
       setError('Укажите название продукта')
@@ -254,8 +260,32 @@ export function NewProductForm({
     }
   }
 
+  const serializedTemplateStageOverrides = useMemo(
+    () =>
+      JSON.stringify(
+        selectedTemplateStages.map((stage) => ({
+          id: stage.id,
+          stageTemplateId: stage.stageTemplateId,
+          stageOrder: stage.stageOrder,
+          stageName: stage.stageName,
+          plannedDate: stage.plannedDate ? stage.plannedDate.toISOString() : null,
+          participatesInAutoshift: stage.participatesInAutoshift,
+        }))
+      ),
+    [selectedTemplateStages]
+  )
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form action={formAction} onSubmit={handleSubmit} className="space-y-6">
+      <input type="hidden" name="name" value={form.name} />
+      <input type="hidden" name="country" value={form.country} />
+      <input type="hidden" name="category" value={form.category} />
+      <input type="hidden" name="sku" value={form.sku} />
+      <input type="hidden" name="priority" value={form.priority} />
+      <input type="hidden" name="responsibleId" value={form.responsibleId} />
+      <input type="hidden" name="notes" value={form.notes} />
+      <input type="hidden" name="productTemplateId" value={form.productTemplateId} />
+      <input type="hidden" name="templateStagesOverride" value={serializedTemplateStageOverrides} />
       <div className="card p-6 space-y-5">
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">
@@ -471,6 +501,7 @@ export function NewProductForm({
             className="input w-full"
             placeholder="Например: Увлажняющий крем для лица 50мл"
             autoFocus
+            required
           />
         </div>
 
