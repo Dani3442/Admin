@@ -22,7 +22,6 @@ import {
   Zap,
   LogOut,
   Package2,
-  Plus,
 } from 'lucide-react'
 import { UserAvatar } from '@/components/users/UserAvatar'
 import { cn, getRoleLabel, getUserDisplayName } from '@/lib/utils'
@@ -69,7 +68,6 @@ export function Header({ user, canCreateProduct = true }: HeaderProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const currentRoute = getRouteWithSearch(pathname, searchParams.toString())
-  const createProductHref = `/products?create=1&returnTo=${encodeURIComponent(currentRoute)}`
   const isAdmin = ['ADMIN', 'DIRECTOR'].includes(user.role)
 
   useEffect(() => {
@@ -264,17 +262,6 @@ export function Header({ user, canCreateProduct = true }: HeaderProps) {
           </div>
 
           <div className="ml-auto flex flex-shrink-0 items-center gap-2">
-            {canCreateProduct && (
-              <Link
-                href={createProductHref}
-                scroll={false}
-                className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200/80 bg-white/90 text-slate-950 transition hover:border-slate-300 hover:bg-slate-50"
-                aria-label="Создать продукт"
-              >
-                <Plus className="h-[18px] w-[18px]" />
-              </Link>
-            )}
-
             <div className="relative" ref={notificationsRef}>
               <button
                 type="button"
