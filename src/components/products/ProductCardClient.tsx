@@ -1138,30 +1138,43 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                 )}
 
                 {tab === 'history' && (
-                  <div className="space-y-2">
-                    {product.changeHistory.length === 0 ? (
-                      <p className="py-8 text-center text-sm text-slate-400">История изменений пуста</p>
-                    ) : (
-                      product.changeHistory.map((h: any) => (
-                        <div key={h.id} className="flex items-start gap-3 border-b border-slate-50 py-2 last:border-0">
-                          <div className="mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-brand-400" />
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2 text-xs text-slate-500">
-                              <span className="font-medium text-slate-700">{h.changedBy.name}</span>
-                              <span>изменил(а)</span>
-                              <span className="font-medium text-slate-700">{h.field}</span>
-                              <span className="ml-auto text-slate-400">{formatDate(h.createdAt)}</span>
-                            </div>
-                            {h.oldValue && h.newValue && (
-                              <div className="mt-0.5 text-xs text-slate-400">
-                                <span className="line-through">{h.oldValue.slice(0, 30)}</span> → <span className="text-slate-600">{h.newValue.slice(0, 30)}</span>
-                              </div>
-                            )}
-                            {h.reason && <div className="mt-0.5 text-xs italic text-slate-400">{h.reason}</div>}
-                          </div>
+                  <div className="rounded-[28px] bg-slate-50 p-4">
+                    <div className="flex h-[min(72vh,760px)] min-h-[480px] flex-col overflow-hidden rounded-[24px] bg-white shadow-[inset_0_0_0_1px_rgba(226,232,240,0.7)]">
+                      <div className="border-b border-slate-100 px-4 py-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <h3 className="text-sm font-semibold text-slate-800">История</h3>
+                          <span className="text-xs font-medium text-slate-400">{product.changeHistory.length}</span>
                         </div>
-                      ))
-                    )}
+                      </div>
+
+                      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+                        {product.changeHistory.length === 0 ? (
+                          <p className="py-8 text-center text-sm text-slate-400">История изменений пуста</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {product.changeHistory.map((h: any) => (
+                              <div key={h.id} className="flex items-start gap-3 border-b border-slate-50 py-2 last:border-0">
+                                <div className="mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-brand-400" />
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2 text-xs text-slate-500">
+                                    <span className="font-medium text-slate-700">{h.changedBy.name}</span>
+                                    <span>изменил(а)</span>
+                                    <span className="font-medium text-slate-700">{h.field}</span>
+                                    <span className="ml-auto text-slate-400">{formatDate(h.createdAt)}</span>
+                                  </div>
+                                  {h.oldValue && h.newValue && (
+                                    <div className="mt-0.5 text-xs text-slate-400">
+                                      <span className="line-through">{h.oldValue.slice(0, 30)}</span> → <span className="text-slate-600">{h.newValue.slice(0, 30)}</span>
+                                    </div>
+                                  )}
+                                  {h.reason && <div className="mt-0.5 text-xs italic text-slate-400">{h.reason}</div>}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 )}
 
