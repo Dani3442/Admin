@@ -1008,23 +1008,37 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
 
                         <div ref={commentsScrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
                           {commentFeed.length === 0 ? (
-                            <div className="flex h-full min-h-[280px] items-center justify-center rounded-[20px] border border-dashed border-slate-200 bg-slate-50/80 text-center">
+                            <motion.div
+                              initial={{ opacity: 0, scale: 0.98, y: 10 }}
+                              animate={{ opacity: 1, scale: 1, y: 0 }}
+                              transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+                              className="flex h-full min-h-[280px] items-center justify-center rounded-[20px] border border-dashed border-slate-200 bg-slate-50/80 text-center"
+                            >
                               <div>
                                 <MessageCircle className="mx-auto mb-2 h-8 w-8 text-slate-300" />
                                 <p className="text-sm font-medium text-slate-500">Комментариев пока нет</p>
                                 <p className="mt-1 text-xs text-slate-400">Начни обсуждение прямо отсюда.</p>
                               </div>
-                            </div>
+                            </motion.div>
                           ) : (
                             <div className="flex min-h-full flex-col justify-end gap-4">
-                              {commentFeed.map((comment: any) => {
+                              <AnimatePresence initial={false}>
+                                {commentFeed.map((comment: any) => {
                                 const ownMessage = comment.author?.id === currentUser.id
                                 const authorName = comment.author?.lastName
                                   ? `${comment.author.name} ${comment.author.lastName}`
                                   : comment.author?.name
 
                                 return (
-                                  <div key={comment.id} className={cn('flex gap-3', ownMessage ? 'justify-end' : 'justify-start')}>
+                                  <motion.div
+                                    key={comment.id}
+                                    layout
+                                    initial={{ opacity: 0, y: 18, scale: 0.985 }}
+                                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                                    exit={{ opacity: 0, y: -8, scale: 0.985 }}
+                                    transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
+                                    className={cn('flex gap-3', ownMessage ? 'justify-end' : 'justify-start')}
+                                  >
                                     {!ownMessage && <UserAvatar user={comment.author} size="sm" className="mt-7" />}
                                     <div className="max-w-[62%] space-y-1">
                                       <div className={cn('flex items-center gap-2 text-xs text-slate-400', ownMessage && 'justify-end')}>
@@ -1043,9 +1057,10 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                                       </div>
                                     </div>
                                     {ownMessage && <UserAvatar user={comment.author} size="sm" className="mt-7" />}
-                                  </div>
+                                  </motion.div>
                                 )
-                              })}
+                                })}
+                              </AnimatePresence>
                             </div>
                           )}
                         </div>
@@ -1090,14 +1105,30 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                                   </div>
                                 </div>
                               )}
-                              <button
+                              <motion.button
                                 type="button"
                                 onClick={submitComment}
                                 disabled={!newComment.trim() || savingComment}
+                                whileTap={!savingComment && newComment.trim() ? { scale: 0.94 } : undefined}
+                                animate={
+                                  savingComment
+                                    ? { scale: [1, 0.94, 1], boxShadow: ['0 0 0 rgba(30,41,59,0)', '0 0 0 8px rgba(15,23,42,0.08)', '0 0 0 rgba(30,41,59,0)'] }
+                                    : { scale: 1, boxShadow: '0 0 0 rgba(30,41,59,0)' }
+                                }
+                                transition={
+                                  savingComment
+                                    ? { duration: 0.9, repeat: Infinity, ease: 'easeInOut' }
+                                    : { duration: 0.2, ease: [0.22, 1, 0.36, 1] }
+                                }
                                 className="absolute right-2 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-brand-950 text-white transition hover:bg-brand-900 disabled:cursor-not-allowed disabled:opacity-45"
                               >
-                                <SendHorizontal className="h-4 w-4" />
-                              </button>
+                                <motion.span
+                                  animate={savingComment ? { x: [0, 1.5, 0], y: [0, -1, 0] } : { x: 0, y: 0 }}
+                                  transition={savingComment ? { duration: 0.75, repeat: Infinity, ease: 'easeInOut' } : { duration: 0.18 }}
+                                >
+                                  <SendHorizontal className="h-4 w-4" />
+                                </motion.span>
+                              </motion.button>
                             </div>
                           </div>
                         )}
