@@ -26,32 +26,29 @@ async function updateProductProgress(productId: string) {
   })
 }
 
-async function normalizeRemainingProductStages(
+async function shiftRemainingProductStagesAfterTemplateDeletion(
   tx: {
     productStage: {
-      findMany: (args: Record<string, unknown>) => Promise<Array<{ id: string }>>
+      findMany: (args: Record<string, unknown>) => Promise<Array<{ id: string; stageOrder: number }>>
       update: (args: Record<string, unknown>) => Promise<unknown>
     }
   },
-  productId: string
+  productId: string,
+  deletedTemplateOrder: number
 ) {
   const remainingStages = await tx.productStage.findMany({
-    where: { productId },
-    orderBy: [{ stageOrder: 'asc' }, { createdAt: 'asc' }],
-    select: { id: true },
+    where: {
+      productId,
+      stageOrder: { gt: deletedTemplateOrder },
+    },
+    orderBy: { stageOrder: 'asc' },
+    select: { id: true, stageOrder: true },
   })
 
-  for (const [index, remainingStage] of remainingStages.entries()) {
+  for (const remainingStage of remainingStages) {
     await tx.productStage.update({
       where: { id: remainingStage.id },
-      data: { stageOrder: -(index + 1) },
-    })
-  }
-
-  for (const [index, remainingStage] of remainingStages.entries()) {
-    await tx.productStage.update({
-      where: { id: remainingStage.id },
-      data: { stageOrder: index },
+      data: { stageOrder: remainingStage.stageOrder - 1 },
     })
   }
 }
@@ -355,7 +352,7 @@ export async function DELETE(req: NextRequest) {
         })
 
         for (const productId of affectedProductIds) {
-          await normalizeRemainingProductStages(tx as any, productId)
+          await shiftRemainingProductStagesAfterTemplateDeletion(tx as any, productId, template.order)
         }
       }
 
@@ -371,14 +368,15 @@ export async function DELETE(req: NextRequest) {
       })
 
       const remainingTemplates = await tx.stageTemplate.findMany({
-        orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
-        select: { id: true },
+        where: { order: { gt: template.order } },
+        orderBy: { order: 'asc' },
+        select: { id: true, order: true },
       })
 
-      for (const [index, remainingTemplate] of remainingTemplates.entries()) {
+      for (const remainingTemplate of remainingTemplates) {
         await tx.stageTemplate.update({
           where: { id: remainingTemplate.id },
-          data: { order: index },
+          data: { order: remainingTemplate.order - 1 },
           select: { id: true },
         })
       }
