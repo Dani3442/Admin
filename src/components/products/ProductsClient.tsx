@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { AnimatePresence, motion } from 'framer-motion'
+import { createPortal } from 'react-dom'
 import {
   Filter,
   GripVertical,
@@ -829,22 +830,22 @@ export function ProductsClient({
       </div>
 
       <AnimatePresence>
-        {contextMenu && contextProduct && (
-        <motion.div
-          ref={contextMenuRef}
-          className="fixed z-50 w-60 rounded-xl border border-slate-200 bg-white p-2 shadow-2xl"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
-          initial={{ opacity: 0, scale: 0.96, y: -6 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.98, y: -4 }}
-          transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
-        >
-          <div className="px-2.5 py-2 border-b border-slate-100">
-            <div className="text-sm font-semibold text-slate-800 truncate">{contextProduct.name}</div>
-            <div className="text-xs text-slate-400 mt-0.5">Быстрые действия по продукту</div>
-          </div>
+        {contextMenu && contextProduct && typeof document !== 'undefined' && createPortal(
+          <motion.div
+            ref={contextMenuRef}
+            className="fixed z-[90] w-60 rounded-xl border border-slate-200 bg-white p-2 shadow-2xl"
+            style={{ left: contextMenu.x, top: contextMenu.y }}
+            initial={{ opacity: 0, scale: 0.96, y: -6 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.98, y: -4 }}
+            transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <div className="border-b border-slate-100 px-2.5 py-2">
+              <div className="truncate text-sm font-semibold text-slate-800">{contextProduct.name}</div>
+              <div className="mt-0.5 text-xs text-slate-400">Быстрые действия по продукту</div>
+            </div>
 
-          <div className="py-1">
+            <div className="py-1">
               <button
                 onClick={() => {
                   setContextMenu(null)
@@ -852,52 +853,53 @@ export function ProductsClient({
                 }}
                 className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
               >
-              <Search className="w-4 h-4 text-slate-400" />
-              Открыть продукт
-            </button>
+                <Search className="h-4 w-4 text-slate-400" />
+                Открыть продукт
+              </button>
 
-            {canManageProducts && (
-              <>
-                <button
-                  onClick={() => handleToggleProductFlag(contextProduct, 'isPinned', !contextProduct.isPinned)}
-                  disabled={savingProductId === contextProduct.id}
-                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-                >
-                  {contextProduct.isPinned ? (
-                    <PinOff className="w-4 h-4 text-slate-400" />
-                  ) : (
-                    <Pin className="w-4 h-4 text-slate-400" />
-                  )}
-                  {contextProduct.isPinned ? 'Снять закрепление' : 'Закрепить наверху'}
-                </button>
+              {canManageProducts && (
+                <>
+                  <button
+                    onClick={() => handleToggleProductFlag(contextProduct, 'isPinned', !contextProduct.isPinned)}
+                    disabled={savingProductId === contextProduct.id}
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                  >
+                    {contextProduct.isPinned ? (
+                      <PinOff className="h-4 w-4 text-slate-400" />
+                    ) : (
+                      <Pin className="h-4 w-4 text-slate-400" />
+                    )}
+                    {contextProduct.isPinned ? 'Снять закрепление' : 'Закрепить наверху'}
+                  </button>
 
-                <button
-                  onClick={() => handleToggleProductFlag(contextProduct, 'isFavorite', !contextProduct.isFavorite)}
-                  disabled={savingProductId === contextProduct.id}
-                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-                >
-                  <Star className={cn('w-4 h-4', contextProduct.isFavorite ? 'text-amber-500 fill-amber-100' : 'text-slate-400')} />
-                  {contextProduct.isFavorite ? 'Убрать из избранного' : 'Добавить в избранное'}
-                </button>
-              </>
-            )}
+                  <button
+                    onClick={() => handleToggleProductFlag(contextProduct, 'isFavorite', !contextProduct.isFavorite)}
+                    disabled={savingProductId === contextProduct.id}
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                  >
+                    <Star className={cn('h-4 w-4', contextProduct.isFavorite ? 'text-amber-500 fill-amber-100' : 'text-slate-400')} />
+                    {contextProduct.isFavorite ? 'Убрать из избранного' : 'Добавить в избранное'}
+                  </button>
+                </>
+              )}
 
-            {canDeleteProducts && (
-              <>
-                <div className="my-1 border-t border-slate-100" />
-                <button
-                  onClick={() => handleDeleteProduct(contextProduct.id, contextProduct.name)}
-                  disabled={deletingProductId === contextProduct.id}
-                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-60"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  {deletingProductId === contextProduct.id ? 'Удаление...' : 'Удалить продукт'}
-                </button>
-              </>
-            )}
-          </div>
-        </motion.div>
-      )}
+              {canDeleteProducts && (
+                <>
+                  <div className="my-1 border-t border-slate-100" />
+                  <button
+                    onClick={() => handleDeleteProduct(contextProduct.id, contextProduct.name)}
+                    disabled={deletingProductId === contextProduct.id}
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-60"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    {deletingProductId === contextProduct.id ? 'Удаление...' : 'Удалить продукт'}
+                  </button>
+                </>
+              )}
+            </div>
+          </motion.div>,
+          document.body
+        )}
       </AnimatePresence>
     </div>
   )
