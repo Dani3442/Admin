@@ -25,7 +25,6 @@ import {
   Plus,
 } from 'lucide-react'
 import { UserAvatar } from '@/components/users/UserAvatar'
-import { useProductCreation } from '@/components/products/ProductCreationContext'
 import { cn, getRoleLabel, getUserDisplayName } from '@/lib/utils'
 import { buildProductHref, getRouteWithSearch } from '@/lib/navigation'
 
@@ -57,7 +56,6 @@ const NAV_ITEMS: Array<{
 ]
 
 export function Header({ user, canCreateProduct = true }: HeaderProps) {
-  const { openCreateProductModal } = useProductCreation()
   const [profileUser, setProfileUser] = useState(user)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
@@ -71,6 +69,7 @@ export function Header({ user, canCreateProduct = true }: HeaderProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const currentRoute = getRouteWithSearch(pathname, searchParams.toString())
+  const createProductHref = `/products?create=1&returnTo=${encodeURIComponent(currentRoute)}`
   const isAdmin = ['ADMIN', 'DIRECTOR'].includes(user.role)
 
   useEffect(() => {
@@ -217,10 +216,6 @@ export function Header({ user, canCreateProduct = true }: HeaderProps) {
   }
 
   const totalBadge = counts.mentions + counts.overdue + counts.risk
-  const handleOpenCreateProduct = () => {
-    openCreateProductModal()
-  }
-
   return (
     <header className="relative z-[60] flex-shrink-0 px-4 pb-2 pt-5 sm:px-6 lg:px-8">
       <div className="page-shell flex justify-center">
@@ -270,14 +265,13 @@ export function Header({ user, canCreateProduct = true }: HeaderProps) {
 
           <div className="ml-auto flex flex-shrink-0 items-center gap-2">
             {canCreateProduct && (
-              <button
-                type="button"
-                onClick={handleOpenCreateProduct}
+              <Link
+                href={createProductHref}
                 className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200/80 bg-white/90 text-slate-950 transition hover:border-slate-300 hover:bg-slate-50"
                 aria-label="Создать продукт"
               >
                 <Plus className="h-[18px] w-[18px]" />
-              </button>
+              </Link>
             )}
 
             <div className="relative" ref={notificationsRef}>

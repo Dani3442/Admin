@@ -36,33 +36,48 @@ export function DashboardShell({
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const createQueryOpen = searchParams.get('create') === '1'
+  const explicitReturnTo = searchParams.get('returnTo')
   const [showCreateProductModal, setShowCreateProductModal] = useState(createQueryOpen)
 
-  const currentRoute = useMemo(() => {
+  const sourceRoute = useMemo(() => {
     const params = new URLSearchParams(searchParams.toString())
     params.delete('create')
+    params.delete('returnTo')
     const query = params.toString()
     return pathname + (query ? `?${query}` : '')
   }, [pathname, searchParams])
 
+  const currentRoute = explicitReturnTo || sourceRoute
+
   const openCreateProductModal = () => {
     if (!canCreateProduct) return
-    setShowCreateProductModal(true)
-
-    const params = new URLSearchParams(searchParams.toString())
-    if (params.get('create') !== '1') {
-      params.set('create', '1')
-      const nextQuery = params.toString()
-      router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false })
-    }
+    const params = new URLSearchParams()
+    params.set('create', '1')
+    params.set('returnTo', sourceRoute)
+    router.push(`/products?${params.toString()}`, { scroll: false })
   }
 
   const closeCreateProductModal = () => {
     setShowCreateProductModal(false)
 
+    if (pathname === '/products' && explicitReturnTo && explicitReturnTo !== '/products') {
+      router.replace(explicitReturnTo, { scroll: false })
+      return
+    }
+
     const params = new URLSearchParams(searchParams.toString())
+    let shouldNavigate = false
+
     if (params.has('create')) {
       params.delete('create')
+      shouldNavigate = true
+    }
+    if (params.has('returnTo')) {
+      params.delete('returnTo')
+      shouldNavigate = true
+    }
+
+    if (shouldNavigate) {
       const nextQuery = params.toString()
       router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false })
     }

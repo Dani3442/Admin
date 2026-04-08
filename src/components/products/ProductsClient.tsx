@@ -18,7 +18,6 @@ import {
 import { cn, detectStageOverlaps, formatDate, formatStageOverlap, getPriorityColor, getPriorityLabel, getStatusColor, getStatusLabel } from '@/lib/utils'
 import { buildProductHref, getRouteWithSearch } from '@/lib/navigation'
 import { FilterSelect } from '@/components/ui/FilterSelect'
-import { useProductCreation } from '@/components/products/ProductCreationContext'
 import {
   filterProducts,
   hasActiveProductFilters,
@@ -99,7 +98,6 @@ export function ProductsClient({
   externalSortField,
   externalSortDirection,
 }: ProductsClientProps) {
-  const { openCreateProductModal } = useProductCreation()
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -140,6 +138,15 @@ export function ProductsClient({
   const currentRoute = typeof window === 'undefined'
     ? getRouteWithSearch(pathname, searchParams.toString())
     : `${window.location.pathname}${window.location.search}`
+  const createProductHref = useMemo(() => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.delete('create')
+    params.delete('returnTo')
+    const returnTo = `${pathname}${params.toString() ? `?${params.toString()}` : ''}`
+    params.set('create', '1')
+    params.set('returnTo', returnTo)
+    return `${pathname}?${params.toString()}`
+  }, [pathname, searchParams])
 
   useEffect(() => {
     setProducts(initialProducts)
@@ -519,13 +526,9 @@ export function ProductsClient({
               {visibleProducts.length} из {products.length} продуктов
             </p>
           </div>
-          <button
-            type="button"
-            onClick={openCreateProductModal}
-            className="btn-primary"
-          >
+          <Link href={createProductHref} className="btn-primary">
             <Plus className="w-4 h-4" /> Новый продукт
-          </button>
+          </Link>
         </div>
       )}
 
