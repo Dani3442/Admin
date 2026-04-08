@@ -4,6 +4,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Filter, LayoutList, Plus, Search, Table2, X } from 'lucide-react'
+import { NewProductForm } from '@/components/products/NewProductForm'
 import { ProductsClient } from '@/components/products/ProductsClient'
 import { TableViewClient } from '@/components/table/TableViewClient'
 import { FilterSelect } from '@/components/ui/FilterSelect'
@@ -56,6 +57,7 @@ interface ProductsWorkspaceProps {
   productTemplates: any[]
   stageSuggestions: Array<{ id: string; name: string }>
   currentUserRole: string
+  createReturnTo?: string | null
 }
 
 const layoutOptions: Array<{ value: ProductsLayoutMode; label: string; icon: typeof LayoutList }> = [
@@ -144,6 +146,7 @@ export function ProductsWorkspace({
   productTemplates,
   stageSuggestions,
   currentUserRole,
+  createReturnTo = null,
 }: ProductsWorkspaceProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -159,6 +162,7 @@ export function ProductsWorkspace({
   const [sortDirection, setSortDirection] = useState<ProductListSortDirection>(searchParams.get('dir') === 'desc' ? 'desc' : 'asc')
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(searchParams.get('advanced') === '1')
   const [onlyWithOverlaps, setOnlyWithOverlaps] = useState(searchParams.get('overlaps') === '1')
+  const createModalOpen = searchParams.get('create') === '1'
   const createProductHref = useMemo(() => {
     const params = new URLSearchParams(searchParams.toString())
     params.delete('create')
@@ -167,6 +171,13 @@ export function ProductsWorkspace({
     params.set('create', '1')
     params.set('returnTo', currentRoute)
     return `${pathname}?${params.toString()}`
+  }, [pathname, searchParams])
+  const currentRoute = useMemo(() => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.delete('create')
+    params.delete('returnTo')
+    const query = params.toString()
+    return `${pathname}${query ? `?${query}` : ''}`
   }, [pathname, searchParams])
 
   const updateLayout = (nextLayout: ProductsLayoutMode) => {
@@ -235,6 +246,19 @@ export function ProductsWorkspace({
     setSortDirection('asc')
     setShowAdvancedFilters(false)
     setOnlyWithOverlaps(false)
+  }
+
+  const closeCreateModal = () => {
+    if (createReturnTo && createReturnTo !== '/products') {
+      router.replace(createReturnTo, { scroll: false })
+      return
+    }
+
+    const params = new URLSearchParams(searchParams.toString())
+    params.delete('create')
+    params.delete('returnTo')
+    const nextQuery = params.toString()
+    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false })
   }
 
   return (
@@ -421,6 +445,46 @@ export function ProductsWorkspace({
         )}
         </AnimatePresence>
       </div>
+
+      <AnimatePresence>
+        {createModalOpen && (
+          <motion.div
+            className="modal-backdrop fixed inset-0 flex items-center justify-center px-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={closeCreateModal}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 10, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 8, scale: 0.98 }}
+              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+              className="w-full max-w-4xl"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="surface-panel max-h-[90vh] overflow-y-auto p-6">
+                <div className="mb-5">
+                  <h3 className="text-base font-semibold text-slate-800">Новый продукт</h3>
+                  <p className="mt-1 text-sm text-slate-500">Создай продукт без выхода из текущего раздела.</p>
+                </div>
+                <NewProductForm
+                  users={users}
+                  productTemplates={productTemplates}
+                  stageSuggestions={stageSuggestions}
+                  mode="modal"
+                  onCancel={closeCreateModal}
+                  onCreated={(productId) => {
+                    closeCreateModal()
+                    router.push(`/products/${encodeURIComponent(productId)}?returnTo=${encodeURIComponent(createReturnTo || currentRoute)}`)
+                    router.refresh()
+                  }}
+                />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </div>
   )

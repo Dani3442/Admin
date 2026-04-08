@@ -77,11 +77,19 @@ async function getProductsWorkspaceData() {
   return { listProducts, tableProducts, users, stages, productTemplates, stageSuggestions }
 }
 
-export default async function ProductsPage() {
+export default async function ProductsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>
+}) {
   const [data, session] = await Promise.all([
     getProductsWorkspaceData(),
     auth(),
   ])
+  const resolvedSearchParams = (await searchParams) || {}
+  const returnToValue = Array.isArray(resolvedSearchParams.returnTo)
+    ? resolvedSearchParams.returnTo[0]
+    : resolvedSearchParams.returnTo
 
   return (
     <ProductsWorkspace
@@ -102,6 +110,7 @@ export default async function ProductsPage() {
       })) as any}
       stageSuggestions={data.stageSuggestions}
       currentUserRole={(session?.user as any)?.role || 'VIEWER'}
+      createReturnTo={typeof returnToValue === 'string' ? returnToValue : null}
     />
   )
 }
