@@ -18,6 +18,27 @@ async function getDashboardData() {
   const in14 = addDays(now, 14)
   const in30 = addDays(now, 30)
 
+  const productDashboardSelect = {
+    id: true,
+    name: true,
+    country: true,
+    status: true,
+    finalDate: true,
+    progressPercent: true,
+    stages: {
+      orderBy: { stageOrder: 'asc' as const },
+      select: {
+        id: true,
+        stageOrder: true,
+        stageName: true,
+        dateValue: true,
+        isCompleted: true,
+        isCritical: true,
+      },
+    },
+    responsible: { select: { id: true, name: true } },
+  }
+
   const [total, inProgress, completed, atRisk, delayed, planned, dueSoon7, dueSoon14, dueSoon30, products, stageTemplates] = await Promise.all([
     prisma.product.count({ where: { isArchived: false } }),
     prisma.product.count({ where: { isArchived: false, status: 'IN_PROGRESS' } }),
@@ -30,20 +51,7 @@ async function getDashboardData() {
     prisma.product.count({ where: { isArchived: false, finalDate: { gte: now, lte: in30 } } }),
     prisma.product.findMany({
       where: { isArchived: false },
-      include: {
-        stages: {
-          orderBy: { stageOrder: 'asc' },
-          select: {
-            id: true,
-            stageOrder: true,
-            stageName: true,
-            dateValue: true,
-            isCompleted: true,
-            isCritical: true,
-          },
-        },
-        responsible: { select: { id: true, name: true } },
-      },
+      select: productDashboardSelect,
       orderBy: [{ riskScore: 'desc' }, { finalDate: 'asc' }],
     }),
     prisma.stageTemplate.findMany({

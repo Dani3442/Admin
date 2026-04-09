@@ -12,6 +12,27 @@ export async function GET(req: NextRequest) {
   const in14 = addDays(now, 14)
   const in30 = addDays(now, 30)
 
+  const analyticsProductSelect = {
+    id: true,
+    name: true,
+    country: true,
+    status: true,
+    finalDate: true,
+    progressPercent: true,
+    stages: {
+      orderBy: { stageOrder: 'asc' as const },
+      select: {
+        id: true,
+        stageOrder: true,
+        stageName: true,
+        dateValue: true,
+        isCompleted: true,
+        isCritical: true,
+      },
+    },
+    responsible: { select: { id: true, name: true } },
+  }
+
   const [
     total,
     inProgress,
@@ -44,20 +65,7 @@ export async function GET(req: NextRequest) {
     }),
     prisma.product.findMany({
       where: { isArchived: false },
-      include: {
-        stages: {
-          orderBy: { stageOrder: 'asc' },
-          select: {
-            id: true,
-            stageOrder: true,
-            stageName: true,
-            dateValue: true,
-            isCompleted: true,
-            isCritical: true,
-          },
-        },
-        responsible: { select: { id: true, name: true } },
-      },
+      select: analyticsProductSelect,
     }),
   ])
 

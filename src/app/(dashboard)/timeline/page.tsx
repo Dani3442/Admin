@@ -4,7 +4,13 @@ import { TimelineClient } from '@/components/TimelineClient'
 async function getData() {
   const products = await prisma.product.findMany({
     where: { isArchived: false, finalDate: { not: null } },
-    include: {
+    select: {
+      id: true,
+      name: true,
+      finalDate: true,
+      status: true,
+      priority: true,
+      progressPercent: true,
       stages: {
         where: { dateValue: { not: null } },
         orderBy: { stageOrder: 'asc' },
