@@ -1,6 +1,9 @@
 import { prisma } from './prisma'
 import { addDays, differenceInDays } from 'date-fns'
-import { supportsProductStageAutoshiftColumn } from './schema-compat'
+import {
+  supportsProductStageAutoshiftColumn,
+  supportsProductStageDurationDaysColumn,
+} from './schema-compat'
 
 const DEFAULT_SHIFT_AUTOMATION = {
   name: 'Сдвиг всех следующих этапов',
@@ -82,7 +85,10 @@ export async function applyAutomation(
   const automation = selectEffectiveAutomation(automations)
 
   if (!automation) return null
-  const hasAutoshiftColumn = await supportsProductStageAutoshiftColumn()
+  const [hasAutoshiftColumn, hasDurationDaysColumn] = await Promise.all([
+    supportsProductStageAutoshiftColumn(),
+    supportsProductStageDurationDaysColumn(),
+  ])
   const product = hasAutoshiftColumn
     ? await prisma.product.findUnique({
         where: { id: productId },
@@ -96,6 +102,7 @@ export async function applyAutomation(
               stageOrder: true,
               dateValue: true,
               plannedDate: true,
+              ...(hasDurationDaysColumn ? { durationDays: true } : {}),
               participatesInAutoshift: true,
             },
           },
@@ -113,6 +120,7 @@ export async function applyAutomation(
               stageOrder: true,
               dateValue: true,
               plannedDate: true,
+              ...(hasDurationDaysColumn ? { durationDays: true } : {}),
             },
           },
         },
@@ -152,7 +160,10 @@ export async function applyAutomation(
         if (baseDate) {
           newStageDate = addDays(baseDate, shiftDays)
         } else if (cascadeCursor) {
-          const durationDays = durationByOrder.get(stage.stageOrder) ?? 1
+          const durationDays =
+            (hasDurationDaysColumn ? (stage as { durationDays?: number | null }).durationDays : null) ??
+            durationByOrder.get(stage.stageOrder) ??
+            1
           newStageDate = addDays(cascadeCursor, durationDays)
         }
 
@@ -207,7 +218,9 @@ export async function applyAutomation(
           where: { order: stage.stageOrder },
           select: { durationDays: true },
         })
-        const durationDays = template?.durationDays || 1
+        const durationDays =
+          (hasDurationDaysColumn ? (stage as { durationDays?: number | null }).durationDays : null) ??
+          (template?.durationDays || 1)
         currentDate = addDays(currentDate, durationDays)
         await prisma.productStage.update({
           where: { id: stage.id },

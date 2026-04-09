@@ -42,8 +42,16 @@ export async function supportsProductStageAffectsFinalDateColumn() {
   return hasDbColumn('product_stages', 'affectsFinalDate')
 }
 
+export async function supportsProductStageDurationDaysColumn() {
+  return hasDbColumn('product_stages', 'durationDays')
+}
+
 export async function supportsStageTemplateAffectsFinalDateColumn() {
   return hasDbColumn('stage_templates', 'affectsFinalDate')
+}
+
+export async function supportsProductTemplateStageDurationDaysColumn() {
+  return hasDbColumn('product_template_stages', 'durationDays')
 }
 
 export async function supportsProductTemplateReferenceColumn() {

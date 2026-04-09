@@ -107,6 +107,7 @@ model ProductTemplateStage {
   stageOrder        Int
   stageName         String
   plannedDate       DateTime?
+  durationDays      Int?
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 
@@ -129,6 +130,7 @@ model ProductStage {
   dateValue               DateTime?
   dateRaw                 String?
   dateEnd                 DateTime?
+  durationDays            Int?
   status                  String    @default("NOT_STARTED")
   isCompleted             Boolean   @default(false)
   isCritical              Boolean   @default(false)

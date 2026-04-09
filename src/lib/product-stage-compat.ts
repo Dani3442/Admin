@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto'
 import {
   supportsProductStageAffectsFinalDateColumn,
   supportsProductStageAutoshiftColumn,
+  supportsProductStageDurationDaysColumn,
   supportsProductStageOverlapAcceptedColumn,
 } from './schema-compat'
 
@@ -13,6 +14,7 @@ type ProductStageCompatCreateInput = {
   dateValue?: Date | null
   dateRaw?: string | null
   dateEnd?: Date | null
+  durationDays?: number | null
   status?: string
   isCompleted?: boolean
   isCritical?: boolean
@@ -38,10 +40,11 @@ export async function createProductStageCompat(
   db: ProductStageDbClient,
   input: ProductStageCompatCreateInput
 ) {
-  const [hasAffectsFinalDateColumn, hasAutoshiftColumn, hasOverlapAcceptedColumn] = await Promise.all([
+  const [hasAffectsFinalDateColumn, hasAutoshiftColumn, hasOverlapAcceptedColumn, hasDurationDaysColumn] = await Promise.all([
     supportsProductStageAffectsFinalDateColumn(),
     supportsProductStageAutoshiftColumn(),
     supportsProductStageOverlapAcceptedColumn(),
+    supportsProductStageDurationDaysColumn(),
   ])
 
   const data = {
@@ -53,6 +56,7 @@ export async function createProductStageCompat(
     dateValue: input.dateValue ?? null,
     dateRaw: input.dateRaw ?? null,
     dateEnd: input.dateEnd ?? null,
+    durationDays: input.durationDays ?? null,
     status: input.status ?? 'NOT_STARTED',
     isCompleted: input.isCompleted ?? false,
     isCritical: input.isCritical ?? false,
@@ -78,6 +82,7 @@ export async function createProductStageCompat(
     'dateValue',
     'dateRaw',
     'dateEnd',
+    'durationDays',
     'status',
     'isCompleted',
     'isCritical',
@@ -100,6 +105,7 @@ export async function createProductStageCompat(
     data.dateValue,
     data.dateRaw,
     data.dateEnd,
+    data.durationDays,
     data.status,
     data.isCompleted,
     data.isCritical,
@@ -116,6 +122,14 @@ export async function createProductStageCompat(
   if (hasAutoshiftColumn) {
     columns.push('participatesInAutoshift')
     values.push(data.participatesInAutoshift)
+  }
+
+  if (!hasDurationDaysColumn) {
+    const durationDaysIndex = columns.indexOf('durationDays')
+    if (durationDaysIndex >= 0) {
+      columns.splice(durationDaysIndex, 1)
+      values.splice(durationDaysIndex, 1)
+    }
   }
 
   if (hasAffectsFinalDateColumn) {

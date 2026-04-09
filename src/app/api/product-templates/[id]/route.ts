@@ -13,61 +13,13 @@ type TemplateStagePayload = {
   stageName: string
   plannedDate: Date | null
   durationDays: number | null
-  participatesInAutoshift: boolean
   stageTemplateDurationDays: number | null
 }
 
-export async function GET() {
-  const session = await auth()
-  if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const hasDurationDaysColumn = await supportsProductTemplateStageDurationDaysColumn()
-
-  const templates = await prisma.productTemplate.findMany({
-    select: {
-      id: true,
-      name: true,
-      description: true,
-      createdAt: true,
-      updatedAt: true,
-      stages: {
-        orderBy: { stageOrder: 'asc' },
-        select: {
-          id: true,
-          stageTemplateId: true,
-          stageOrder: true,
-          stageName: true,
-          plannedDate: true,
-          ...(hasDurationDaysColumn ? { durationDays: true } : {}),
-          stageTemplate: {
-            select: {
-              durationDays: true,
-            },
-          },
-        },
-      },
-    },
-    orderBy: [{ createdAt: 'desc' }],
-  })
-
-  return NextResponse.json(
-    templates.map((template) => ({
-      ...template,
-      stages: template.stages.map((stage) => ({
-        id: stage.id,
-        stageTemplateId: stage.stageTemplateId,
-        stageOrder: stage.stageOrder,
-        stageName: stage.stageName,
-        plannedDate: stage.plannedDate,
-        durationDays: hasDurationDaysColumn
-          ? stage.durationDays ?? stage.stageTemplate.durationDays ?? null
-          : stage.stageTemplate.durationDays ?? null,
-        participatesInAutoshift: true,
-      })),
-    }))
-  )
-}
-
-export async function POST(req: NextRequest) {
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasPermission((session.user as any).role, Permission.EDIT_STAGES)) {
@@ -75,29 +27,31 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const { id } = await params
     const body = await req.json()
     const hasDurationDaysColumn = await supportsProductTemplateStageDurationDaysColumn()
     const templateName = String(body?.name || '').trim()
     const description = typeof body?.description === 'string' ? body.description.trim() : ''
     const rawStages = Array.isArray(body?.stages) ? body.stages : []
 
-    const stages: TemplateStagePayload[] = rawStages
-      .map((stage: any, index: number) => ({
-        stageOrder: index,
-        stageName: normalizeStageName(String(stage?.stageName || '')),
-        plannedDate: stage?.plannedDate ? new Date(stage.plannedDate) : null,
-        durationDays:
-          typeof stage?.durationDays === 'number' && Number.isFinite(stage.durationDays)
-            ? Math.max(1, Math.floor(stage.durationDays))
-            : null,
-        participatesInAutoshift: stage?.participatesInAutoshift !== false,
-        stageTemplateDurationDays: null,
-      }))
-      .filter((stage: { stageName: string }) => stage.stageName)
-
     if (!templateName) {
       return NextResponse.json({ error: 'Укажите название шаблона' }, { status: 400 })
     }
+
+    const preparedStages: TemplateStagePayload[] =
+      rawStages
+        .map((stage: any, index: number) => ({
+          stageOrder: index,
+          stageName: normalizeStageName(String(stage?.stageName || '')),
+          plannedDate: stage?.plannedDate ? new Date(stage.plannedDate) : null,
+          durationDays:
+            typeof stage?.durationDays === 'number' && Number.isFinite(stage.durationDays)
+              ? Math.max(1, Math.floor(stage.durationDays))
+              : null,
+          stageTemplateDurationDays: null,
+          }))
+        .filter((stage: { stageName: string }) => stage.stageName)
+    const stages = recalculateSequentialStageDates(preparedStages)
 
     if (stages.length === 0) {
       return NextResponse.json({ error: 'Добавьте хотя бы один этап в шаблон' }, { status: 400 })
@@ -119,15 +73,20 @@ export async function POST(req: NextRequest) {
     }
 
     const template = await prisma.$transaction(async (tx) => {
+      const existing = await tx.productTemplate.findUnique({
+        where: { id },
+        select: { id: true },
+      })
+
+      if (!existing) {
+        throw new Error('Шаблон этапов не найден')
+      }
+
       const existingStageTemplates = await tx.stageTemplate.findMany({
         select: {
           id: true,
           name: true,
           order: true,
-          durationText: true,
-          durationDays: true,
-          isCritical: true,
-          affectsFinalDate: true,
           createdAt: true,
         },
         orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
@@ -141,19 +100,12 @@ export async function POST(req: NextRequest) {
         stageName: string
         plannedDate: Date | null
         durationDays: number | null
-      }> = recalculateSequentialStageDates(
-        stages
-      ).map((stage) => ({
-        stageTemplateId: '',
-        stageOrder: stage.stageOrder,
-        stageName: stage.stageName,
-        plannedDate: stage.plannedDate,
-        durationDays: stage.durationDays ?? null,
-      }))
+      }> = []
 
-      for (const stage of resolvedStages) {
+      for (const stage of stages) {
         let stageTemplate = existingStageTemplates.find(
-          (existing) => existing.name.trim().toLowerCase() === stage.stageName.toLowerCase()
+          (existingTemplate) =>
+            existingTemplate.name.trim().toLowerCase() === stage.stageName.toLowerCase()
         )
 
         if (!stageTemplate) {
@@ -170,10 +122,6 @@ export async function POST(req: NextRequest) {
               id: true,
               name: true,
               order: true,
-              durationText: true,
-              durationDays: true,
-              isCritical: true,
-              affectsFinalDate: true,
               createdAt: true,
             },
           })
@@ -181,28 +129,48 @@ export async function POST(req: NextRequest) {
           nextOrder += 1
         }
 
-        ;(stage as any).stageTemplateId = stageTemplate.id
+        resolvedStages.push({
+          stageTemplateId: stageTemplate.id,
+          stageOrder: stage.stageOrder,
+          stageName: stage.stageName,
+          plannedDate: stage.plannedDate,
+          durationDays: stage.durationDays ?? null,
+        })
       }
 
-      const createdTemplate = await tx.productTemplate.create({
+      await tx.productTemplate.update({
+        where: { id },
         data: {
           name: templateName,
           description: description || null,
-          stages: {
-            create: resolvedStages.map((stage: any) => ({
-              stageTemplateId: stage.stageTemplateId,
-              stageOrder: stage.stageOrder,
-              stageName: stage.stageName,
-              plannedDate: stage.plannedDate,
-              ...(hasDurationDaysColumn ? { durationDays: stage.durationDays ?? null } : {}),
-            })),
-          },
         },
       })
 
+      await tx.productTemplateStage.deleteMany({
+        where: { productTemplateId: id },
+      })
+
+      for (const stage of resolvedStages) {
+        await tx.productTemplateStage.create({
+          data: {
+            productTemplateId: id,
+            stageTemplateId: stage.stageTemplateId,
+            stageOrder: stage.stageOrder,
+            stageName: stage.stageName,
+            plannedDate: stage.plannedDate,
+            ...(hasDurationDaysColumn ? { durationDays: stage.durationDays } : {}),
+          },
+        })
+      }
+
       return tx.productTemplate.findUniqueOrThrow({
-        where: { id: createdTemplate.id },
-        include: {
+        where: { id },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          createdAt: true,
+          updatedAt: true,
           stages: {
             orderBy: { stageOrder: 'asc' },
             select: {
@@ -231,14 +199,20 @@ export async function POST(req: NextRequest) {
         stageOrder: stage.stageOrder,
         stageName: stage.stageName,
         plannedDate: stage.plannedDate,
-        durationDays: hasDurationDaysColumn
-          ? stage.durationDays ?? stage.stageTemplate.durationDays ?? null
-          : stage.stageTemplate.durationDays ?? null,
+        durationDays:
+          (hasDurationDaysColumn ? (stage as any).durationDays : null) ??
+          stage.stageTemplate.durationDays ??
+          null,
         participatesInAutoshift: true,
       })),
-    }, { status: 201 })
+    })
   } catch (error) {
-    console.error('[product-templates:create] Failed to create template', error)
-    return NextResponse.json({ error: 'Не удалось создать шаблон этапов' }, { status: 500 })
+    const message =
+      error instanceof Error ? error.message : 'Не удалось обновить шаблон этапов'
+
+    return NextResponse.json(
+      { error: message },
+      { status: message === 'Шаблон этапов не найден' ? 404 : 500 }
+    )
   }
 }

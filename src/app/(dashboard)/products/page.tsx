@@ -3,9 +3,11 @@ import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { ProductsWorkspace } from '@/components/products/ProductsWorkspace'
 import { recalculateAllRisks } from '@/lib/risk'
+import { supportsProductTemplateStageDurationDaysColumn } from '@/lib/schema-compat'
 
 async function getProductsWorkspaceData() {
   await recalculateAllRisks()
+  const hasTemplateStageDurationDaysColumn = await supportsProductTemplateStageDurationDaysColumn()
 
   const [listProducts, tableProducts, users, stages, productTemplates, stageSuggestions] = await Promise.all([
     prisma.product.findMany({
@@ -55,7 +57,12 @@ async function getProductsWorkspaceData() {
       orderBy: { order: 'asc' },
     }),
     prisma.productTemplate.findMany({
-      include: {
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        createdAt: true,
+        updatedAt: true,
         stages: {
           orderBy: { stageOrder: 'asc' },
           select: {
@@ -64,6 +71,12 @@ async function getProductsWorkspaceData() {
             stageOrder: true,
             stageName: true,
             plannedDate: true,
+            ...(hasTemplateStageDurationDaysColumn ? { durationDays: true } : {}),
+            stageTemplate: {
+              select: {
+                durationDays: true,
+              },
+            },
           },
         },
       },
@@ -75,7 +88,15 @@ async function getProductsWorkspaceData() {
     }),
   ])
 
-  return { listProducts, tableProducts, users, stages, productTemplates, stageSuggestions }
+  return {
+    listProducts,
+    tableProducts,
+    users,
+    stages,
+    productTemplates,
+    stageSuggestions,
+    hasTemplateStageDurationDaysColumn,
+  }
 }
 
 export default async function ProductsPage({
@@ -117,6 +138,10 @@ export default async function ProductsPage({
           stageOrder: stage.stageOrder,
           stageName: stage.stageName,
           plannedDate: stage.plannedDate,
+          durationDays:
+            (data.hasTemplateStageDurationDaysColumn ? (stage as any).durationDays : null) ??
+            stage.stageTemplate.durationDays ??
+            null,
           participatesInAutoshift: true,
         })),
       })) as any}

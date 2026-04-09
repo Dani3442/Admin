@@ -84,6 +84,7 @@ export interface ProductStageWithTemplate {
   dateValue: Date | null
   dateRaw: string | null
   dateEnd: Date | null
+  durationDays?: number | null
   status: StageStatus
   isCompleted: boolean
   isCritical: boolean
@@ -117,6 +118,7 @@ export interface ProductTemplateStageData {
   stageOrder: number
   stageName: string
   plannedDate: Date | null
+  durationDays: number | null
   participatesInAutoshift: boolean
 }
 

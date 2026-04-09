@@ -1,7 +1,11 @@
 import { prisma } from '@/lib/prisma'
 import { createProductStageCompat } from '@/lib/product-stage-compat'
 import { getFinalDateFromStages } from '@/lib/product-derived-fields'
-import { supportsProductTemplateReferenceColumn } from '@/lib/schema-compat'
+import {
+  supportsProductTemplateReferenceColumn,
+  supportsProductTemplateStageDurationDaysColumn,
+} from '@/lib/schema-compat'
+import { recalculateSequentialStageDates } from '@/lib/stage-schedule'
 
 export interface CreateProductStageOverrideInput {
   id?: string
@@ -9,6 +13,7 @@ export interface CreateProductStageOverrideInput {
   stageOrder: number
   stageName: string
   plannedDate?: string | Date | null
+  durationDays?: number | null
   participatesInAutoshift?: boolean
 }
 
@@ -39,7 +44,12 @@ export async function createProduct(input: CreateProductInput) {
   }
 
   return prisma.$transaction(async (tx) => {
-    const [stageTemplates, sortOrderAggregate, selectedTemplate, hasProductTemplateReferenceColumn] = await Promise.all([
+    const [
+      stageTemplates,
+      sortOrderAggregate,
+      hasProductTemplateReferenceColumn,
+      hasProductTemplateStageDurationDaysColumn,
+    ] = await Promise.all([
       tx.stageTemplate.findMany({
         select: {
           id: true,
@@ -56,26 +66,36 @@ export async function createProduct(input: CreateProductInput) {
         where: { isArchived: false },
         _max: { sortOrder: true },
       }),
-      input.productTemplateId
-        ? tx.productTemplate.findUnique({
-            where: { id: String(input.productTemplateId) },
-            include: {
-              stages: {
-                orderBy: { stageOrder: 'asc' },
-                include: {
-                  stageTemplate: {
-                    select: {
-                      id: true,
-                      isCritical: true,
-                    },
+      supportsProductTemplateReferenceColumn(),
+      supportsProductTemplateStageDurationDaysColumn(),
+    ])
+
+    const selectedTemplate = input.productTemplateId
+      ? await tx.productTemplate.findUnique({
+          where: { id: String(input.productTemplateId) },
+          select: {
+            id: true,
+            stages: {
+              orderBy: { stageOrder: 'asc' },
+              select: {
+                id: true,
+                stageTemplateId: true,
+                stageOrder: true,
+                stageName: true,
+                plannedDate: true,
+                ...(hasProductTemplateStageDurationDaysColumn ? { durationDays: true } : {}),
+                stageTemplate: {
+                  select: {
+                    id: true,
+                    isCritical: true,
+                    durationDays: true,
                   },
                 },
               },
             },
-          })
-        : Promise.resolve(null),
-      supportsProductTemplateReferenceColumn(),
-    ])
+          },
+        })
+      : null
 
     if (input.productTemplateId && !selectedTemplate) {
       throw new Error('Выбранный шаблон этапов не найден')
@@ -93,12 +113,16 @@ export async function createProduct(input: CreateProductInput) {
             stageOrder: typeof stage?.stageOrder === 'number' ? stage.stageOrder : index,
             stageName: String(stage?.stageName || '').trim(),
             dateValue: stage?.plannedDate ? new Date(stage.plannedDate) : null,
+            durationDays:
+              typeof stage?.durationDays === 'number' && Number.isFinite(stage.durationDays)
+                ? Math.max(1, Math.floor(stage.durationDays))
+                : null,
             participatesInAutoshift: stage?.participatesInAutoshift !== false,
           }))
           .filter((stage) => stage.stageTemplateId && stage.stageName)
       : []
 
-    const templateStages = selectedTemplate
+    const rawTemplateStages = selectedTemplate
       ? selectedTemplate.stages.map((stage, index) => {
           const override = safeTemplateOverrides.find(
             (candidate) =>
@@ -110,7 +134,9 @@ export async function createProduct(input: CreateProductInput) {
             stageTemplateId: stage.stageTemplateId,
             stageOrder: index,
             stageName: override?.stageName || stage.stageName,
-            dateValue: override?.dateValue ?? stage.plannedDate,
+            plannedDate: override?.dateValue ?? stage.plannedDate,
+            durationDays: override?.durationDays ?? stage.durationDays ?? stage.stageTemplate.durationDays ?? null,
+            stageTemplateDurationDays: stage.stageTemplate.durationDays ?? null,
             isCritical: stage.stageTemplate.isCritical,
             affectsFinalDate: true,
             participatesInAutoshift: override?.participatesInAutoshift ?? true,
@@ -120,11 +146,18 @@ export async function createProduct(input: CreateProductInput) {
           stageTemplateId: template.id,
           stageOrder: template.normalizedOrder,
           stageName: template.name,
-          dateValue: null,
+          plannedDate: null,
+          durationDays: template.durationDays ?? null,
+          stageTemplateDurationDays: template.durationDays ?? null,
           isCritical: template.isCritical,
           affectsFinalDate: true,
           participatesInAutoshift: true,
         }))
+
+    const templateStages = recalculateSequentialStageDates(rawTemplateStages).map((stage) => ({
+      ...stage,
+      dateValue: stage.plannedDate,
+    }))
 
     const productCreateData: any = {
       name,
@@ -155,6 +188,7 @@ export async function createProduct(input: CreateProductInput) {
         stageName: stage.stageName,
         dateValue: stage.dateValue,
         plannedDate: stage.dateValue,
+        durationDays: stage.durationDays ?? null,
         isCritical: stage.isCritical,
         affectsFinalDate: stage.affectsFinalDate,
         participatesInAutoshift: stage.participatesInAutoshift,

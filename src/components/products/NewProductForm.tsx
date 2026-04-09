@@ -6,6 +6,8 @@ import { ArrowLeft, Layers3, Plus, Save, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import { DatePicker } from '@/components/ui/DatePicker'
 import type { ProductTemplateData, ProductTemplateStageData } from '@/types'
+import { formatDate } from '@/lib/utils'
+import { recalculateSequentialStageDates } from '@/lib/stage-schedule'
 
 const PRIORITIES = [
   { value: 'CRITICAL', label: 'Критический' },
@@ -18,6 +20,7 @@ interface TemplateDraftStage {
   id: string
   stageName: string
   plannedDate: Date | null
+  durationDays: number | null
   participatesInAutoshift: boolean
 }
 
@@ -39,8 +42,28 @@ function createDraftStage(): TemplateDraftStage {
     id: `stage-${Math.random().toString(36).slice(2, 10)}`,
     stageName: '',
     plannedDate: null,
+    durationDays: 1,
     participatesInAutoshift: true,
   }
+}
+
+function recalculateDraftStages(stages: TemplateDraftStage[]) {
+  return recalculateSequentialStageDates(stages.map((stage) => ({ ...stage }))).map((stage) => ({
+    ...stage,
+    durationDays: stage.durationDays ?? 1,
+  }))
+}
+
+function recalculateSelectedTemplateStages(stages: SelectedTemplateStageOverride[]) {
+  return recalculateSequentialStageDates(
+    stages.map((stage) => ({
+      ...stage,
+      stageTemplateDurationDays: stage.durationDays,
+    }))
+  ).map((stage) => ({
+    ...stage,
+    durationDays: stage.durationDays ?? 1,
+  }))
 }
 
 export function NewProductForm({
@@ -88,10 +111,13 @@ export function NewProductForm({
     }
 
     setSelectedTemplateStages(
-      selectedTemplate.stages.map((stage) => ({
-        ...stage,
-        plannedDate: stage.plannedDate ? new Date(stage.plannedDate) : null,
-      }))
+      recalculateSelectedTemplateStages(
+        selectedTemplate.stages.map((stage) => ({
+          ...stage,
+          plannedDate: stage.plannedDate ? new Date(stage.plannedDate) : null,
+          durationDays: stage.durationDays ?? 1,
+        }))
+      )
     )
   }, [selectedTemplate])
 
@@ -101,7 +127,24 @@ export function NewProductForm({
 
   const updateTemplateStage = (stageId: string, patch: Partial<TemplateDraftStage>) => {
     setTemplateStages((prev) =>
-      prev.map((stage) => (stage.id === stageId ? { ...stage, ...patch } : stage))
+      {
+        const nextStages = prev.map((stage, index) => {
+          if (stage.id !== stageId) return stage
+
+          const nextPatch: Partial<TemplateDraftStage> =
+            index === 0 || !('plannedDate' in patch)
+              ? patch
+              : { ...patch, plannedDate: stage.plannedDate }
+
+          return { ...stage, ...nextPatch }
+        })
+
+        if (nextStages[0]?.plannedDate === null) {
+          return nextStages.map((stage) => ({ ...stage, plannedDate: null }))
+        }
+
+        return recalculateDraftStages(nextStages)
+      }
     )
   }
 
@@ -110,20 +153,38 @@ export function NewProductForm({
     patch: Partial<SelectedTemplateStageOverride>
   ) => {
     setSelectedTemplateStages((prev) =>
-      prev.map((stage) => (stage.id === stageId ? { ...stage, ...patch } : stage))
+      {
+        const nextStages = prev.map((stage, index) => {
+          if (stage.id !== stageId) return stage
+
+          const nextPatch: Partial<SelectedTemplateStageOverride> =
+            index === 0 || !('plannedDate' in patch)
+              ? patch
+              : { ...patch, plannedDate: stage.plannedDate }
+
+          return { ...stage, ...nextPatch }
+        })
+
+        if (nextStages[0]?.plannedDate === null) {
+          return nextStages.map((stage) => ({ ...stage, plannedDate: null }))
+        }
+
+        return recalculateSelectedTemplateStages(nextStages)
+      }
     )
   }
 
   const addTemplateStage = () => {
-    setTemplateStages((prev) => [...prev, createDraftStage()])
+    setTemplateStages((prev) => recalculateDraftStages([...prev, createDraftStage()]))
   }
 
   const removeTemplateStage = (stageId: string) => {
     setTemplateStages((prev) => {
       if (prev.length === 1) {
         return [{ ...prev[0], stageName: '', plannedDate: null, participatesInAutoshift: true }]
+          .map((stage) => ({ ...stage, durationDays: 1 }))
       }
-      return prev.filter((stage) => stage.id !== stageId)
+      return recalculateDraftStages(prev.filter((stage) => stage.id !== stageId))
     })
   }
 
@@ -141,6 +202,7 @@ export function NewProductForm({
       .map((stage) => ({
         stageName: stage.stageName.trim(),
         plannedDate: stage.plannedDate,
+        durationDays: stage.durationDays ?? 1,
         participatesInAutoshift: stage.participatesInAutoshift,
       }))
       .filter((stage) => stage.stageName)
@@ -168,6 +230,7 @@ export function NewProductForm({
           stages: normalizedStages.map((stage) => ({
             stageName: stage.stageName,
             plannedDate: stage.plannedDate ? stage.plannedDate.toISOString() : null,
+            durationDays: stage.durationDays,
             participatesInAutoshift: stage.participatesInAutoshift,
           })),
         }),
@@ -216,6 +279,7 @@ export function NewProductForm({
             stageOrder: stage.stageOrder,
             stageName: stage.stageName,
             plannedDate: stage.plannedDate ? stage.plannedDate.toISOString() : null,
+            durationDays: stage.durationDays ?? 1,
             participatesInAutoshift: stage.participatesInAutoshift,
           })),
           responsibleId: form.responsibleId || null,
@@ -269,6 +333,7 @@ export function NewProductForm({
           stageOrder: stage.stageOrder,
           stageName: stage.stageName,
           plannedDate: stage.plannedDate ? stage.plannedDate.toISOString() : null,
+          durationDays: stage.durationDays ?? 1,
           participatesInAutoshift: stage.participatesInAutoshift,
         }))
       ),
@@ -349,19 +414,65 @@ export function NewProductForm({
               </div>
               <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
                 {selectedTemplateStages.map((stage, index) => (
-                  <div key={stage.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 px-3 py-2">
+                  <div
+                    key={stage.id}
+                    className="grid gap-3 rounded-lg border border-slate-100 px-3 py-3 md:grid-cols-[minmax(0,1fr)_220px_150px_120px]"
+                  >
                     <div className="min-w-0">
                       <div className="text-sm font-medium text-slate-700">
                         {index + 1}. {stage.stageName}
                       </div>
                     </div>
-                    <DatePicker
-                      value={stage.plannedDate}
-                      onChange={(date) => updateSelectedTemplateStage(stage.id, { plannedDate: date })}
-                      inputClassName="h-9 w-36 text-xs"
-                      panelClassName="w-[320px]"
-                      placeholder="Без даты"
-                    />
+                    <div>
+                      <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                        {index === 0 ? 'Старт этапа' : 'Рассчитанная дата'}
+                      </div>
+                      {index === 0 ? (
+                        <DatePicker
+                          value={stage.plannedDate}
+                          onChange={(date) => updateSelectedTemplateStage(stage.id, { plannedDate: date })}
+                          inputClassName="h-9 w-full text-xs"
+                          panelClassName="w-[320px]"
+                          placeholder="Без даты"
+                        />
+                      ) : (
+                        <div className="flex h-9 items-center rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-600">
+                          {formatDate(stage.plannedDate)}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                        Количество дней
+                      </div>
+                      <input
+                        type="number"
+                        min={1}
+                        step={1}
+                        value={stage.durationDays ?? 1}
+                        onChange={(e) =>
+                          updateSelectedTemplateStage(stage.id, {
+                            durationDays: e.target.value ? Math.max(1, Number(e.target.value)) : 1,
+                          })
+                        }
+                        className="input h-9 w-full text-sm"
+                      />
+                    </div>
+                    <div className="flex items-end">
+                      <span className="flex h-9 w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600">
+                        <span>Автосдвиг</span>
+                        <input
+                          type="checkbox"
+                          checked={stage.participatesInAutoshift}
+                          onChange={(e) =>
+                            updateSelectedTemplateStage(stage.id, {
+                              participatesInAutoshift: e.target.checked,
+                            })
+                          }
+                          className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                        />
+                      </span>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -410,7 +521,7 @@ export function NewProductForm({
 
               <div className="space-y-3">
                 {templateStages.map((stage, index) => (
-                  <div key={stage.id} className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3 md:grid-cols-[minmax(0,1fr)_220px_180px_44px]">
+                  <div key={stage.id} className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3 md:grid-cols-[minmax(0,1fr)_220px_140px_180px_44px]">
                     <div>
                       <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1.5">
                         Этап {index + 1}
@@ -426,14 +537,38 @@ export function NewProductForm({
                     </div>
                     <div>
                       <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1.5">
-                        Дата этапа
+                        {index === 0 ? 'Дата старта' : 'Рассчитанная дата'}
                       </label>
-                      <DatePicker
-                        value={stage.plannedDate}
-                        onChange={(date) => updateTemplateStage(stage.id, { plannedDate: date })}
-                        inputClassName="h-11 text-sm"
-                        panelClassName="w-[320px]"
-                        placeholder="Необязательно"
+                      {index === 0 ? (
+                        <DatePicker
+                          value={stage.plannedDate}
+                          onChange={(date) => updateTemplateStage(stage.id, { plannedDate: date })}
+                          inputClassName="h-11 text-sm"
+                          panelClassName="w-[320px]"
+                          placeholder="Необязательно"
+                        />
+                      ) : (
+                        <div className="flex h-11 items-center rounded-[18px] border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600">
+                          {formatDate(stage.plannedDate)}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1.5">
+                        Количество дней
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        step={1}
+                        value={stage.durationDays ?? 1}
+                        onChange={(e) =>
+                          updateTemplateStage(stage.id, {
+                            durationDays: e.target.value ? Math.max(1, Number(e.target.value)) : 1,
+                          })
+                        }
+                        className="input h-11 w-full"
+                        placeholder="1"
                       />
                     </div>
                     <label className="flex items-end">

@@ -3,8 +3,11 @@ import { auth, hasPermission, Permission } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { NewProductForm } from '@/components/products/NewProductForm'
 import { createProduct } from '@/lib/product-create'
+import { supportsProductTemplateStageDurationDaysColumn } from '@/lib/schema-compat'
 
 async function getCreateProductData() {
+  const hasProductTemplateStageDurationDaysColumn = await supportsProductTemplateStageDurationDaysColumn()
+
   const [users, productTemplates, stageSuggestions] = await Promise.all([
     prisma.user.findMany({
       where: { isActive: true },
@@ -12,7 +15,12 @@ async function getCreateProductData() {
       orderBy: { name: 'asc' },
     }),
     prisma.productTemplate.findMany({
-      include: {
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        createdAt: true,
+        updatedAt: true,
         stages: {
           orderBy: { stageOrder: 'asc' },
           select: {
@@ -21,6 +29,12 @@ async function getCreateProductData() {
             stageOrder: true,
             stageName: true,
             plannedDate: true,
+            ...(hasProductTemplateStageDurationDaysColumn ? { durationDays: true } : {}),
+            stageTemplate: {
+              select: {
+                durationDays: true,
+              },
+            },
           },
         },
       },
@@ -42,6 +56,10 @@ async function getCreateProductData() {
         stageOrder: stage.stageOrder,
         stageName: stage.stageName,
         plannedDate: stage.plannedDate,
+        durationDays:
+          (hasProductTemplateStageDurationDaysColumn ? (stage as any).durationDays : null) ??
+          stage.stageTemplate.durationDays ??
+          null,
         participatesInAutoshift: true,
       })),
     })),
