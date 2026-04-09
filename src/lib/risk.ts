@@ -130,7 +130,7 @@ export async function recalculateAllRisks() {
 
     // Only update if changed
     if (product.riskScore !== riskScore || product.status !== newStatus) {
-      await prisma.product.update({
+      await prisma.product.updateMany({
         where: { id: product.id },
         data: { riskScore, status: newStatus },
       })
@@ -236,7 +236,7 @@ export async function recalculateProductRisk(productId: string) {
   else if (product.status === 'AT_RISK' || product.status === 'DELAYED') newStatus = 'IN_PROGRESS'
 
   if (product.riskScore !== riskScore || product.status !== newStatus) {
-    await prisma.product.update({
+    await prisma.product.updateMany({
       where: { id: product.id },
       data: { riskScore, status: newStatus },
     })
