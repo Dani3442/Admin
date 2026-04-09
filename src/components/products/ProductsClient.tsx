@@ -233,6 +233,17 @@ export function ProductsClient({
     }
   }, [draggingProductId])
 
+  const clampMenuPosition = (x: number, y: number, width: number, height: number) => {
+    if (typeof window === 'undefined') {
+      return { x, y }
+    }
+
+    return {
+      x: Math.max(12, Math.min(x, window.innerWidth - width - 12)),
+      y: Math.max(12, Math.min(y, window.innerHeight - height - 12)),
+    }
+  }
+
   const now = new Date()
   const effectiveSortField = externalSortField ?? sortField
   const effectiveSortDirection = externalSortDirection ?? sortDirection
@@ -373,16 +384,14 @@ export function ProductsClient({
 
   const handleOpenContextMenu = (event: React.MouseEvent, productId: string) => {
     event.preventDefault()
+    event.stopPropagation()
 
-    const menuWidth = 240
-    const menuHeight = 210
-    const safeX = Math.min(event.clientX, window.innerWidth - menuWidth - 16)
-    const safeY = Math.min(event.clientY, window.innerHeight - menuHeight - 16)
+    const { x, y } = clampMenuPosition(event.clientX, event.clientY, 240, archiveMode ? 260 : 280)
 
     setContextMenu({
       productId,
-      x: Math.max(12, safeX),
-      y: Math.max(12, safeY),
+      x,
+      y,
     })
   }
 
@@ -747,7 +756,7 @@ export function ProductsClient({
                     }}
                     data-product-row="true"
                     onClick={() => handleOpenProduct(product.id)}
-                    onContextMenu={(event) => handleOpenContextMenu(event, product.id)}
+                    onContextMenuCapture={(event) => handleOpenContextMenu(event, product.id)}
                     className={cn(
                       'relative cursor-pointer transition-all duration-150 hover:bg-slate-50/70',
                       isDragging && 'bg-white shadow-[0_22px_44px_-30px_rgba(15,23,42,0.45)]',
@@ -783,7 +792,7 @@ export function ProductsClient({
                     </td>
                     <td
                       className={cn('table-cell', isDragging && 'bg-white')}
-                      onContextMenu={(event) => handleOpenContextMenu(event, product.id)}
+                      onContextMenuCapture={(event) => handleOpenContextMenu(event, product.id)}
                     >
                       <div className="flex items-start gap-3">
                           <div className="mt-0.5 flex items-center gap-1">
@@ -793,7 +802,7 @@ export function ProductsClient({
                         <div className="min-w-0">
                           <Link
                             href={buildProductHref(product.id, currentRoute)}
-                            onContextMenu={(event) => handleOpenContextMenu(event, product.id)}
+                            onContextMenuCapture={(event) => handleOpenContextMenu(event, product.id)}
                             className="text-[19px] font-medium leading-[1.25] tracking-normal text-slate-800 hover:text-brand-700 transition-colors"
                           >
                             {product.name.length > 70 ? `${product.name.slice(0, 70)}…` : product.name}
@@ -919,7 +928,7 @@ export function ProductsClient({
                     ) : (
                       <Pin className="h-4 w-4 text-slate-400" />
                     )}
-                    {contextProduct.isPinned ? 'Снять закрепление' : 'Закрепить наверху'}
+                    {contextProduct.isPinned ? 'Открепить' : 'Закрепить наверху'}
                   </button>
 
                   <button

@@ -4,7 +4,7 @@ import { useState, useRef, useCallback, useEffect, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { Search, CheckCircle2, AlertTriangle, Plus, ChevronLeft, ChevronRight, Pencil, X, Trash2, Filter, Archive } from 'lucide-react'
+import { Search, CheckCircle2, AlertTriangle, Plus, ChevronLeft, ChevronRight, Pencil, X, Trash2, Filter, Archive, Pin, PinOff, Star } from 'lucide-react'
 import { cn, formatDate, detectStageOverlaps, getPriorityLabel, getStatusLabel } from '@/lib/utils'
 import { DatePicker } from '@/components/ui/DatePicker'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -180,8 +180,10 @@ export function TableViewClient({
   const [newStageAutoshift, setNewStageAutoshift] = useState(true)
   const menuRef = useRef<HTMLDivElement>(null)
   const canEditTable = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUserRole) && !archiveMode
+  const canManageProducts = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUserRole) && !archiveMode
   const canArchiveProducts = ['ADMIN', 'DIRECTOR'].includes(currentUserRole) && !archiveMode
   const canDeleteProducts = ['ADMIN', 'DIRECTOR'].includes(currentUserRole)
+  const [savingProductId, setSavingProductId] = useState<string | null>(null)
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null)
   const [archivingProductId, setArchivingProductId] = useState<string | null>(null)
   const [pendingDeleteStageId, setPendingDeleteStageId] = useState<string | null>(null)
@@ -254,6 +256,17 @@ export function TableViewClient({
     if (typeof window === 'undefined') return
     window.localStorage.setItem('product-admin:table-column-widths', JSON.stringify(columnWidths))
   }, [columnWidths])
+
+  const clampMenuPosition = useCallback((x: number, y: number, width: number, height: number) => {
+    if (typeof window === 'undefined') {
+      return { x, y }
+    }
+
+    return {
+      x: Math.max(12, Math.min(x, window.innerWidth - width - 12)),
+      y: Math.max(12, Math.min(y, window.innerHeight - height - 12)),
+    }
+  }, [])
 
   const handleResizeStart = useCallback((e: React.MouseEvent, colId: string) => {
     e.preventDefault()
@@ -411,7 +424,8 @@ export function TableViewClient({
     if (!canEditTable) return
     e.preventDefault()
     e.stopPropagation()
-    setStageMenu({ kind: 'header', stageId: stage.id, x: e.clientX, y: e.clientY })
+    const { x, y } = clampMenuPosition(e.clientX, e.clientY, 220, 260)
+    setStageMenu({ kind: 'header', stageId: stage.id, x, y })
   }
 
   const handleStageCellContextMenu = (e: React.MouseEvent, productId: string, stage: ProductStage | undefined) => {
@@ -419,12 +433,13 @@ export function TableViewClient({
     e.preventDefault()
     e.stopPropagation()
     setProductMenu(null)
+    const { x, y } = clampMenuPosition(e.clientX, e.clientY, 220, 120)
     setStageMenu({
       kind: 'cell',
       stageId: stage.id,
       productId,
-      x: e.clientX,
-      y: e.clientY,
+      x,
+      y,
     })
   }
 
@@ -436,11 +451,50 @@ export function TableViewClient({
   }
 
   const handleOpenProductContextMenu = (event: React.MouseEvent, productId: string) => {
-    if (!canDeleteProducts) return
     event.preventDefault()
     event.stopPropagation()
     setStageMenu(null)
-    setProductMenu({ productId, x: event.clientX, y: event.clientY })
+    const { x, y } = clampMenuPosition(event.clientX, event.clientY, 240, 240)
+    setProductMenu({ productId, x, y })
+  }
+
+  const handleToggleProductFlag = async (
+    product: Product,
+    field: 'isPinned' | 'isFavorite',
+    nextValue: boolean
+  ) => {
+    if (!canManageProducts) return
+
+    const previousProducts = products
+    setSavingProductId(product.id)
+    setProducts((current) =>
+      current.map((item) =>
+        item.id === product.id
+          ? { ...item, [field]: nextValue }
+          : item
+      )
+    )
+    setProductMenu(null)
+
+    try {
+      const response = await fetch(`/api/products/${product.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [field]: nextValue }),
+      })
+      const data = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'Не удалось обновить продукт')
+      }
+
+      router.refresh()
+    } catch (error: any) {
+      setProducts(previousProducts)
+      window.alert(error.message || 'Не удалось обновить продукт')
+    } finally {
+      setSavingProductId(null)
+    }
   }
 
   const handleDeleteProduct = async () => {
@@ -1095,6 +1149,30 @@ export function TableViewClient({
                       <Search className="h-4 w-4 text-slate-400" />
                       Открыть продукт
                     </button>
+                    {canManageProducts && (
+                      <>
+                        <button
+                          onClick={() => handleToggleProductFlag(product, 'isPinned', !Boolean(product.isPinned))}
+                          disabled={savingProductId === product.id}
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                        >
+                          {product.isPinned ? (
+                            <PinOff className="h-4 w-4 text-slate-400" />
+                          ) : (
+                            <Pin className="h-4 w-4 text-slate-400" />
+                          )}
+                          {product.isPinned ? 'Открепить' : 'Закрепить наверху'}
+                        </button>
+                        <button
+                          onClick={() => handleToggleProductFlag(product, 'isFavorite', !Boolean(product.isFavorite))}
+                          disabled={savingProductId === product.id}
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                        >
+                          <Star className={cn('h-4 w-4', product.isFavorite ? 'fill-slate-300 text-slate-500' : 'text-slate-400')} />
+                          {product.isFavorite ? 'Убрать из избранного' : 'Добавить в избранное'}
+                        </button>
+                      </>
+                    )}
                     {canArchiveProducts && (
                       <>
                         <div className="my-1 border-t border-slate-100" />
