@@ -1,17 +1,14 @@
-import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { ProductsWorkspace } from '@/components/products/ProductsWorkspace'
-import { recalculateAllRisks } from '@/lib/risk'
 import { supportsProductTemplateStageDurationDaysColumn } from '@/lib/schema-compat'
 
-async function getProductsWorkspaceData(archived = false) {
-  await recalculateAllRisks()
+async function getArchiveWorkspaceData() {
   const hasTemplateStageDurationDaysColumn = await supportsProductTemplateStageDurationDaysColumn()
 
   const [listProducts, tableProducts, users, stages, productTemplates, stageSuggestions] = await Promise.all([
     prisma.product.findMany({
-      where: { isArchived: archived },
+      where: { isArchived: true },
       select: {
         id: true,
         name: true,
@@ -43,10 +40,10 @@ async function getProductsWorkspaceData(archived = false) {
           orderBy: { stageOrder: 'asc' },
         },
       },
-      orderBy: [{ isPinned: 'desc' }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
+      orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }],
     }),
     prisma.product.findMany({
-      where: { isArchived: archived },
+      where: { isArchived: true },
       select: {
         id: true,
         name: true,
@@ -78,7 +75,7 @@ async function getProductsWorkspaceData(archived = false) {
           },
         },
       },
-      orderBy: [{ isPinned: 'desc' }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
+      orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }],
     }),
     prisma.user.findMany({
       where: { isActive: true },
@@ -139,30 +136,11 @@ async function getProductsWorkspaceData(archived = false) {
   }
 }
 
-export default async function ProductsPage({
-  searchParams,
-}: {
-  searchParams?: Promise<Record<string, string | string[] | undefined>>
-}) {
-  const [resolvedSearchParamsRaw, data, session] = await Promise.all([
-    searchParams ?? Promise.resolve({}),
-    getProductsWorkspaceData(false),
+export default async function ArchivePage() {
+  const [data, session] = await Promise.all([
+    getArchiveWorkspaceData(),
     auth(),
   ])
-  const resolvedSearchParams = resolvedSearchParamsRaw as Record<string, string | string[] | undefined>
-
-  const rawCreate = resolvedSearchParams?.create
-  const createRequested = Array.isArray(rawCreate) ? rawCreate[0] === '1' : rawCreate === '1'
-
-  if (createRequested) {
-    const rawReturnTo = resolvedSearchParams?.returnTo
-    const returnTo =
-      typeof rawReturnTo === 'string' && rawReturnTo.trim()
-        ? rawReturnTo
-        : '/products'
-
-    redirect(`/products/new?returnTo=${encodeURIComponent(returnTo)}`)
-  }
 
   return (
     <ProductsWorkspace
@@ -185,7 +163,7 @@ export default async function ProductsPage({
       })) as any}
       stageSuggestions={data.stageSuggestions}
       currentUserRole={(session?.user as any)?.role || 'VIEWER'}
-      archiveMode={false}
+      archiveMode
     />
   )
 }

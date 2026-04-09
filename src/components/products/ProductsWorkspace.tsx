@@ -56,6 +56,7 @@ interface ProductsWorkspaceProps {
   productTemplates: any[]
   stageSuggestions: Array<{ id: string; name: string }>
   currentUserRole: string
+  archiveMode?: boolean
 }
 
 const layoutOptions: Array<{ value: ProductsLayoutMode; label: string; icon: typeof LayoutList }> = [
@@ -144,6 +145,7 @@ export function ProductsWorkspace({
   productTemplates,
   stageSuggestions,
   currentUserRole,
+  archiveMode = false,
 }: ProductsWorkspaceProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -245,6 +247,17 @@ export function ProductsWorkspace({
   return (
     <div className="page-section">
       <div className="surface-panel space-y-5 p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="page-heading">{archiveMode ? 'Архив продуктов' : 'Продукты'}</h1>
+            <p className="subtle-copy mt-1">
+              {archiveMode
+                ? 'Архивные продукты со всей историей, комментариями и итоговым статусом.'
+                : 'Рабочий список активных продуктов и текущих статусов.'}
+            </p>
+          </div>
+        </div>
+
         <div className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center gap-3">
             <div className="relative min-w-[260px] flex-1">
@@ -376,9 +389,11 @@ export function ProductsWorkspace({
 
           <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
             <div>{layoutSwitcher}</div>
-            <Link href={createProductHref} scroll={false} className="btn-primary self-start">
-              <Plus className="h-4 w-4" /> Новый продукт
-            </Link>
+            {!archiveMode && (
+              <Link href={createProductHref} scroll={false} className="btn-primary self-start">
+                <Plus className="h-4 w-4" /> Новый продукт
+              </Link>
+            )}
           </div>
         </div>
       </div>
@@ -402,6 +417,7 @@ export function ProductsWorkspace({
                 externalFilters={filters}
                 externalSortField={sortField}
                 externalSortDirection={sortDirection}
+                archiveMode={archiveMode}
               />
             </motion.div>
           ) : (
@@ -421,6 +437,7 @@ export function ProductsWorkspace({
                 externalFilters={filters}
                 externalSortField={sortField}
                 externalSortDirection={sortDirection}
+                archiveMode={archiveMode}
               />
             </motion.div>
           )}

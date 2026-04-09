@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { DatePicker } from '@/components/ui/DatePicker'
 import type { ProductTemplateData, ProductTemplateStageData } from '@/types'
 import { formatDate } from '@/lib/utils'
-import { recalculateSequentialStageDates } from '@/lib/stage-schedule'
+import { buildSequentialStageSchedule } from '@/lib/stage-schedule'
 
 const PRIORITIES = [
   { value: 'CRITICAL', label: 'Критический' },
@@ -21,10 +21,13 @@ interface TemplateDraftStage {
   stageName: string
   plannedDate: Date | null
   durationDays: number | null
+  effectiveDurationDays?: number | null
   participatesInAutoshift: boolean
 }
 
-interface SelectedTemplateStageOverride extends ProductTemplateStageData {}
+interface SelectedTemplateStageOverride extends ProductTemplateStageData {
+  effectiveDurationDays?: number | null
+}
 
 interface NewProductFormProps {
   users: Array<{ id: string; name: string }>
@@ -34,36 +37,56 @@ interface NewProductFormProps {
   onCancel?: () => void
   onCreated?: (productId: string) => void
   returnTo?: string
-  formAction?: (formData: FormData) => void | Promise<void>
 }
 
-function createDraftStage(): TemplateDraftStage {
+function createDraftStage(index = 0): TemplateDraftStage {
   return {
     id: `stage-${Math.random().toString(36).slice(2, 10)}`,
     stageName: '',
     plannedDate: null,
-    durationDays: 1,
+    durationDays: index === 0 ? 1 : null,
+    effectiveDurationDays: index === 0 ? 1 : null,
     participatesInAutoshift: true,
   }
 }
 
 function recalculateDraftStages(stages: TemplateDraftStage[]) {
-  return recalculateSequentialStageDates(stages.map((stage) => ({ ...stage }))).map((stage) => ({
-    ...stage,
-    durationDays: stage.durationDays ?? 1,
+  return buildSequentialStageSchedule(
+    stages.map((stage) => ({
+      ...stage,
+      stageTemplateDurationDays: null,
+    }))
+  ).map((stage) => ({
+    id: stage.id,
+    stageName: stage.stageName,
+    plannedDate: stage.plannedDate,
+    durationDays: stage.durationDays ?? null,
+    effectiveDurationDays: stage.effectiveDurationDays,
+    participatesInAutoshift: stage.participatesInAutoshift,
   }))
 }
 
 function recalculateSelectedTemplateStages(stages: SelectedTemplateStageOverride[]) {
-  return recalculateSequentialStageDates(
+  return buildSequentialStageSchedule(
     stages.map((stage) => ({
       ...stage,
-      stageTemplateDurationDays: stage.durationDays,
+      stageTemplateDurationDays: stage.stageTemplateDurationDays ?? null,
     }))
   ).map((stage) => ({
     ...stage,
-    durationDays: stage.durationDays ?? 1,
+    durationDays: stage.durationDays ?? null,
+    effectiveDurationDays: stage.effectiveDurationDays,
   }))
+}
+
+function hydrateSelectedTemplateStages(stages: ProductTemplateStageData[]) {
+  return recalculateSelectedTemplateStages(
+    stages.map((stage) => ({
+      ...stage,
+      plannedDate: stage.plannedDate ? new Date(stage.plannedDate) : null,
+      durationDays: stage.durationDays ?? null,
+    }))
+  )
 }
 
 export function NewProductForm({
@@ -74,7 +97,6 @@ export function NewProductForm({
   onCancel,
   onCreated,
   returnTo = '/products',
-  formAction,
 }: NewProductFormProps) {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
@@ -85,7 +107,7 @@ export function NewProductForm({
   const [templateError, setTemplateError] = useState('')
   const [templateDraftName, setTemplateDraftName] = useState('')
   const [templateDraftDescription, setTemplateDraftDescription] = useState('')
-  const [templateStages, setTemplateStages] = useState<TemplateDraftStage[]>([createDraftStage()])
+  const [templateStages, setTemplateStages] = useState<TemplateDraftStage[]>([createDraftStage(0)])
   const [selectedTemplateStages, setSelectedTemplateStages] = useState<SelectedTemplateStageOverride[]>([])
 
   const [form, setForm] = useState({
@@ -111,13 +133,7 @@ export function NewProductForm({
     }
 
     setSelectedTemplateStages(
-      recalculateSelectedTemplateStages(
-        selectedTemplate.stages.map((stage) => ({
-          ...stage,
-          plannedDate: stage.plannedDate ? new Date(stage.plannedDate) : null,
-          durationDays: stage.durationDays ?? 1,
-        }))
-      )
+      hydrateSelectedTemplateStages(selectedTemplate.stages)
     )
   }, [selectedTemplate])
 
@@ -140,7 +156,7 @@ export function NewProductForm({
         })
 
         if (nextStages[0]?.plannedDate === null) {
-          return nextStages.map((stage) => ({ ...stage, plannedDate: null }))
+          return nextStages.map((stage) => ({ ...stage, plannedDate: null, effectiveDurationDays: null }))
         }
 
         return recalculateDraftStages(nextStages)
@@ -166,7 +182,7 @@ export function NewProductForm({
         })
 
         if (nextStages[0]?.plannedDate === null) {
-          return nextStages.map((stage) => ({ ...stage, plannedDate: null }))
+          return nextStages.map((stage) => ({ ...stage, plannedDate: null, effectiveDurationDays: null }))
         }
 
         return recalculateSelectedTemplateStages(nextStages)
@@ -175,14 +191,13 @@ export function NewProductForm({
   }
 
   const addTemplateStage = () => {
-    setTemplateStages((prev) => recalculateDraftStages([...prev, createDraftStage()]))
+    setTemplateStages((prev) => recalculateDraftStages([...prev, createDraftStage(prev.length)]))
   }
 
   const removeTemplateStage = (stageId: string) => {
     setTemplateStages((prev) => {
       if (prev.length === 1) {
-        return [{ ...prev[0], stageName: '', plannedDate: null, participatesInAutoshift: true }]
-          .map((stage) => ({ ...stage, durationDays: 1 }))
+        return [{ ...prev[0], stageName: '', plannedDate: null, durationDays: 1, effectiveDurationDays: 1, participatesInAutoshift: true }]
       }
       return recalculateDraftStages(prev.filter((stage) => stage.id !== stageId))
     })
@@ -191,30 +206,39 @@ export function NewProductForm({
   const resetTemplateBuilder = () => {
     setTemplateDraftName('')
     setTemplateDraftDescription('')
-    setTemplateStages([createDraftStage()])
+    setTemplateStages([createDraftStage(0)])
     setTemplateError('')
     setShowTemplateBuilder(false)
   }
 
-  const handleCreateTemplate = async () => {
+  const buildTemplateDraftPayload = () => {
     const normalizedName = templateDraftName.trim()
     const normalizedStages = templateStages
       .map((stage) => ({
         stageName: stage.stageName.trim(),
         plannedDate: stage.plannedDate,
-        durationDays: stage.durationDays ?? 1,
+        durationDays: stage.durationDays ?? null,
         participatesInAutoshift: stage.participatesInAutoshift,
       }))
       .filter((stage) => stage.stageName)
 
+    return {
+      normalizedName,
+      normalizedStages,
+    }
+  }
+
+  const persistTemplateDraft = async () => {
+    const { normalizedName, normalizedStages } = buildTemplateDraftPayload()
+
     if (!normalizedName) {
       setTemplateError('Укажите название шаблона')
-      return
+      return null
     }
 
     if (normalizedStages.length === 0) {
       setTemplateError('Добавьте хотя бы один этап в шаблон')
-      return
+      return null
     }
 
     setTemplateSaving(true)
@@ -230,7 +254,7 @@ export function NewProductForm({
           stages: normalizedStages.map((stage) => ({
             stageName: stage.stageName,
             plannedDate: stage.plannedDate ? stage.plannedDate.toISOString() : null,
-            durationDays: stage.durationDays,
+            durationDays: stage.durationDays ?? null,
             participatesInAutoshift: stage.participatesInAutoshift,
           })),
         }),
@@ -243,20 +267,23 @@ export function NewProductForm({
       }
 
       setTemplates((prev) => [data, ...prev])
+      setSelectedTemplateStages(hydrateSelectedTemplateStages(Array.isArray(data?.stages) ? data.stages : []))
       setForm((prev) => ({ ...prev, productTemplateId: data.id }))
       resetTemplateBuilder()
+      return data as ProductTemplateData
     } catch (err: any) {
       setTemplateError(err.message || 'Не удалось создать шаблон этапов')
+      return null
     } finally {
       setTemplateSaving(false)
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    if (formAction) {
-      return
-    }
+  const handleCreateTemplate = async () => {
+    await persistTemplateDraft()
+  }
 
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.name.trim()) {
       setError('Укажите название продукта')
@@ -267,19 +294,37 @@ export function NewProductForm({
     setError('')
 
     try {
+      const templateDraftHasContent = (() => {
+        const { normalizedName, normalizedStages } = buildTemplateDraftPayload()
+        return Boolean(normalizedName || normalizedStages.length > 0)
+      })()
+
+      let productTemplateId = form.productTemplateId || null
+      let templateStageOverrides = selectedTemplateStages
+
+      if (showTemplateBuilder && templateDraftHasContent) {
+        const createdTemplate = await persistTemplateDraft()
+        if (!createdTemplate?.id) {
+          throw new Error('Не удалось сохранить шаблон этапов')
+        }
+
+        productTemplateId = createdTemplate.id
+        templateStageOverrides = hydrateSelectedTemplateStages(createdTemplate.stages)
+      }
+
       const res = await fetch('/api/products', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...form,
-          productTemplateId: form.productTemplateId || null,
-          templateStagesOverride: selectedTemplateStages.map((stage) => ({
+          productTemplateId,
+          templateStagesOverride: templateStageOverrides.map((stage) => ({
             id: stage.id,
             stageTemplateId: stage.stageTemplateId,
             stageOrder: stage.stageOrder,
             stageName: stage.stageName,
             plannedDate: stage.plannedDate ? stage.plannedDate.toISOString() : null,
-            durationDays: stage.durationDays ?? 1,
+            durationDays: stage.durationDays ?? null,
             participatesInAutoshift: stage.participatesInAutoshift,
           })),
           responsibleId: form.responsibleId || null,
@@ -333,7 +378,7 @@ export function NewProductForm({
           stageOrder: stage.stageOrder,
           stageName: stage.stageName,
           plannedDate: stage.plannedDate ? stage.plannedDate.toISOString() : null,
-          durationDays: stage.durationDays ?? 1,
+          durationDays: stage.durationDays ?? null,
           participatesInAutoshift: stage.participatesInAutoshift,
         }))
       ),
@@ -341,7 +386,7 @@ export function NewProductForm({
   )
 
   return (
-    <form action={formAction} onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-6">
       <input type="hidden" name="name" value={form.name} />
       <input type="hidden" name="country" value={form.country} />
       <input type="hidden" name="category" value={form.category} />
@@ -449,10 +494,11 @@ export function NewProductForm({
                         type="number"
                         min={1}
                         step={1}
-                        value={stage.durationDays ?? 1}
+                        value={stage.durationDays ?? stage.effectiveDurationDays ?? 1}
                         onChange={(e) =>
                           updateSelectedTemplateStage(stage.id, {
-                            durationDays: e.target.value ? Math.max(1, Number(e.target.value)) : 1,
+                            durationDays: e.target.value ? Math.max(1, Number(e.target.value)) : null,
+                            ...(e.target.value ? {} : { durationDays: null }),
                           })
                         }
                         className="input h-9 w-full text-sm"
@@ -561,10 +607,10 @@ export function NewProductForm({
                         type="number"
                         min={1}
                         step={1}
-                        value={stage.durationDays ?? 1}
+                        value={stage.durationDays ?? stage.effectiveDurationDays ?? 1}
                         onChange={(e) =>
                           updateTemplateStage(stage.id, {
-                            durationDays: e.target.value ? Math.max(1, Number(e.target.value)) : 1,
+                            durationDays: e.target.value ? Math.max(1, Number(e.target.value)) : null,
                           })
                         }
                         className="input h-11 w-full"

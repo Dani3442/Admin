@@ -46,6 +46,7 @@ interface TableViewClientProps {
   externalFilters?: ProductListFilters
   externalSortField?: ProductListSortField
   externalSortDirection?: ProductListSortDirection
+  archiveMode?: boolean
 }
 
 interface EditingCellState {
@@ -147,6 +148,7 @@ export function TableViewClient({
   externalFilters,
   externalSortField,
   externalSortDirection,
+  archiveMode = false,
 }: TableViewClientProps) {
   const [products, setProducts] = useState(initial)
   const [stages, setStages] = useState(initialStages)
@@ -177,8 +179,8 @@ export function TableViewClient({
   const [newStageDuration, setNewStageDuration] = useState('')
   const [newStageAutoshift, setNewStageAutoshift] = useState(true)
   const menuRef = useRef<HTMLDivElement>(null)
-  const canEditTable = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUserRole)
-  const canDeleteProducts = ['ADMIN', 'DIRECTOR'].includes(currentUserRole)
+  const canEditTable = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUserRole) && !archiveMode
+  const canDeleteProducts = ['ADMIN', 'DIRECTOR'].includes(currentUserRole) && !archiveMode
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null)
   const [pendingDeleteStageId, setPendingDeleteStageId] = useState<string | null>(null)
   const [pendingDeleteProduct, setPendingDeleteProduct] = useState<{ id: string; name: string } | null>(null)
@@ -381,8 +383,21 @@ export function TableViewClient({
         setPendingDeleteStageId(null)
         router.refresh()
       } else {
-        const data = await res.json().catch(() => null)
-        window.alert(data?.error || 'Не удалось удалить этап')
+        const responseText = await res.text()
+        let data: { error?: string; details?: string } | null = null
+
+        try {
+          data = responseText ? JSON.parse(responseText) : null
+        } catch {
+          data = null
+        }
+
+        window.alert(
+          data?.details ||
+            data?.error ||
+            responseText ||
+            'Не удалось удалить этап'
+        )
       }
     } finally {
       setStageMenu(null)

@@ -3,20 +3,17 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getCommentDisplayText } from '@/lib/comment-mentions'
 
-export async function GET(req: NextRequest) {
-  const session = await auth()
-  if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const currentUserId = (session.user as any).id as string
-
+async function getNotificationData(currentUserId: string) {
   const now = new Date()
   const sevenDaysAgo = new Date(now.getTime() - 7 * 86400000)
-
   const mentionToken = `](${currentUserId})`
 
-  const [recentChanges, overdueStages, riskProducts, recentMentions, mentionSeenEntries] = await Promise.all([
-    // Recent changes (last 7 days)
+  const [recentChanges, overdueStages, riskProducts, recentMentions, notificationSeenEntries] = await Promise.all([
     prisma.changeHistory.findMany({
-      where: { createdAt: { gte: sevenDaysAgo } },
+      where: {
+        createdAt: { gte: sevenDaysAgo },
+        field: { notIn: ['notificationsSeenAt', 'mentionsSeenAt'] },
+      },
       include: {
         changedBy: { select: { name: true } },
         product: { select: { id: true, name: true } },
@@ -25,7 +22,6 @@ export async function GET(req: NextRequest) {
       take: 10,
     }),
 
-    // Overdue stages (date in the past, not completed)
     prisma.productStage.findMany({
       where: {
         isCompleted: false,
@@ -42,13 +38,12 @@ export async function GET(req: NextRequest) {
       take: 10,
     }),
 
-    // Products at risk or delayed
     prisma.product.findMany({
       where: {
         isArchived: false,
         status: { in: ['AT_RISK', 'DELAYED'] },
       },
-      select: { id: true, name: true, status: true, riskScore: true, finalDate: true },
+      select: { id: true, name: true, status: true, riskScore: true, finalDate: true, updatedAt: true },
       orderBy: { riskScore: 'desc' },
       take: 5,
     }),
@@ -71,7 +66,7 @@ export async function GET(req: NextRequest) {
     prisma.changeHistory.findMany({
       where: {
         changedById: currentUserId,
-        field: 'mentionsSeenAt',
+        field: 'notificationsSeenAt',
       },
       select: {
         productId: true,
@@ -83,7 +78,7 @@ export async function GET(req: NextRequest) {
   ])
 
   const seenAtByProductId = new Map<string, Date>()
-  for (const entry of mentionSeenEntries) {
+  for (const entry of notificationSeenEntries) {
     if (!entry.productId || seenAtByProductId.has(entry.productId)) continue
     const parsed = entry.newValue ? new Date(entry.newValue) : entry.createdAt
     if (!Number.isNaN(parsed.getTime())) {
@@ -91,10 +86,33 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const unreadMentions = recentMentions.filter((comment) => {
-    const seenAt = seenAtByProductId.get(comment.product.id)
-    return !seenAt || comment.createdAt > seenAt
-  })
+  const isUnread = (productId: string | null, createdAt: Date) => {
+    if (!productId) return true
+    const seenAt = seenAtByProductId.get(productId)
+    return !seenAt || createdAt > seenAt
+  }
+
+  return {
+    now,
+    recentChanges,
+    overdueStages,
+    riskProducts,
+    recentMentions,
+    isUnread,
+  }
+}
+
+export async function GET(req: NextRequest) {
+  const session = await auth()
+  if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const currentUserId = (session.user as any).id as string
+
+  const { now, recentChanges, overdueStages, riskProducts, recentMentions, isUnread } = await getNotificationData(currentUserId)
+
+  const unreadMentions = recentMentions.filter((comment) => isUnread(comment.product.id, comment.createdAt))
+  const unreadOverdueStages = overdueStages.filter((stage) => isUnread(stage.product.id, stage.dateValue!))
+  const unreadRiskProducts = riskProducts.filter((product) => isUnread(product.id, product.updatedAt))
+  const unreadChanges = recentChanges.filter((change) => isUnread(change.product.id, change.createdAt))
 
   const notifications: Array<{
     id: string
@@ -106,7 +124,7 @@ export async function GET(req: NextRequest) {
     href?: string | null
   }> = []
 
-  for (const comment of unreadMentions) {
+  for (const comment of recentMentions) {
     notifications.push({
       id: `mention-${comment.id}`,
       type: 'mention',
@@ -139,7 +157,7 @@ export async function GET(req: NextRequest) {
       title: product.status === 'DELAYED' ? 'Задержка' : 'Под риском',
       description: `${product.name} (риск: ${product.riskScore}/100)`,
       productId: product.id,
-      createdAt: now.toISOString(),
+      createdAt: product.updatedAt.toISOString(),
     })
   }
 
@@ -163,10 +181,70 @@ export async function GET(req: NextRequest) {
     notifications: notifications.slice(0, 20),
     counts: {
       mentions: unreadMentions.length,
-      overdue: overdueStages.length,
-      risk: riskProducts.length,
-      changes: recentChanges.length,
-      total: unreadMentions.length + overdueStages.length + riskProducts.length + recentChanges.length,
+      overdue: unreadOverdueStages.length,
+      risk: unreadRiskProducts.length,
+      changes: unreadChanges.length,
+      total: unreadMentions.length + unreadOverdueStages.length + unreadRiskProducts.length + unreadChanges.length,
     },
   })
+}
+
+export async function POST() {
+  const session = await auth()
+  if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const currentUserId = (session.user as any).id as string
+
+  const { now, recentChanges, overdueStages, riskProducts, recentMentions, isUnread } = await getNotificationData(currentUserId)
+
+  const productIds = new Set<string>()
+
+  for (const comment of recentMentions) {
+    if (isUnread(comment.product.id, comment.createdAt)) {
+      productIds.add(comment.product.id)
+    }
+  }
+
+  for (const stage of overdueStages) {
+    if (isUnread(stage.product.id, stage.dateValue!)) {
+      productIds.add(stage.product.id)
+    }
+  }
+
+  for (const product of riskProducts) {
+    if (isUnread(product.id, product.updatedAt)) {
+      productIds.add(product.id)
+    }
+  }
+
+  for (const change of recentChanges) {
+    if (isUnread(change.product.id, change.createdAt)) {
+      productIds.add(change.product.id)
+    }
+  }
+
+  const ids = Array.from(productIds)
+
+  if (ids.length === 0) {
+    return NextResponse.json({ success: true, updated: 0 })
+  }
+
+  await prisma.$transaction([
+    prisma.changeHistory.deleteMany({
+      where: {
+        changedById: currentUserId,
+        field: 'notificationsSeenAt',
+        productId: { in: ids },
+      },
+    }),
+    prisma.changeHistory.createMany({
+      data: ids.map((productId) => ({
+        productId,
+        field: 'notificationsSeenAt',
+        newValue: now.toISOString(),
+        changedById: currentUserId,
+      })),
+    }),
+  ])
+
+  return NextResponse.json({ success: true, updated: ids.length })
 }

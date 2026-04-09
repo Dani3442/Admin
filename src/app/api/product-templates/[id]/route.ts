@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth, hasPermission, Permission } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { recalculateSequentialStageDates } from '@/lib/stage-schedule'
+import { buildSequentialStageSchedule } from '@/lib/stage-schedule'
 import { supportsProductTemplateStageDurationDaysColumn } from '@/lib/schema-compat'
 
 function normalizeStageName(name: string) {
@@ -51,7 +51,7 @@ export async function PATCH(
           stageTemplateDurationDays: null,
           }))
         .filter((stage: { stageName: string }) => stage.stageName)
-    const stages = recalculateSequentialStageDates(preparedStages)
+    const stages = buildSequentialStageSchedule(preparedStages)
 
     if (stages.length === 0) {
       return NextResponse.json({ error: 'Добавьте хотя бы один этап в шаблон' }, { status: 400 })
@@ -199,10 +199,8 @@ export async function PATCH(
         stageOrder: stage.stageOrder,
         stageName: stage.stageName,
         plannedDate: stage.plannedDate,
-        durationDays:
-          (hasDurationDaysColumn ? (stage as any).durationDays : null) ??
-          stage.stageTemplate.durationDays ??
-          null,
+        durationDays: hasDurationDaysColumn ? (stage as any).durationDays ?? null : null,
+        stageTemplateDurationDays: stage.stageTemplate.durationDays ?? null,
         participatesInAutoshift: true,
       })),
     })

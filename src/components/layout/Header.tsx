@@ -16,6 +16,7 @@ import {
   ChevronRight,
   LayoutDashboard,
   Package,
+  Archive,
   Settings,
   UserCircle2,
   Users,
@@ -51,6 +52,7 @@ const NAV_ITEMS: Array<{
   { label: 'Продукты', href: '/products', icon: Package },
   { label: 'Автоматизации', href: '/automations', icon: Zap },
   { label: 'Пользователи', href: '/users', icon: Users, adminOnly: true },
+  { label: 'Архив', href: '/archive', icon: Archive },
 ]
 
 export function Header({ user }: HeaderProps) {
@@ -134,6 +136,16 @@ export function Header({ user }: HeaderProps) {
     }
   }
 
+  const markNotificationsSeen = async () => {
+    try {
+      await fetch('/api/notifications', {
+        method: 'POST',
+      })
+    } catch {
+      // Keep the panel usable even if the mark-seen request fails.
+    }
+  }
+
   useEffect(() => {
     fetchNotifications()
   }, [])
@@ -142,12 +154,18 @@ export function Header({ user }: HeaderProps) {
     fetchNotifications()
   }, [pathname, searchParams])
 
-  const handleToggleNotifications = () => {
+  const handleToggleNotifications = async () => {
     const nextOpen = !notificationsOpen
     setNotificationsOpen(nextOpen)
     setProfileOpen(false)
 
-    if (nextOpen && !loaded) {
+    if (nextOpen) {
+      setNotifications([])
+      setCounts({ mentions: 0, overdue: 0, risk: 0, changes: 0, total: 0 })
+      setLoaded(true)
+      await markNotificationsSeen()
+      fetchNotifications()
+    } else if (!loaded) {
       fetchNotifications()
     }
   }

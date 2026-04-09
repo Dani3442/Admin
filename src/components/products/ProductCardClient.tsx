@@ -5,9 +5,9 @@ import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { AnimatePresence, motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
-import { ArrowLeft, CalendarDays, CheckCircle2, Circle, AlertTriangle, MessageCircle, Clock, History, Zap, ExternalLink, Edit2, Save, Pencil, ChevronUp, ChevronDown, X, Plus, Trash2, SendHorizontal } from 'lucide-react'
+import { ArrowLeft, CalendarDays, CheckCircle2, Circle, AlertTriangle, MessageCircle, Clock, History, Zap, ExternalLink, Edit2, Save, Pencil, ChevronUp, ChevronDown, X, Plus, Trash2, SendHorizontal, Archive, ArchiveRestore } from 'lucide-react'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
-import { cn, getStatusColor, getStatusLabel, getPriorityColor, getPriorityLabel, formatDate, detectStageOverlaps, formatStageOverlap } from '@/lib/utils'
+import { cn, getStatusColor, getStatusLabel, getPriorityColor, getPriorityLabel, formatDate, formatDurationDays, detectStageOverlaps, formatStageOverlap } from '@/lib/utils'
 import { DatePicker } from '@/components/ui/DatePicker'
 import { resolveBackNavigation } from '@/lib/navigation'
 import { UserAvatar } from '@/components/users/UserAvatar'
@@ -69,8 +69,14 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
   const [automationDesc, setAutomationDesc] = useState('')
   const [savingAutomation, setSavingAutomation] = useState(false)
   const [deletingProduct, setDeletingProduct] = useState(false)
+  const [lifecycleSaving, setLifecycleSaving] = useState(false)
   const [pendingDeleteStageId, setPendingDeleteStageId] = useState<string | null>(null)
-  const [confirmDeleteProductOpen, setConfirmDeleteProductOpen] = useState(false)
+  const [confirmArchiveProductOpen, setConfirmArchiveProductOpen] = useState(false)
+  const [confirmRestoreProductOpen, setConfirmRestoreProductOpen] = useState(false)
+  const [closeModalOpen, setCloseModalOpen] = useState(false)
+  const [closeStatus, setCloseStatus] = useState<'COMPLETED' | 'CANCELLED'>('COMPLETED')
+  const [closeComment, setCloseComment] = useState('')
+  const [archiveReason, setArchiveReason] = useState('')
   const commentInputRef = useRef<HTMLTextAreaElement>(null)
   const commentsScrollRef = useRef<HTMLDivElement>(null)
   const markedSeenProductRef = useRef<string | null>(null)
@@ -86,9 +92,10 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
     return () => document.removeEventListener('mousedown', handleClick)
   }, [stageMenu])
 
-  const canEdit = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUser?.role)
-  const canComment = Boolean(currentUser?.id)
-  const canDeleteProduct = ['ADMIN', 'DIRECTOR'].includes(currentUser?.role)
+  const canEdit = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUser?.role) && !product.isArchived
+  const canComment = Boolean(currentUser?.id) && !product.isArchived
+  const canArchiveProduct = ['ADMIN', 'DIRECTOR'].includes(currentUser?.role)
+  const canCloseProduct = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUser?.role)
   const backNavigation = resolveBackNavigation(searchParams.get('returnTo'))
   const mentionableUsers = useMemo(
     () =>
@@ -581,28 +588,83 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
     }
   }
 
-  const handleDeleteProduct = async () => {
-    setConfirmDeleteProductOpen(true)
+  const handleArchiveProduct = async () => {
+    setConfirmArchiveProductOpen(true)
   }
 
-  const confirmDeleteProduct = async () => {
+  const confirmArchiveProduct = async () => {
     setDeletingProduct(true)
     try {
       const res = await fetch(`/api/products/${product.id}`, {
-        method: 'DELETE',
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'archive', archiveReason }),
       })
       const data = await res.json().catch(() => null)
 
       if (!res.ok) {
-        throw new Error(data?.error || 'Не удалось удалить продукт')
+        throw new Error(data?.error || 'Не удалось архивировать продукт')
       }
 
-      setConfirmDeleteProductOpen(false)
-      router.push(backNavigation.href)
+      setConfirmArchiveProductOpen(false)
+      setArchiveReason('')
+      setProduct((prev: any) => ({ ...prev, ...data }))
       router.refresh()
     } catch (error: any) {
-      alert(error.message || 'Не удалось удалить продукт')
+      alert(error.message || 'Не удалось архивировать продукт')
       setDeletingProduct(false)
+    }
+  }
+
+  const confirmRestoreProduct = async () => {
+    setLifecycleSaving(true)
+    try {
+      const res = await fetch(`/api/products/${product.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'restore' }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        throw new Error(data?.error || 'Не удалось восстановить продукт')
+      }
+
+      setConfirmRestoreProductOpen(false)
+      setProduct((prev: any) => ({ ...prev, ...data }))
+      router.refresh()
+    } catch (error: any) {
+      alert(error.message || 'Не удалось восстановить продукт')
+    } finally {
+      setLifecycleSaving(false)
+    }
+  }
+
+  const confirmCloseProduct = async () => {
+    setLifecycleSaving(true)
+    try {
+      const res = await fetch(`/api/products/${product.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'close',
+          status: closeStatus,
+          closureComment: closeComment,
+        }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        throw new Error(data?.error || 'Не удалось закрыть продукт')
+      }
+
+      setCloseModalOpen(false)
+      setCloseComment('')
+      setCloseStatus('COMPLETED')
+      setProduct((prev: any) => ({ ...prev, ...data }))
+      router.refresh()
+    } catch (error: any) {
+      alert(error.message || 'Не удалось закрыть продукт')
+    } finally {
+      setLifecycleSaving(false)
     }
   }
 
@@ -669,20 +731,74 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
         <Link href={backNavigation.href} className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 transition-colors">
           <ArrowLeft className="w-4 h-4" /> {backNavigation.label}
         </Link>
-        {canDeleteProduct && (
-          <button
-            onClick={handleDeleteProduct}
-            disabled={deletingProduct}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-          >
-            <Trash2 className="w-4 h-4" />
-            {deletingProduct ? 'Удаление...' : 'Удалить продукт'}
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {canCloseProduct && !product.isArchived && (
+            <button
+              onClick={() => setCloseModalOpen(true)}
+              disabled={lifecycleSaving}
+              className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-800 disabled:opacity-60"
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              Закрыть продукт
+            </button>
+          )}
+          {canArchiveProduct && !product.isArchived && (
+            <button
+              onClick={handleArchiveProduct}
+              disabled={deletingProduct}
+              className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-60"
+            >
+              <Archive className="h-4 w-4" />
+              {deletingProduct ? 'Архивация...' : 'Архивировать'}
+            </button>
+          )}
+          {canArchiveProduct && product.isArchived && (
+            <button
+              onClick={() => setConfirmRestoreProductOpen(true)}
+              disabled={lifecycleSaving}
+              className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-50 disabled:opacity-60"
+            >
+              <ArchiveRestore className="h-4 w-4" />
+              Восстановить
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Header Card */}
       <div className="card">
+        {(product.closedAt || product.isArchived) && (
+          <div className="mb-4 rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+            <div className="flex flex-wrap items-center gap-4">
+              {product.closedAt && (
+                <span>
+                  Закрыт: <span className="font-medium text-slate-800">{formatDate(product.closedAt)}</span>
+                  {product.closedBy?.name ? (
+                    <>
+                      {' '}• <span className="font-medium text-slate-800">{product.closedBy.name}</span>
+                    </>
+                  ) : null}
+                </span>
+              )}
+              {product.isArchived && (
+                <span>
+                  В архиве: <span className="font-medium text-slate-800">{formatDate(product.archivedAt)}</span>
+                  {product.archivedBy?.name ? (
+                    <>
+                      {' '}• <span className="font-medium text-slate-800">{product.archivedBy.name}</span>
+                    </>
+                  ) : null}
+                </span>
+              )}
+            </div>
+            {product.closureComment && (
+              <p className="mt-2 text-slate-500">Комментарий при закрытии: <span className="text-slate-700">{product.closureComment}</span></p>
+            )}
+            {product.archiveReason && (
+              <p className="mt-1 text-slate-500">Причина архивации: <span className="text-slate-700">{product.archiveReason}</span></p>
+            )}
+          </div>
+        )}
         <div className="flex items-start gap-4">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 flex-wrap mb-2">
@@ -962,9 +1078,9 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                             )}
                           </div>
 
-                          {stage.stageTemplate?.durationText && (
+                          {Boolean(stage.durationDays ?? stage.stageTemplate?.durationDays) && (
                             <div className="w-16 flex-shrink-0 text-center text-xs text-slate-400">
-                              {stage.stageTemplate.durationText}
+                              {formatDurationDays(stage.durationDays ?? stage.stageTemplate?.durationDays ?? null)}
                             </div>
                           )}
 
@@ -1399,14 +1515,117 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
       />
 
       <ConfirmDialog
-        open={confirmDeleteProductOpen}
-        title="Удалить продукт?"
-        description={`Продукт «${product.name}» будет удалён вместе со всеми этапами, комментариями и историей.`}
-        confirmLabel="Удалить продукт"
+        open={confirmArchiveProductOpen}
+        title="Архивировать продукт?"
+        description={`Продукт «${product.name}» исчезнет из активных списков, но вся история, комментарии и этапы сохранятся.`}
+        confirmLabel="Архивировать"
         loading={deletingProduct}
-        onCancel={() => setConfirmDeleteProductOpen(false)}
-        onConfirm={confirmDeleteProduct}
+        onCancel={() => setConfirmArchiveProductOpen(false)}
+        onConfirm={confirmArchiveProduct}
       />
+
+      <ConfirmDialog
+        open={confirmRestoreProductOpen}
+        title="Восстановить продукт?"
+        description={`Продукт «${product.name}» снова появится в активных списках.`}
+        confirmLabel="Восстановить"
+        loading={lifecycleSaving}
+        confirmTone="primary"
+        onCancel={() => setConfirmRestoreProductOpen(false)}
+        onConfirm={confirmRestoreProduct}
+      />
+
+      <AnimatePresence>
+        {closeModalOpen && typeof document !== 'undefined' && createPortal(
+          <motion.div
+            className="modal-backdrop flex items-center justify-center px-4"
+            onClick={() => setCloseModalOpen(false)}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="w-full max-w-lg space-y-4 rounded-[28px] bg-white p-6 shadow-xl"
+              onClick={(event) => event.stopPropagation()}
+              initial={{ opacity: 0, y: 18, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 12, scale: 0.98 }}
+              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-slate-900">Закрыть продукт</h3>
+                <button onClick={() => setCloseModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => setCloseStatus('COMPLETED')}
+                  className={cn(
+                    'rounded-[18px] border px-4 py-3 text-left text-sm transition-colors',
+                    closeStatus === 'COMPLETED'
+                      ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                      : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                  )}
+                >
+                  Завершён
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCloseStatus('CANCELLED')}
+                  className={cn(
+                    'rounded-[18px] border px-4 py-3 text-left text-sm transition-colors',
+                    closeStatus === 'CANCELLED'
+                      ? 'border-red-300 bg-red-50 text-red-700'
+                      : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                  )}
+                >
+                  Отменён
+                </button>
+              </div>
+
+              <label className="block space-y-1.5">
+                <span className="label mb-0">Комментарий закрытия</span>
+                <textarea
+                  value={closeComment}
+                  onChange={(event) => setCloseComment(event.target.value)}
+                  className="input h-24 w-full resize-none"
+                  placeholder="Коротко опиши итог по продукту"
+                />
+              </label>
+
+              <label className="block space-y-1.5">
+                <span className="label mb-0">Причина архивации</span>
+                <textarea
+                  value={archiveReason}
+                  onChange={(event) => setArchiveReason(event.target.value)}
+                  className="input h-20 w-full resize-none"
+                  placeholder="Почему продукт можно убрать в архив"
+                />
+              </label>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  onClick={() => setCloseModalOpen(false)}
+                  className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 transition-colors hover:text-slate-800"
+                >
+                  Отмена
+                </button>
+                <button
+                  onClick={confirmCloseProduct}
+                  className="btn-primary text-sm"
+                  disabled={lifecycleSaving}
+                >
+                  {lifecycleSaving ? 'Сохраняем...' : 'Закрыть продукт'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>,
+          document.body
+        )}
+      </AnimatePresence>
     </div>
   )
 }

@@ -80,7 +80,7 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
   const isSelf = profile.id === viewer.id
   const endpoint = isSelf ? '/api/profile' : `/api/users/${profile.id}`
   const canEditAnything = permissions.canEditPersonal || permissions.canEditOperational || permissions.canEditSensitive
-  const canOpenSettingsPanel = true
+  const canOpenSettingsPanel = ['ADMIN', 'DIRECTOR'].includes(viewer.role)
   const canSaveSettings = permissions.canEditOperational || permissions.canEditSensitive
   const backNavigation = resolveBackNavigation(searchParams.get('returnTo'), isSelf ? '/dashboard' : '/users')
 
@@ -243,6 +243,16 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
           <div className="flex items-start gap-4">
             <div className="relative shrink-0">
               <UserAvatar user={{ name: form.name, lastName: form.lastName, avatar: form.avatar }} size="xl" />
+              {activePanel === 'edit' && permissions.canEditPersonal && (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="absolute -bottom-1 right-2 inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/90 bg-slate-950 text-white shadow-lg transition hover:scale-[1.03] hover:bg-slate-800"
+                  aria-label="Обновить аватар"
+                >
+                  <Camera className="h-3.5 w-3.5" />
+                </button>
+              )}
             </div>
 
             <div className="min-w-0 space-y-4">
@@ -298,6 +308,8 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
         </div>
       )}
 
+      <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
+
       {activePanel === 'edit' && (
         <div className="surface-panel space-y-5 p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -308,8 +320,7 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
             {renderPanelActions(true)}
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
-            <div className="grid gap-4">
+          <div className="grid gap-4">
               <label className="space-y-1.5">
                 <span className="label mb-0">Имя</span>
                 <input
@@ -347,27 +358,6 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
                 <input value={profile.email} disabled className="input bg-slate-50 text-slate-500" />
                 <span className="text-xs text-slate-400">Email используется как логин и меняется только через администратора.</span>
               </label>
-            </div>
-
-            <div className="surface-subtle space-y-3 px-4 py-4">
-              <div className="text-sm font-semibold text-slate-800">Аватар</div>
-              <div className="flex justify-center">
-                <UserAvatar user={{ name: form.name, lastName: form.lastName, avatar: form.avatar }} size="xl" />
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button type="button" className="btn-secondary" onClick={() => fileInputRef.current?.click()}>
-                  <Camera className="h-4 w-4" />
-                  Загрузить
-                </button>
-                {form.avatar && (
-                  <button type="button" className="btn-secondary" onClick={() => updateField('avatar', null)}>
-                    <X className="h-4 w-4" />
-                    Удалить
-                  </button>
-                )}
-              </div>
-              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
-            </div>
           </div>
         </div>
       )}

@@ -4,8 +4,6 @@ import { prisma } from '@/lib/prisma'
 import { recalculateProductRisk } from '@/lib/risk'
 import { createProductStageCompat } from '@/lib/product-stage-compat'
 import {
-  supportsChangeHistoryProductStageIdColumn,
-  supportsCommentProductStageIdColumn,
   supportsStageTemplateAffectsFinalDateColumn,
 } from '@/lib/schema-compat'
 
@@ -26,30 +24,143 @@ async function updateProductProgress(productId: string) {
   })
 }
 
-async function shiftRemainingProductStagesAfterTemplateDeletion(
-  tx: {
-    productStage: {
-      findMany: (args: Record<string, unknown>) => Promise<Array<{ id: string; stageOrder: number }>>
-      update: (args: Record<string, unknown>) => Promise<unknown>
-    }
-  },
-  productId: string,
-  deletedTemplateOrder: number
+async function normalizeRemainingProductStages(
+  tx: any,
+  productId: string
 ) {
   const remainingStages = await tx.productStage.findMany({
-    where: {
-      productId,
-      stageOrder: { gt: deletedTemplateOrder },
-    },
-    orderBy: { stageOrder: 'asc' },
-    select: { id: true, stageOrder: true },
+    where: { productId },
+    select: { id: true },
+    orderBy: [{ stageOrder: 'asc' }, { createdAt: 'asc' }],
   })
 
-  for (const remainingStage of remainingStages) {
+  for (let index = 0; index < remainingStages.length; index += 1) {
     await tx.productStage.update({
-      where: { id: remainingStage.id },
-      data: { stageOrder: remainingStage.stageOrder - 1 },
+      where: { id: remainingStages[index].id },
+      data: { stageOrder: 1000000 + index },
+      select: { id: true },
     })
+  }
+
+  for (let index = 0; index < remainingStages.length; index += 1) {
+    await tx.productStage.update({
+      where: { id: remainingStages[index].id },
+      data: { stageOrder: index },
+      select: { id: true },
+    })
+  }
+}
+
+async function normalizeRemainingProductTemplateStages(
+  tx: any
+) {
+  const templateStages = await tx.productTemplateStage.findMany({
+    select: {
+      id: true,
+      productTemplateId: true,
+    },
+    orderBy: [
+      { productTemplateId: 'asc' },
+      { stageOrder: 'asc' },
+      { createdAt: 'asc' },
+    ],
+  })
+
+  const grouped = new Map<string, { id: string }[]>()
+  for (const stage of templateStages) {
+    const bucket = grouped.get(stage.productTemplateId) ?? []
+    bucket.push({ id: stage.id })
+    grouped.set(stage.productTemplateId, bucket)
+  }
+
+  for (const stages of grouped.values()) {
+    for (let index = 0; index < stages.length; index += 1) {
+      await tx.productTemplateStage.update({
+        where: { id: stages[index].id },
+        data: { stageOrder: 1000000 + index },
+        select: { id: true },
+      })
+    }
+
+    for (let index = 0; index < stages.length; index += 1) {
+      await tx.productTemplateStage.update({
+        where: { id: stages[index].id },
+        data: { stageOrder: index },
+        select: { id: true },
+      })
+    }
+  }
+}
+
+async function normalizeRemainingStageTemplates(
+  tx: any
+) {
+  const templates = await tx.stageTemplate.findMany({
+    select: { id: true },
+    orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
+  })
+
+  for (let index = 0; index < templates.length; index += 1) {
+    await tx.stageTemplate.update({
+      where: { id: templates[index].id },
+      data: { order: 1000000 + index },
+      select: { id: true },
+    })
+  }
+
+  for (let index = 0; index < templates.length; index += 1) {
+    await tx.stageTemplate.update({
+      where: { id: templates[index].id },
+      data: { order: index },
+      select: { id: true },
+    })
+  }
+}
+
+async function deleteRelatedStageRecords(
+  tx: {
+    comment: {
+      deleteMany: (args: Record<string, unknown>) => Promise<unknown>
+    }
+    changeHistory: {
+      deleteMany: (args: Record<string, unknown>) => Promise<unknown>
+    }
+  },
+  productStageIds: string[]
+) {
+  if (productStageIds.length === 0) return
+
+  const silentlyIgnoreMissingColumn = (error: unknown, columnName: string) => {
+    const message = error instanceof Error ? error.message : String(error)
+    return message.includes(columnName) && (
+      message.includes('does not exist') ||
+      message.includes('Unknown argument') ||
+      message.includes('Unknown field')
+    )
+  }
+
+  try {
+    await tx.comment.deleteMany({
+      where: {
+        productStageId: { in: productStageIds },
+      },
+    })
+  } catch (error) {
+    if (!silentlyIgnoreMissingColumn(error, 'productStageId')) {
+      throw error
+    }
+  }
+
+  try {
+    await tx.changeHistory.deleteMany({
+      where: {
+        productStageId: { in: productStageIds },
+      },
+    })
+  } catch (error) {
+    if (!silentlyIgnoreMissingColumn(error, 'productStageId')) {
+      throw error
+    }
   }
 }
 
@@ -292,11 +403,6 @@ export async function DELETE(req: NextRequest) {
   }
 
   try {
-    const hasStageTemplateAffectsFinalDateColumn = await supportsStageTemplateAffectsFinalDateColumn()
-    const [hasCommentProductStageIdColumn, hasChangeHistoryProductStageIdColumn] = await Promise.all([
-      supportsCommentProductStageIdColumn(),
-      supportsChangeHistoryProductStageIdColumn(),
-    ])
     const { searchParams } = new URL(req.url)
     const id = searchParams.get('id')
 
@@ -329,21 +435,7 @@ export async function DELETE(req: NextRequest) {
       affectedProductIds = [...new Set(productStages.map((stage) => stage.productId))]
 
       if (productStageIds.length > 0) {
-        if (hasCommentProductStageIdColumn) {
-          await tx.comment.deleteMany({
-            where: {
-              productStageId: { in: productStageIds },
-            },
-          })
-        }
-
-        if (hasChangeHistoryProductStageIdColumn) {
-          await tx.changeHistory.deleteMany({
-            where: {
-              productStageId: { in: productStageIds },
-            },
-          })
-        }
+        await deleteRelatedStageRecords(tx as any, productStageIds)
 
         await tx.productStage.deleteMany({
           where: {
@@ -352,7 +444,7 @@ export async function DELETE(req: NextRequest) {
         })
 
         for (const productId of affectedProductIds) {
-          await shiftRemainingProductStagesAfterTemplateDeletion(tx as any, productId, template.order)
+          await normalizeRemainingProductStages(tx as any, productId)
         }
       }
 
@@ -362,24 +454,17 @@ export async function DELETE(req: NextRequest) {
         },
       })
 
+      await normalizeRemainingProductTemplateStages(tx as any)
+
       await tx.stageTemplate.delete({
         where: { id },
         select: { id: true },
       })
 
-      const remainingTemplates = await tx.stageTemplate.findMany({
-        where: { order: { gt: template.order } },
-        orderBy: { order: 'asc' },
-        select: { id: true, order: true },
-      })
-
-      for (const remainingTemplate of remainingTemplates) {
-        await tx.stageTemplate.update({
-          where: { id: remainingTemplate.id },
-          data: { order: remainingTemplate.order - 1 },
-          select: { id: true },
-        })
-      }
+      await normalizeRemainingStageTemplates(tx as any)
+    }, {
+      timeout: 20000,
+      maxWait: 10000,
     })
 
     await Promise.allSettled(
@@ -403,6 +488,13 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json(all.map((stage) => ({ ...stage, participatesInAutoshift: true })))
   } catch (error) {
     console.error('[stage-templates:delete] Failed to delete stage template', error)
-    return NextResponse.json({ error: 'Не удалось удалить этап' }, { status: 500 })
+    const details = error instanceof Error ? error.message : String(error)
+    return NextResponse.json(
+      {
+        error: process.env.NODE_ENV === 'production' ? 'Не удалось удалить этап' : details,
+        details,
+      },
+      { status: 500 }
+    )
   }
 }

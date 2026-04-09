@@ -62,6 +62,26 @@ export function formatDateShort(date: Date | string | null | undefined): string 
   }
 }
 
+export function formatDurationDays(days: number | null | undefined): string {
+  if (typeof days !== 'number' || !Number.isFinite(days) || days <= 0) {
+    return ''
+  }
+
+  const normalized = Math.max(1, Math.floor(days))
+  const mod10 = normalized % 10
+  const mod100 = normalized % 100
+
+  if (mod10 === 1 && mod100 !== 11) {
+    return `${normalized} день`
+  }
+
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
+    return `${normalized} дня`
+  }
+
+  return `${normalized} дней`
+}
+
 export function getDaysUntil(date: Date | string | null | undefined): number | null {
   if (!date) return null
   return differenceInDays(new Date(date), new Date())

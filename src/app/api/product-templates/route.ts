@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth, hasPermission, Permission } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { recalculateSequentialStageDates } from '@/lib/stage-schedule'
+import { buildSequentialStageSchedule } from '@/lib/stage-schedule'
 import { supportsProductTemplateStageDurationDaysColumn } from '@/lib/schema-compat'
 
 function normalizeStageName(name: string) {
@@ -58,9 +58,8 @@ export async function GET() {
         stageOrder: stage.stageOrder,
         stageName: stage.stageName,
         plannedDate: stage.plannedDate,
-        durationDays: hasDurationDaysColumn
-          ? stage.durationDays ?? stage.stageTemplate.durationDays ?? null
-          : stage.stageTemplate.durationDays ?? null,
+        durationDays: hasDurationDaysColumn ? stage.durationDays ?? null : null,
+        stageTemplateDurationDays: stage.stageTemplate.durationDays ?? null,
         participatesInAutoshift: true,
       })),
     }))
@@ -135,15 +134,15 @@ export async function POST(req: NextRequest) {
 
       let nextOrder = (existingStageTemplates.at(-1)?.order ?? -1) + 1
 
+      const scheduledStages = buildSequentialStageSchedule(stages)
+
       const resolvedStages: Array<{
         stageTemplateId: string
         stageOrder: number
         stageName: string
         plannedDate: Date | null
         durationDays: number | null
-      }> = recalculateSequentialStageDates(
-        stages
-      ).map((stage) => ({
+      }> = scheduledStages.map((stage) => ({
         stageTemplateId: '',
         stageOrder: stage.stageOrder,
         stageName: stage.stageName,
@@ -231,9 +230,8 @@ export async function POST(req: NextRequest) {
         stageOrder: stage.stageOrder,
         stageName: stage.stageName,
         plannedDate: stage.plannedDate,
-        durationDays: hasDurationDaysColumn
-          ? stage.durationDays ?? stage.stageTemplate.durationDays ?? null
-          : stage.stageTemplate.durationDays ?? null,
+        durationDays: hasDurationDaysColumn ? stage.durationDays ?? null : null,
+        stageTemplateDurationDays: stage.stageTemplate.durationDays ?? null,
         participatesInAutoshift: true,
       })),
     }, { status: 201 })

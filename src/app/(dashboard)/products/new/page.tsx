@@ -2,7 +2,6 @@ import { redirect } from 'next/navigation'
 import { auth, hasPermission, Permission } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { NewProductForm } from '@/components/products/NewProductForm'
-import { createProduct } from '@/lib/product-create'
 import { supportsProductTemplateStageDurationDaysColumn } from '@/lib/schema-compat'
 
 async function getCreateProductData() {
@@ -56,10 +55,8 @@ async function getCreateProductData() {
         stageOrder: stage.stageOrder,
         stageName: stage.stageName,
         plannedDate: stage.plannedDate,
-        durationDays:
-          (hasProductTemplateStageDurationDaysColumn ? (stage as any).durationDays : null) ??
-          stage.stageTemplate.durationDays ??
-          null,
+        durationDays: hasProductTemplateStageDurationDaysColumn ? (stage as any).durationDays ?? null : null,
+        stageTemplateDurationDays: stage.stageTemplate.durationDays ?? null,
         participatesInAutoshift: true,
       })),
     })),
@@ -100,39 +97,6 @@ export default async function NewProductPage({
           stageSuggestions={data.stageSuggestions}
           mode="page"
           returnTo={returnTo}
-          formAction={async (formData) => {
-            'use server'
-
-            const session = await auth()
-            if (!session?.user) redirect('/login')
-            if (!hasPermission((session.user as any).role, Permission.EDIT_STAGES)) {
-              redirect('/products')
-            }
-
-            const rawOverride = String(formData.get('templateStagesOverride') || '[]')
-            let templateStagesOverride: any[] = []
-
-            try {
-              const parsed = JSON.parse(rawOverride)
-              templateStagesOverride = Array.isArray(parsed) ? parsed : []
-            } catch {
-              templateStagesOverride = []
-            }
-
-            const product = await createProduct({
-              name: String(formData.get('name') || ''),
-              country: String(formData.get('country') || ''),
-              category: String(formData.get('category') || ''),
-              sku: String(formData.get('sku') || ''),
-              priority: String(formData.get('priority') || 'MEDIUM'),
-              responsibleId: String(formData.get('responsibleId') || ''),
-              notes: String(formData.get('notes') || ''),
-              productTemplateId: String(formData.get('productTemplateId') || ''),
-              templateStagesOverride,
-            })
-
-            redirect(`/products/${encodeURIComponent(product.id)}`)
-          }}
         />
       </div>
     </div>

@@ -58,6 +58,19 @@ export async function supportsProductTemplateReferenceColumn() {
   return hasDbColumn('products', 'productTemplateId')
 }
 
+export async function supportsProductLifecycleColumns() {
+  const [closedAt, closedById, closureComment, archivedAt, archivedById, archiveReason] = await Promise.all([
+    hasDbColumn('products', 'closedAt'),
+    hasDbColumn('products', 'closedById'),
+    hasDbColumn('products', 'closureComment'),
+    hasDbColumn('products', 'archivedAt'),
+    hasDbColumn('products', 'archivedById'),
+    hasDbColumn('products', 'archiveReason'),
+  ])
+
+  return closedAt && closedById && closureComment && archivedAt && archivedById && archiveReason
+}
+
 export async function supportsCommentProductStageIdColumn() {
   return hasDbColumn('comments', 'productStageId')
 }

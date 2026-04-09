@@ -61,6 +61,12 @@ export interface ProductWithStages {
   finalDate: Date | null
   responsibleId: string | null
   productTemplateId: string | null
+  closedAt: Date | null
+  closedById: string | null
+  closureComment: string | null
+  archivedAt: Date | null
+  archivedById: string | null
+  archiveReason: string | null
   riskScore: number
   progressPercent: number
   notes: string | null
@@ -71,6 +77,8 @@ export interface ProductWithStages {
   createdAt: Date
   updatedAt: Date
   responsible?: { id: string; name: string; email: string } | null
+  closedBy?: { id: string; name: string; email?: string } | null
+  archivedBy?: { id: string; name: string; email?: string } | null
   stages: ProductStageWithTemplate[]
   _count?: { comments: number }
 }
@@ -119,6 +127,7 @@ export interface ProductTemplateStageData {
   stageName: string
   plannedDate: Date | null
   durationDays: number | null
+  stageTemplateDurationDays?: number | null
   participatesInAutoshift: boolean
 }
 

@@ -4,11 +4,45 @@ import { auth } from '@/lib/auth'
 import { ProductCardClient } from '@/components/products/ProductCardClient'
 import { getFinalDateFromStages } from '@/lib/product-derived-fields'
 import { getOverlapAcceptedMap } from '@/lib/overlap-acceptance'
+import { supportsProductLifecycleColumns } from '@/lib/schema-compat'
 
 async function getProduct(id: string) {
+  const hasProductLifecycleColumns = await supportsProductLifecycleColumns()
   const product = await prisma.product.findUnique({
     where: { id },
-    include: {
+    select: {
+      id: true,
+      name: true,
+      category: true,
+      sku: true,
+      country: true,
+      competitorUrl: true,
+      status: true,
+      priority: true,
+      finalDate: true,
+      responsibleId: true,
+      productTemplateId: true,
+      riskScore: true,
+      progressPercent: true,
+      notes: true,
+      sortOrder: true,
+      isPinned: true,
+      isFavorite: true,
+      isArchived: true,
+      createdAt: true,
+      updatedAt: true,
+      ...(hasProductLifecycleColumns
+        ? {
+            closedAt: true,
+            closedById: true,
+            closureComment: true,
+            archivedAt: true,
+            archivedById: true,
+            archiveReason: true,
+            closedBy: { select: { id: true, name: true, email: true } },
+            archivedBy: { select: { id: true, name: true, email: true } },
+          }
+        : {}),
       responsible: { select: { id: true, name: true, email: true } },
       stages: {
         orderBy: { stageOrder: 'asc' },
@@ -21,6 +55,7 @@ async function getProduct(id: string) {
           dateValue: true,
           dateRaw: true,
           dateEnd: true,
+          durationDays: true,
           status: true,
           isCompleted: true,
           isCritical: true,
@@ -67,12 +102,20 @@ async function getProduct(id: string) {
     },
   })
 
-  if (!product || product.isArchived) return null
+  if (!product) return null
 
   const overlapAcceptedById = await getOverlapAcceptedMap(id)
 
   return {
     ...product,
+    closedAt: hasProductLifecycleColumns ? (product as any).closedAt ?? null : null,
+    closedById: hasProductLifecycleColumns ? (product as any).closedById ?? null : null,
+    closureComment: hasProductLifecycleColumns ? (product as any).closureComment ?? null : null,
+    archivedAt: hasProductLifecycleColumns ? (product as any).archivedAt ?? null : null,
+    archivedById: hasProductLifecycleColumns ? (product as any).archivedById ?? null : null,
+    archiveReason: hasProductLifecycleColumns ? (product as any).archiveReason ?? null : null,
+    closedBy: hasProductLifecycleColumns ? (product as any).closedBy ?? null : null,
+    archivedBy: hasProductLifecycleColumns ? (product as any).archivedBy ?? null : null,
     finalDate: getFinalDateFromStages(product.stages),
     stages: product.stages.map((stage) => ({
       ...stage,

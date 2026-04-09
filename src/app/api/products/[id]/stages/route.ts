@@ -5,8 +5,6 @@ import { recalculateProductRisk } from '@/lib/risk'
 import { recalculateProductDerivedFields } from '@/lib/product-derived-fields'
 import { createProductStageCompat } from '@/lib/product-stage-compat'
 import {
-  supportsChangeHistoryProductStageIdColumn,
-  supportsCommentProductStageIdColumn,
   supportsStageTemplateAffectsFinalDateColumn,
 } from '@/lib/schema-compat'
 
@@ -99,6 +97,47 @@ async function getProductStageSnapshot(productId: string) {
   })
 
   return product
+}
+
+async function deleteRelatedStageRecords(
+  tx: {
+    comment: {
+      deleteMany: (args: Record<string, unknown>) => Promise<unknown>
+    }
+    changeHistory: {
+      deleteMany: (args: Record<string, unknown>) => Promise<unknown>
+    }
+  },
+  stageId: string
+) {
+  const silentlyIgnoreMissingColumn = (error: unknown, columnName: string) => {
+    const message = error instanceof Error ? error.message : String(error)
+    return message.includes(columnName) && (
+      message.includes('does not exist') ||
+      message.includes('Unknown argument') ||
+      message.includes('Unknown field')
+    )
+  }
+
+  try {
+    await tx.comment.deleteMany({
+      where: { productStageId: stageId },
+    })
+  } catch (error) {
+    if (!silentlyIgnoreMissingColumn(error, 'productStageId')) {
+      throw error
+    }
+  }
+
+  try {
+    await tx.changeHistory.deleteMany({
+      where: { productStageId: stageId },
+    })
+  } catch (error) {
+    if (!silentlyIgnoreMissingColumn(error, 'productStageId')) {
+      throw error
+    }
+  }
 }
 
 export async function POST(
@@ -241,10 +280,6 @@ export async function DELETE(
   }
 
   try {
-    const [hasCommentProductStageIdColumn, hasChangeHistoryProductStageIdColumn] = await Promise.all([
-      supportsCommentProductStageIdColumn(),
-      supportsChangeHistoryProductStageIdColumn(),
-    ])
     const { searchParams } = new URL(req.url)
     const stageId = searchParams.get('stageId')
 
@@ -262,17 +297,7 @@ export async function DELETE(
     }
 
     await prisma.$transaction(async (tx) => {
-      if (hasCommentProductStageIdColumn) {
-        await tx.comment.deleteMany({
-          where: { productStageId: stageId },
-        })
-      }
-
-      if (hasChangeHistoryProductStageIdColumn) {
-        await tx.changeHistory.deleteMany({
-          where: { productStageId: stageId },
-        })
-      }
+      await deleteRelatedStageRecords(tx as any, stageId)
 
       await tx.productStage.delete({
         where: { id: stageId },

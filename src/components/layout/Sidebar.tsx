@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  LayoutDashboard, Package, Zap, Users, Settings,
+  LayoutDashboard, Package, Archive, Zap, Users, Settings,
   ChevronRight, Package2, ChevronsLeft
 } from 'lucide-react'
 import { UserAvatar } from '@/components/users/UserAvatar'
@@ -19,6 +19,7 @@ interface SidebarProps {
 const nav = [
   { label: 'Дашборд', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Продукты', href: '/products', icon: Package },
+  { label: 'Архив', href: '/archive', icon: Archive },
   { label: 'Автоматизации', href: '/automations', icon: Zap },
   { label: 'Пользователи', href: '/users', icon: Users, adminOnly: true },
   { label: 'Настройки', href: '/settings', icon: Settings },

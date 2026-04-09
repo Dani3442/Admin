@@ -75,6 +75,7 @@ interface ProductsClientProps {
   externalFilters?: ProductListFilters
   externalSortField?: ProductListSortField
   externalSortDirection?: ProductListSortDirection
+  archiveMode?: boolean
 }
 
 interface ContextMenuState {
@@ -99,6 +100,7 @@ export function ProductsClient({
   externalFilters,
   externalSortField,
   externalSortDirection,
+  archiveMode = false,
 }: ProductsClientProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -136,8 +138,8 @@ export function ProductsClient({
   const visibleProductsRef = useRef<ProductListItem[]>([])
   const dragOverStateRef = useRef<{ productId: string; position: 'before' | 'after' } | null>(null)
 
-  const canManageProducts = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUserRole)
-  const canDeleteProducts = ['ADMIN', 'DIRECTOR'].includes(currentUserRole)
+  const canManageProducts = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUserRole) && !archiveMode
+  const canDeleteProducts = ['ADMIN', 'DIRECTOR'].includes(currentUserRole) && !archiveMode
   const currentRoute = typeof window === 'undefined'
     ? getRouteWithSearch(pathname, searchParams.toString())
     : `${window.location.pathname}${window.location.search}`
@@ -529,12 +531,14 @@ export function ProductsClient({
           <div>
             <h1 className="page-heading">Продукты</h1>
             <p className="subtle-copy mt-1">
-              {visibleProducts.length} из {products.length} продуктов
+              {visibleProducts.length} из {products.length} {archiveMode ? 'архивных' : ''} продуктов
             </p>
           </div>
-          <Link href={createProductHref} className="btn-primary">
-            <Plus className="w-4 h-4" /> Новый продукт
-          </Link>
+          {!archiveMode && (
+            <Link href={createProductHref} className="btn-primary">
+              <Plus className="w-4 h-4" /> Новый продукт
+            </Link>
+          )}
         </div>
       )}
 
