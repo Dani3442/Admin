@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { AnimatePresence, motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
 import {
+  Archive,
   Filter,
   GripVertical,
   Pin,
@@ -130,6 +131,8 @@ export function ProductsClient({
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null)
   const [pendingDeleteProduct, setPendingDeleteProduct] = useState<{ id: string; name: string } | null>(null)
+  const [archivingProductId, setArchivingProductId] = useState<string | null>(null)
+  const [pendingArchiveProduct, setPendingArchiveProduct] = useState<{ id: string; name: string } | null>(null)
   const [savingProductId, setSavingProductId] = useState<string | null>(null)
   const [draggingProductId, setDraggingProductId] = useState<string | null>(null)
   const [dragOverState, setDragOverState] = useState<{ productId: string; position: 'before' | 'after' } | null>(null)
@@ -139,7 +142,8 @@ export function ProductsClient({
   const dragOverStateRef = useRef<{ productId: string; position: 'before' | 'after' } | null>(null)
 
   const canManageProducts = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUserRole) && !archiveMode
-  const canDeleteProducts = ['ADMIN', 'DIRECTOR'].includes(currentUserRole) && !archiveMode
+  const canArchiveProducts = ['ADMIN', 'DIRECTOR'].includes(currentUserRole) && !archiveMode
+  const canDeleteProducts = ['ADMIN', 'DIRECTOR'].includes(currentUserRole)
   const currentRoute = typeof window === 'undefined'
     ? getRouteWithSearch(pathname, searchParams.toString())
     : `${window.location.pathname}${window.location.search}`
@@ -334,6 +338,36 @@ export function ProductsClient({
       window.alert(error.message || 'Не удалось удалить продукт')
     } finally {
       setDeletingProductId(null)
+    }
+  }
+
+  const confirmArchiveProduct = async () => {
+    if (!pendingArchiveProduct) return
+
+    const previousProducts = products
+    setArchivingProductId(pendingArchiveProduct.id)
+    setContextMenu(null)
+    setProducts((currentProducts) => currentProducts.filter((product) => product.id !== pendingArchiveProduct.id))
+
+    try {
+      const response = await fetch(`/api/products/${pendingArchiveProduct.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'archive' }),
+      })
+      const data = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'Не удалось архивировать продукт')
+      }
+
+      setPendingArchiveProduct(null)
+      router.refresh()
+    } catch (error: any) {
+      setProducts(previousProducts)
+      window.alert(error.message || 'Не удалось архивировать продукт')
+    } finally {
+      setArchivingProductId(null)
     }
   }
 
@@ -899,7 +933,21 @@ export function ProductsClient({
                 </>
               )}
 
-              {canDeleteProducts && (
+              {canArchiveProducts && (
+                <>
+                  <div className="my-1 border-t border-slate-100" />
+                  <button
+                    onClick={() => setPendingArchiveProduct({ id: contextProduct.id, name: contextProduct.name })}
+                    disabled={archivingProductId === contextProduct.id}
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-amber-700 hover:bg-amber-50 disabled:opacity-60"
+                  >
+                    <Archive className="h-4 w-4" />
+                    {archivingProductId === contextProduct.id ? 'Архивация...' : 'Архивировать продукт'}
+                  </button>
+                </>
+              )}
+
+              {archiveMode && canDeleteProducts && (
                 <>
                   <div className="my-1 border-t border-slate-100" />
                   <button
@@ -908,7 +956,7 @@ export function ProductsClient({
                     className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-60"
                   >
                     <Trash2 className="h-4 w-4" />
-                    {deletingProductId === contextProduct.id ? 'Удаление...' : 'Удалить продукт'}
+                    {deletingProductId === contextProduct.id ? 'Удаление...' : 'Удалить архивный продукт'}
                   </button>
                 </>
               )}
@@ -919,14 +967,31 @@ export function ProductsClient({
       </AnimatePresence>
 
       <ConfirmDialog
-        open={Boolean(pendingDeleteProduct)}
-        title="Удалить продукт?"
+        open={Boolean(pendingArchiveProduct)}
+        title="Архивировать продукт?"
         description={
-          pendingDeleteProduct
-            ? `Продукт «${pendingDeleteProduct.name}» будет удалён вместе со всеми связанными этапами, комментариями и историей.`
+          pendingArchiveProduct
+            ? `Продукт «${pendingArchiveProduct.name}» исчезнет из активных списков, но этапы, комментарии и история сохранятся.`
             : ''
         }
-        confirmLabel="Удалить"
+        confirmLabel="Архивировать"
+        confirmTone="primary"
+        loading={Boolean(pendingArchiveProduct && archivingProductId === pendingArchiveProduct.id)}
+        onCancel={() => setPendingArchiveProduct(null)}
+        onConfirm={confirmArchiveProduct}
+      />
+
+      <ConfirmDialog
+        open={Boolean(pendingDeleteProduct)}
+        title={archiveMode ? 'Удалить архивный продукт?' : 'Удалить продукт?'}
+        description={
+          pendingDeleteProduct
+            ? archiveMode
+              ? `Архивный продукт «${pendingDeleteProduct.name}» будет удалён навсегда вместе со всеми этапами, комментариями и историей.`
+              : `Продукт «${pendingDeleteProduct.name}» будет удалён вместе со всеми связанными этапами, комментариями и историей.`
+            : ''
+        }
+        confirmLabel={archiveMode ? 'Удалить навсегда' : 'Удалить'}
         loading={Boolean(pendingDeleteProduct && deletingProductId === pendingDeleteProduct.id)}
         onCancel={() => setPendingDeleteProduct(null)}
         onConfirm={confirmDeleteProduct}

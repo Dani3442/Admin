@@ -4,7 +4,7 @@ import { useState, useRef, useCallback, useEffect, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { Search, CheckCircle2, AlertTriangle, Plus, ChevronLeft, ChevronRight, Pencil, X, Trash2, Filter } from 'lucide-react'
+import { Search, CheckCircle2, AlertTriangle, Plus, ChevronLeft, ChevronRight, Pencil, X, Trash2, Filter, Archive } from 'lucide-react'
 import { cn, formatDate, detectStageOverlaps, getPriorityLabel, getStatusLabel } from '@/lib/utils'
 import { DatePicker } from '@/components/ui/DatePicker'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -180,10 +180,13 @@ export function TableViewClient({
   const [newStageAutoshift, setNewStageAutoshift] = useState(true)
   const menuRef = useRef<HTMLDivElement>(null)
   const canEditTable = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUserRole) && !archiveMode
-  const canDeleteProducts = ['ADMIN', 'DIRECTOR'].includes(currentUserRole) && !archiveMode
+  const canArchiveProducts = ['ADMIN', 'DIRECTOR'].includes(currentUserRole) && !archiveMode
+  const canDeleteProducts = ['ADMIN', 'DIRECTOR'].includes(currentUserRole)
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null)
+  const [archivingProductId, setArchivingProductId] = useState<string | null>(null)
   const [pendingDeleteStageId, setPendingDeleteStageId] = useState<string | null>(null)
   const [pendingDeleteProduct, setPendingDeleteProduct] = useState<{ id: string; name: string } | null>(null)
+  const [pendingArchiveProduct, setPendingArchiveProduct] = useState<{ id: string; name: string } | null>(null)
   const userOptions = Array.from(
     new Map(
       products
@@ -457,6 +460,31 @@ export function TableViewClient({
       window.alert(error.message || 'Не удалось удалить продукт')
     } finally {
       setDeletingProductId(null)
+    }
+  }
+
+  const handleArchiveProduct = async () => {
+    if (!pendingArchiveProduct) return
+    setArchivingProductId(pendingArchiveProduct.id)
+    try {
+      const response = await fetch(`/api/products/${pendingArchiveProduct.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'archive' }),
+      })
+      const data = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'Не удалось архивировать продукт')
+      }
+
+      setProducts((prev) => prev.filter((product) => product.id !== pendingArchiveProduct.id))
+      setPendingArchiveProduct(null)
+      router.refresh()
+    } catch (error: any) {
+      alert(error.message || 'Не удалось архивировать продукт')
+    } finally {
+      setArchivingProductId(null)
     }
   }
 
@@ -1067,7 +1095,21 @@ export function TableViewClient({
                       <Search className="h-4 w-4 text-slate-400" />
                       Открыть продукт
                     </button>
-                    {canDeleteProducts && (
+                    {canArchiveProducts && (
+                      <>
+                        <div className="my-1 border-t border-slate-100" />
+                        <button
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-amber-700 hover:bg-amber-50 disabled:opacity-60"
+                          onClick={() => setPendingArchiveProduct({ id: product.id, name: product.name })}
+                          disabled={archivingProductId === product.id}
+                        >
+                          <Archive className="h-4 w-4 text-amber-600" />
+                          {archivingProductId === product.id ? 'Архивация...' : 'Архивировать продукт'}
+                        </button>
+                      </>
+                    )}
+
+                    {archiveMode && canDeleteProducts && (
                       <>
                         <div className="my-1 border-t border-slate-100" />
                         <button
@@ -1075,7 +1117,7 @@ export function TableViewClient({
                           onClick={() => setPendingDeleteProduct({ id: product.id, name: product.name })}
                         >
                           <Trash2 className="h-4 w-4 text-red-500" />
-                          Удалить продукт
+                          Удалить архивный продукт
                         </button>
                       </>
                     )}
@@ -1098,14 +1140,31 @@ export function TableViewClient({
       />
 
       <ConfirmDialog
-        open={Boolean(pendingDeleteProduct)}
-        title="Удалить продукт?"
+        open={Boolean(pendingArchiveProduct)}
+        title="Архивировать продукт?"
         description={
-          pendingDeleteProduct
-            ? `Продукт «${pendingDeleteProduct.name}» будет удалён вместе со всеми этапами, комментариями и историей.`
+          pendingArchiveProduct
+            ? `Продукт «${pendingArchiveProduct.name}» исчезнет из активных списков, но этапы, комментарии и история сохранятся.`
             : ''
         }
-        confirmLabel="Удалить продукт"
+        confirmLabel="Архивировать"
+        confirmTone="primary"
+        loading={Boolean(pendingArchiveProduct && archivingProductId === pendingArchiveProduct.id)}
+        onCancel={() => setPendingArchiveProduct(null)}
+        onConfirm={handleArchiveProduct}
+      />
+
+      <ConfirmDialog
+        open={Boolean(pendingDeleteProduct)}
+        title={archiveMode ? 'Удалить архивный продукт?' : 'Удалить продукт?'}
+        description={
+          pendingDeleteProduct
+            ? archiveMode
+              ? `Архивный продукт «${pendingDeleteProduct.name}» будет удалён навсегда вместе со всеми этапами, комментариями и историей.`
+              : `Продукт «${pendingDeleteProduct.name}» будет удалён вместе со всеми этапами, комментариями и историей.`
+            : ''
+        }
+        confirmLabel={archiveMode ? 'Удалить навсегда' : 'Удалить продукт'}
         loading={Boolean(pendingDeleteProduct && deletingProductId === pendingDeleteProduct.id)}
         onCancel={() => setPendingDeleteProduct(null)}
         onConfirm={handleDeleteProduct}

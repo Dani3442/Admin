@@ -335,9 +335,25 @@ export async function DELETE(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
   const hasProductLifecycleColumns = await supportsProductLifecycleColumns()
+  const existingProduct = await prisma.product.findUnique({
+    where: { id },
+    select: { id: true, isArchived: true },
+  })
+
+  if (!existingProduct) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
 
   if (!hasProductLifecycleColumns) {
     return NextResponse.json({ error: 'Для архивации продукта нужно применить обновление схемы базы данных' }, { status: 409 })
+  }
+
+  if (existingProduct.isArchived) {
+    await prisma.product.delete({
+      where: { id },
+    })
+
+    return NextResponse.json({ success: true, deleted: true })
   }
 
   await prisma.product.update({
