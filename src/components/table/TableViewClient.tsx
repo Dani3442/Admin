@@ -9,7 +9,9 @@ import { cn, formatDate, detectStageOverlaps, getPriorityLabel, getStatusLabel }
 import { DatePicker } from '@/components/ui/DatePicker'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { FilterSelect } from '@/components/ui/FilterSelect'
+import { FloatingContextMenu } from '@/components/ui/FloatingContextMenu'
 import { buildProductHref, getRouteWithSearch } from '@/lib/navigation'
+import { useContextMenu } from '@/hooks/useContextMenu'
 import { filterProducts, sortProducts, type ProductListFilters, type ProductListSortDirection, type ProductListSortField, type ProductQuickView } from '@/lib/product-list'
 
 interface Stage {
@@ -58,8 +60,8 @@ interface EditingCellState {
 }
 
 type StageMenuState =
-  | { kind: 'header'; stageId: string; x: number; y: number }
-  | { kind: 'cell'; stageId: string; productId: string; x: number; y: number }
+  | { kind: 'header'; stageId: string }
+  | { kind: 'cell'; stageId: string; productId: string }
 
 const ALL_STATUSES = ['PLANNED', 'IN_PROGRESS', 'AT_RISK', 'DELAYED', 'COMPLETED', 'CANCELLED'] as const
 const ALL_PRIORITIES = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] as const
@@ -164,16 +166,23 @@ export function TableViewClient({
   const currentRoute = getRouteWithSearch(pathname, searchParams.toString())
 
   // Stage management state
-  const [stageMenu, setStageMenu] = useState<StageMenuState | null>(null)
   const [renamingStage, setRenamingStage] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [showNewStageForm, setShowNewStageForm] = useState(false)
   const [newStageName, setNewStageName] = useState('')
   const [newStageDuration, setNewStageDuration] = useState('')
   const [newStageAutoshift, setNewStageAutoshift] = useState(true)
-  const menuRef = useRef<HTMLDivElement>(null)
   const canEditTable = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUserRole) && !archiveMode
   const [pendingDeleteStageId, setPendingDeleteStageId] = useState<string | null>(null)
+  const {
+    menu: stageMenu,
+    menuRef,
+    closeMenu: closeStageMenu,
+    openMenuFromEvent: openStageMenu,
+  } = useContextMenu<StageMenuState>({
+    width: 220,
+    height: 260,
+  })
   const userOptions = Array.from(
     new Map(
       products
@@ -196,17 +205,6 @@ export function TableViewClient({
       return next
     })
   }, [initialStages])
-
-  // Close menu on outside click
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setStageMenu(null)
-      }
-    }
-    if (stageMenu) document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [stageMenu])
 
   // Column resize state
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
@@ -240,17 +238,6 @@ export function TableViewClient({
     if (typeof window === 'undefined') return
     window.localStorage.setItem('product-admin:table-column-widths', JSON.stringify(columnWidths))
   }, [columnWidths])
-
-  const clampMenuPosition = useCallback((x: number, y: number, width: number, height: number) => {
-    if (typeof window === 'undefined') {
-      return { x, y }
-    }
-
-    return {
-      x: Math.max(12, Math.min(x, window.innerWidth - width - 12)),
-      y: Math.max(12, Math.min(y, window.innerHeight - height - 12)),
-    }
-  }, [])
 
   const handleResizeStart = useCallback((e: React.MouseEvent, colId: string) => {
     e.preventDefault()
@@ -312,7 +299,7 @@ export function TableViewClient({
         router.refresh()
       }
     } finally {
-      setStageMenu(null)
+      closeStageMenu()
     }
   }
 
@@ -400,37 +387,33 @@ export function TableViewClient({
         )
       }
     } finally {
-      setStageMenu(null)
+      closeStageMenu()
     }
   }
 
   const handleStageHeaderClick = (e: React.MouseEvent, stage: Stage) => {
     if (!canEditTable) return
-    e.preventDefault()
-    e.stopPropagation()
-    const { x, y } = clampMenuPosition(e.clientX, e.clientY, 220, 260)
-    setStageMenu({ kind: 'header', stageId: stage.id, x, y })
+    openStageMenu(e, { kind: 'header', stageId: stage.id }, { width: 220, height: 260 })
   }
 
   const handleStageCellContextMenu = (e: React.MouseEvent, productId: string, stage: ProductStage | undefined) => {
     if (!canEditTable || !stage) return
-    e.preventDefault()
-    e.stopPropagation()
-    const { x, y } = clampMenuPosition(e.clientX, e.clientY, 220, 120)
-    setStageMenu({
-      kind: 'cell',
-      stageId: stage.id,
-      productId,
-      x,
-      y,
-    })
+    openStageMenu(
+      e,
+      {
+        kind: 'cell',
+        stageId: stage.id,
+        productId,
+      },
+      { width: 220, height: 120 }
+    )
   }
 
   const startRename = (stage: Stage) => {
     if (!canEditTable) return
     setRenamingStage(stage.id)
     setRenameValue(stage.name)
-    setStageMenu(null)
+    closeStageMenu()
   }
 
   const handleToggleStageTemplateAutoshift = async (stage: Stage, nextValue: boolean) => {
@@ -459,7 +442,7 @@ export function TableViewClient({
     } catch (error: any) {
       window.alert(error.message || 'Не удалось обновить автосдвиг этапа')
     } finally {
-      setStageMenu(null)
+      closeStageMenu()
     }
   }
 
@@ -496,7 +479,7 @@ export function TableViewClient({
     } catch (error: any) {
       window.alert(error.message || 'Не удалось обновить автосдвиг этапа')
     } finally {
-      setStageMenu(null)
+      closeStageMenu()
     }
   }
 
@@ -943,14 +926,14 @@ export function TableViewClient({
         </div>
       </div>
 
-      {stageMenu && typeof document !== 'undefined' && createPortal(
-        <>
-          {canEditTable && stageMenu && (
-            <div
-              ref={menuRef}
-              className="fixed z-[90] min-w-[180px] rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
-              style={{ left: stageMenu.x, top: stageMenu.y }}
-            >
+      {canEditTable && stageMenu && (
+        <FloatingContextMenu
+          open
+          x={stageMenu.x}
+          y={stageMenu.y}
+          menuRef={menuRef}
+          className="fixed z-[90] min-w-[180px] rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
+        >
               {stageMenu.kind === 'header' ? (() => {
                 const stage = stages.find((s) => s.id === stageMenu.stageId)
                 if (!stage) return null
@@ -1014,11 +997,7 @@ export function TableViewClient({
                   </button>
                 )
               })()}
-            </div>
-          )}
-
-        </>,
-        document.body
+        </FloatingContextMenu>
       )}
 
       <ConfirmDialog

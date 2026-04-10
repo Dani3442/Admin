@@ -5,13 +5,15 @@ import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { AnimatePresence, motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
-import { ArrowLeft, CalendarDays, CheckCircle2, Circle, AlertTriangle, MessageCircle, Clock, History, Zap, ExternalLink, Edit2, Save, Pencil, ChevronUp, ChevronDown, X, Plus, Trash2, SendHorizontal, Archive, ArchiveRestore } from 'lucide-react'
+import { ArrowLeft, CalendarDays, CheckCircle2, Circle, AlertTriangle, MessageCircle, Clock, History, Zap, ExternalLink, Edit2, Save, Pencil, ChevronUp, ChevronDown, X, Trash2, SendHorizontal, Archive, ArchiveRestore } from 'lucide-react'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { FloatingContextMenu } from '@/components/ui/FloatingContextMenu'
 import { cn, getStatusColor, getStatusLabel, getPriorityColor, getPriorityLabel, formatDate, formatDurationDays, detectStageOverlaps, formatStageOverlap } from '@/lib/utils'
 import { DatePicker } from '@/components/ui/DatePicker'
 import { resolveBackNavigation } from '@/lib/navigation'
 import { UserAvatar } from '@/components/users/UserAvatar'
 import { encodeCommentMentions, getCommentSegments } from '@/lib/comment-mentions'
+import { useContextMenu } from '@/hooks/useContextMenu'
 // Types are string-based (no Prisma enums needed)
 
 const AUTOMATION_ACTIONS = [
@@ -51,16 +53,9 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
   const [editingStageId, setEditingStageId] = useState<string | null>(null)
   const [stageEditValues, setStageEditValues] = useState<Record<string, any>>({})
   const [saving, setSaving] = useState(false)
-  const [showAddStageForm, setShowAddStageForm] = useState(false)
-  const [newStageName, setNewStageName] = useState('')
-  const [newStageDate, setNewStageDate] = useState<Date | null>(null)
-  const [newStageAutoshift, setNewStageAutoshift] = useState(true)
 
-  // Context menu state
-  const [stageMenu, setStageMenu] = useState<{ stageId: string; x: number; y: number } | null>(null)
   const [renamingStageId, setRenamingStageId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
-  const menuRef = useRef<HTMLDivElement>(null)
 
   // Automation modal state
   const [automationModal, setAutomationModal] = useState<{ stageId: string; stageOrder: number; stageName: string } | null>(null)
@@ -73,29 +68,22 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
   const [pendingDeleteStageId, setPendingDeleteStageId] = useState<string | null>(null)
   const [confirmArchiveProductOpen, setConfirmArchiveProductOpen] = useState(false)
   const [confirmRestoreProductOpen, setConfirmRestoreProductOpen] = useState(false)
-  const [closeModalOpen, setCloseModalOpen] = useState(false)
-  const [closeStatus, setCloseStatus] = useState<'COMPLETED' | 'CANCELLED'>('COMPLETED')
-  const [closeComment, setCloseComment] = useState('')
-  const [archiveReason, setArchiveReason] = useState('')
   const commentInputRef = useRef<HTMLTextAreaElement>(null)
   const commentsScrollRef = useRef<HTMLDivElement>(null)
   const markedSeenProductRef = useRef<string | null>(null)
-
-  // Close context menu on outside click
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setStageMenu(null)
-      }
-    }
-    if (stageMenu) document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [stageMenu])
+  const {
+    menu: stageMenu,
+    menuRef,
+    closeMenu: closeStageMenu,
+    openMenuFromEvent: openStageMenu,
+  } = useContextMenu<{ stageId: string }>({
+    width: 220,
+    height: 320,
+  })
 
   const canEdit = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUser?.role) && !product.isArchived
   const canComment = Boolean(currentUser?.id) && !product.isArchived
   const canArchiveProduct = ['ADMIN', 'DIRECTOR'].includes(currentUser?.role)
-  const canCloseProduct = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUser?.role)
   const backNavigation = resolveBackNavigation(searchParams.get('returnTo'))
   const mentionableUsers = useMemo(
     () =>
@@ -383,13 +371,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
   // Right-click context menu handler
   const handleStageContextMenu = (e: React.MouseEvent, stage: any) => {
     if (!canEdit) return
-    e.preventDefault()
-    e.stopPropagation()
-    const menuWidth = 220
-    const menuHeight = 320
-    const nextX = Math.max(12, Math.min(e.clientX, window.innerWidth - menuWidth - 12))
-    const nextY = Math.max(12, Math.min(e.clientY, window.innerHeight - menuHeight - 12))
-    setStageMenu({ stageId: stage.id, x: nextX, y: nextY })
+    openStageMenu(e, { stageId: stage.id }, { width: 220, height: 320 })
   }
 
   // Rename stage
@@ -445,7 +427,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
       }
     } finally {
       setSaving(false)
-      setStageMenu(null)
+      closeStageMenu()
     }
   }
 
@@ -480,46 +462,6 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
     }
   }
 
-  const handleAddStage = async () => {
-    const stageName = newStageName.trim()
-    if (!stageName) return
-
-    setSaving(true)
-    try {
-      const res = await fetch(`/api/products/${product.id}/stages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          stageName,
-          dateValue: newStageDate || null,
-          participatesInAutoshift: newStageAutoshift,
-        }),
-      })
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Не удалось добавить этап')
-      }
-
-      setProduct((prev: any) => ({
-        ...prev,
-        stages: data.stages,
-        finalDate: data.finalDate ?? prev.finalDate,
-        progressPercent: data.progressPercent,
-        riskScore: data.riskScore,
-        status: data.status,
-      }))
-      setNewStageName('')
-      setNewStageDate(null)
-      setNewStageAutoshift(true)
-      setShowAddStageForm(false)
-    } catch (error: any) {
-      alert(error.message || 'Не удалось добавить этап')
-    } finally {
-      setSaving(false)
-    }
-  }
-
   const handleToggleStageAutoshift = async (stage: any, nextValue: boolean) => {
     setSaving(true)
     try {
@@ -546,7 +488,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
         riskScore: data.product?.riskScore ?? prev.riskScore,
         status: data.product?.status ?? prev.status,
       }))
-      setStageMenu(null)
+      closeStageMenu()
     } catch (error: any) {
       alert(error.message || 'Не удалось обновить автосдвиг этапа')
     } finally {
@@ -580,7 +522,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
         status: data.status,
       }))
       setPendingDeleteStageId(null)
-      setStageMenu(null)
+      closeStageMenu()
     } catch (error: any) {
       alert(error.message || 'Не удалось удалить этап')
     } finally {
@@ -598,7 +540,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
       const res = await fetch(`/api/products/${product.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'archive', archiveReason }),
+        body: JSON.stringify({ action: 'archive' }),
       })
       const data = await res.json().catch(() => null)
 
@@ -607,7 +549,6 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
       }
 
       setConfirmArchiveProductOpen(false)
-      setArchiveReason('')
       setProduct((prev: any) => ({ ...prev, ...data }))
       router.refresh()
     } catch (error: any) {
@@ -634,35 +575,6 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
       router.refresh()
     } catch (error: any) {
       alert(error.message || 'Не удалось восстановить продукт')
-    } finally {
-      setLifecycleSaving(false)
-    }
-  }
-
-  const confirmCloseProduct = async () => {
-    setLifecycleSaving(true)
-    try {
-      const res = await fetch(`/api/products/${product.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'close',
-          status: closeStatus,
-          closureComment: closeComment,
-        }),
-      })
-      const data = await res.json().catch(() => null)
-      if (!res.ok) {
-        throw new Error(data?.error || 'Не удалось закрыть продукт')
-      }
-
-      setCloseModalOpen(false)
-      setCloseComment('')
-      setCloseStatus('COMPLETED')
-      setProduct((prev: any) => ({ ...prev, ...data }))
-      router.refresh()
-    } catch (error: any) {
-      alert(error.message || 'Не удалось закрыть продукт')
     } finally {
       setLifecycleSaving(false)
     }
@@ -732,16 +644,6 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
           <ArrowLeft className="w-4 h-4" /> {backNavigation.label}
         </Link>
         <div className="flex items-center gap-2">
-          {canCloseProduct && !product.isArchived && (
-            <button
-              onClick={() => setCloseModalOpen(true)}
-              disabled={lifecycleSaving}
-              className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-800 disabled:opacity-60"
-            >
-              <CheckCircle2 className="h-4 w-4" />
-              Закрыть продукт
-            </button>
-          )}
           {canArchiveProduct && !product.isArchived && (
             <button
               onClick={handleArchiveProduct}
@@ -891,81 +793,6 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
               >
                 {tab === 'stages' && (
                   <div className="space-y-2">
-                    {canEdit && (
-                      <div className="mb-3 flex items-center justify-end gap-3">
-                        <button
-                          onClick={() => {
-                            setShowAddStageForm((prev) => {
-                              const next = !prev
-                              if (!next) {
-                                setNewStageName('')
-                                setNewStageDate(null)
-                                setNewStageAutoshift(true)
-                              }
-                              return next
-                            })
-                          }}
-                          className="btn-primary text-sm"
-                          disabled={saving}
-                        >
-                          <Plus className="w-4 h-4" />
-                          Добавить этап
-                        </button>
-                      </div>
-                    )}
-                    {canEdit && showAddStageForm && (
-                      <div className="mb-3 flex items-center gap-2 rounded-[24px] bg-slate-50 p-3">
-                        <input
-                          type="text"
-                          value={newStageName}
-                          onChange={(e) => setNewStageName(e.target.value)}
-                          className="input flex-1 text-sm"
-                          placeholder="Название нового этапа"
-                          autoFocus
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleAddStage()
-                            if (e.key === 'Escape') {
-                              setShowAddStageForm(false)
-                              setNewStageName('')
-                              setNewStageDate(null)
-                              setNewStageAutoshift(true)
-                            }
-                          }}
-                        />
-                        <DatePicker
-                          value={newStageDate}
-                          onChange={setNewStageDate}
-                          inputClassName="h-11 w-56 text-sm"
-                          panelClassName="w-[360px]"
-                          placeholder="Дата этапа"
-                        />
-                        <label className="flex h-11 items-center gap-2 rounded-[18px] bg-white px-3 text-sm text-slate-600">
-                          <span className="whitespace-nowrap">Автосдвиг</span>
-                          <input
-                            type="checkbox"
-                            checked={newStageAutoshift}
-                            onChange={(e) => setNewStageAutoshift(e.target.checked)}
-                            className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
-                          />
-                        </label>
-                        <button onClick={handleAddStage} className="btn-primary text-sm" disabled={!newStageName.trim() || saving}>
-                          <Save className="w-4 h-4" />
-                          Сохранить
-                        </button>
-                        <button
-                          onClick={() => {
-                            setShowAddStageForm(false)
-                            setNewStageName('')
-                            setNewStageDate(null)
-                            setNewStageAutoshift(true)
-                          }}
-                          className="btn-secondary text-sm"
-                          disabled={saving}
-                        >
-                          Отмена
-                        </button>
-                      </div>
-                    )}
                     {overlaps.length > 0 && (
                       <div className="mb-3 flex items-start gap-2 rounded-[24px] bg-orange-50 p-3">
                         <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-orange-500" />
@@ -1325,7 +1152,6 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
       </div>
 
       {/* Stage Context Menu */}
-      <AnimatePresence>
       {stageMenu && (() => {
         const stage = product.stages.find((s: any) => s.id === stageMenu.stageId)
         if (!stage) return null
@@ -1333,14 +1159,12 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
         const isFirst = idx === 0
         const isLast = idx === product.stages.length - 1
         return (
-          <motion.div
-            ref={menuRef}
-            className="fixed z-[130] bg-white rounded-lg shadow-lg border border-slate-200 py-1 min-w-[220px]"
-            style={{ left: stageMenu.x, top: stageMenu.y }}
-            initial={{ opacity: 0, scale: 0.96, y: -6 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.98, y: -4 }}
-            transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+          <FloatingContextMenu
+            open
+            x={stageMenu.x}
+            y={stageMenu.y}
+            menuRef={menuRef}
+            className="fixed z-[130] min-w-[220px] rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
           >
             <button
               className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
@@ -1350,7 +1174,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                   ...prev,
                   [stage.id]: { ...prev[stage.id], dateValue: stage.dateValue ? new Date(stage.dateValue) : null },
                 }))
-                setStageMenu(null)
+                closeStageMenu()
               }}
             >
               <CalendarDays className="w-3.5 h-3.5 text-slate-400" />
@@ -1361,7 +1185,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
               onClick={() => {
                 setRenamingStageId(stage.id)
                 setRenameValue(stage.stageName)
-                setStageMenu(null)
+                closeStageMenu()
               }}
             >
               <Pencil className="w-3.5 h-3.5 text-slate-400" />
@@ -1389,7 +1213,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
               onClick={() => {
                 setAutomationModal({ stageId: stage.id, stageOrder: stage.stageOrder, stageName: stage.stageName })
                 setAutomationName(`При изменении "${stage.stageName}"`)
-                setStageMenu(null)
+                closeStageMenu()
               }}
             >
               <Zap className="w-3.5 h-3.5 text-amber-500" />
@@ -1410,10 +1234,9 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
               <Trash2 className="w-3.5 h-3.5 text-red-500" />
               Удалить этап
             </button>
-          </motion.div>
+          </FloatingContextMenu>
         )
       })()}
-      </AnimatePresence>
 
       {/* Automation Modal */}
       <AnimatePresence>
@@ -1535,97 +1358,6 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
         onConfirm={confirmRestoreProduct}
       />
 
-      <AnimatePresence>
-        {closeModalOpen && typeof document !== 'undefined' && createPortal(
-          <motion.div
-            className="modal-backdrop flex items-center justify-center px-4"
-            onClick={() => setCloseModalOpen(false)}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <motion.div
-              className="w-full max-w-lg space-y-4 rounded-[28px] bg-white p-6 shadow-xl"
-              onClick={(event) => event.stopPropagation()}
-              initial={{ opacity: 0, y: 18, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 12, scale: 0.98 }}
-              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-            >
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-slate-900">Закрыть продукт</h3>
-                <button onClick={() => setCloseModalOpen(false)} className="text-slate-400 hover:text-slate-600">
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={() => setCloseStatus('COMPLETED')}
-                  className={cn(
-                    'rounded-[18px] border px-4 py-3 text-left text-sm transition-colors',
-                    closeStatus === 'COMPLETED'
-                      ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
-                      : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                  )}
-                >
-                  Завершён
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCloseStatus('CANCELLED')}
-                  className={cn(
-                    'rounded-[18px] border px-4 py-3 text-left text-sm transition-colors',
-                    closeStatus === 'CANCELLED'
-                      ? 'border-red-300 bg-red-50 text-red-700'
-                      : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                  )}
-                >
-                  Отменён
-                </button>
-              </div>
-
-              <label className="block space-y-1.5">
-                <span className="label mb-0">Комментарий закрытия</span>
-                <textarea
-                  value={closeComment}
-                  onChange={(event) => setCloseComment(event.target.value)}
-                  className="input h-24 w-full resize-none"
-                  placeholder="Коротко опиши итог по продукту"
-                />
-              </label>
-
-              <label className="block space-y-1.5">
-                <span className="label mb-0">Причина архивации</span>
-                <textarea
-                  value={archiveReason}
-                  onChange={(event) => setArchiveReason(event.target.value)}
-                  className="input h-20 w-full resize-none"
-                  placeholder="Почему продукт можно убрать в архив"
-                />
-              </label>
-
-              <div className="flex justify-end gap-3 pt-2">
-                <button
-                  onClick={() => setCloseModalOpen(false)}
-                  className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 transition-colors hover:text-slate-800"
-                >
-                  Отмена
-                </button>
-                <button
-                  onClick={confirmCloseProduct}
-                  className="btn-primary text-sm"
-                  disabled={lifecycleSaving}
-                >
-                  {lifecycleSaving ? 'Сохраняем...' : 'Закрыть продукт'}
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>,
-          document.body
-        )}
-      </AnimatePresence>
     </div>
   )
 }

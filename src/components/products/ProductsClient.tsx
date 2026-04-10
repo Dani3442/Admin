@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { AnimatePresence, motion } from 'framer-motion'
-import { createPortal } from 'react-dom'
 import {
   Archive,
   Filter,
@@ -22,6 +21,8 @@ import { cn, detectStageOverlaps, formatDate, formatStageOverlap, getPriorityCol
 import { buildProductHref, getRouteWithSearch } from '@/lib/navigation'
 import { FilterSelect } from '@/components/ui/FilterSelect'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { FloatingContextMenu } from '@/components/ui/FloatingContextMenu'
+import { useContextMenu } from '@/hooks/useContextMenu'
 import {
   filterProducts,
   hasActiveProductFilters,
@@ -82,8 +83,6 @@ interface ProductsClientProps {
 
 interface ContextMenuState {
   productId: string
-  x: number
-  y: number
 }
 
 const isValidSortField = (value: string | null): value is ProductListSortField =>
@@ -107,8 +106,6 @@ export function ProductsClient({
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const contextMenuRef = useRef<HTMLDivElement>(null)
-  const listTableRef = useRef<HTMLTableElement>(null)
   const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({})
   const suppressNavigationRef = useRef(false)
   const dragSessionRef = useRef<{
@@ -130,7 +127,6 @@ export function ProductsClient({
   const [sortDirection, setSortDirection] = useState<ProductListSortDirection>(searchParams.get('dir') === 'desc' ? 'desc' : 'asc')
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(searchParams.get('advanced') === '1')
   const [onlyWithOverlaps, setOnlyWithOverlaps] = useState(searchParams.get('overlaps') === '1')
-  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null)
   const [pendingDeleteProduct, setPendingDeleteProduct] = useState<{ id: string; name: string } | null>(null)
   const [archivingProductId, setArchivingProductId] = useState<string | null>(null)
@@ -146,6 +142,15 @@ export function ProductsClient({
   const productsRef = useRef(products)
   const visibleProductsRef = useRef<ProductListItem[]>([])
   const dragOverStateRef = useRef<{ productId: string; position: 'before' | 'after' } | null>(null)
+  const {
+    menu: contextMenu,
+    menuRef: contextMenuRef,
+    closeMenu: closeContextMenu,
+    openMenuFromEvent: openContextMenuFromEvent,
+  } = useContextMenu<ContextMenuState>({
+    width: 240,
+    height: archiveMode ? 260 : 320,
+  })
 
   const canManageProducts = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUserRole) && !archiveMode
   const canArchiveProducts = ['ADMIN', 'DIRECTOR'].includes(currentUserRole) && !archiveMode
@@ -214,32 +219,6 @@ export function ProductsClient({
   }, [controlsHidden, countryFilter, externalFilters, externalSortDirection, externalSortField, onlyWithOverlaps, priorityFilter, quickView, responsibleFilter, search, searchParams, showAdvancedFilters, sortDirection, sortField, statusFilter])
 
   useEffect(() => {
-    if (!contextMenu) return
-
-    const closeMenu = (event: MouseEvent) => {
-      if (contextMenuRef.current && !contextMenuRef.current.contains(event.target as Node)) {
-        setContextMenu(null)
-      }
-    }
-
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setContextMenu(null)
-    }
-
-    const closeOnScroll = () => setContextMenu(null)
-
-    document.addEventListener('mousedown', closeMenu)
-    document.addEventListener('keydown', closeOnEscape)
-    window.addEventListener('scroll', closeOnScroll, true)
-
-    return () => {
-      document.removeEventListener('mousedown', closeMenu)
-      document.removeEventListener('keydown', closeOnEscape)
-      window.removeEventListener('scroll', closeOnScroll, true)
-    }
-  }, [contextMenu])
-
-  useEffect(() => {
     if (!draggingProductId) {
       document.body.classList.remove('cursor-grabbing')
       return
@@ -251,17 +230,6 @@ export function ProductsClient({
       document.body.classList.remove('cursor-grabbing')
     }
   }, [draggingProductId])
-
-  const clampMenuPosition = (x: number, y: number, width: number, height: number) => {
-    if (typeof window === 'undefined') {
-      return { x, y }
-    }
-
-    return {
-      x: Math.max(12, Math.min(x, window.innerWidth - width - 12)),
-      y: Math.max(12, Math.min(y, window.innerHeight - height - 12)),
-    }
-  }
 
   const now = new Date()
   const effectiveSortField = externalSortField ?? sortField
@@ -324,7 +292,7 @@ export function ProductsClient({
     const previousProducts = products
     setSavingProductId(product.id)
     updateProduct(product.id, (currentProduct) => ({ ...currentProduct, [field]: nextValue }))
-    setContextMenu(null)
+    closeContextMenu()
 
     try {
       const response = await fetch(`/api/products/${product.id}`, {
@@ -355,7 +323,7 @@ export function ProductsClient({
     if (!pendingDeleteProduct) return
     const previousProducts = products
     setDeletingProductId(pendingDeleteProduct.id)
-    setContextMenu(null)
+    closeContextMenu()
     setProducts((currentProducts) => currentProducts.filter((product) => product.id !== pendingDeleteProduct.id))
 
     try {
@@ -381,7 +349,7 @@ export function ProductsClient({
 
     const previousProducts = products
     setArchivingProductId(pendingArchiveProduct.id)
-    setContextMenu(null)
+    closeContextMenu()
     setProducts((currentProducts) => currentProducts.filter((product) => product.id !== pendingArchiveProduct.id))
 
     try {
@@ -432,7 +400,7 @@ export function ProductsClient({
     const affectedIds = new Set(selectedProductIds)
 
     setBulkActionPending(true)
-    setContextMenu(null)
+    closeContextMenu()
     setProducts((currentProducts) => currentProducts.filter((product) => !affectedIds.has(product.id)))
 
     try {
@@ -462,51 +430,18 @@ export function ProductsClient({
     }
   }
 
-  const openProductContextMenuAt = useCallback((productId: string, clientX: number, clientY: number) => {
+  const handleProductRowContextMenu = useCallback((event: React.MouseEvent<HTMLTableRowElement>, productId: string) => {
     suppressNavigationRef.current = true
     window.setTimeout(() => {
       suppressNavigationRef.current = false
     }, 120)
 
-    const { x, y } = clampMenuPosition(clientX, clientY, 240, archiveMode ? 260 : 320)
-
-    setContextMenu({
-      productId,
-      x,
-      y,
-    })
-  }, [archiveMode])
-
-  useEffect(() => {
-    const handleNativeContextMenu = (event: MouseEvent) => {
-      const table = listTableRef.current
-      if (!table) return
-
-      const path = typeof event.composedPath === 'function' ? event.composedPath() : []
-      const rowFromPath = path.find(
-        (node): node is HTMLElement =>
-          node instanceof HTMLElement && Boolean(node.dataset.productContextId)
-      )
-
-      const fallbackTarget =
-        event.target instanceof HTMLElement ? event.target.closest<HTMLElement>('[data-product-context-id]') : null
-
-      const row = rowFromPath ?? fallbackTarget
-      if (!row || !table.contains(row)) return
-
-      const productId = row.dataset.productContextId
-      if (!productId) return
-
-      event.preventDefault()
-      event.stopPropagation()
-      openProductContextMenuAt(productId, event.clientX, event.clientY)
-    }
-
-    document.addEventListener('contextmenu', handleNativeContextMenu, true)
-    return () => {
-      document.removeEventListener('contextmenu', handleNativeContextMenu, true)
-    }
-  }, [openProductContextMenuAt])
+    openContextMenuFromEvent(
+      event,
+      { productId },
+      { width: 240, height: archiveMode ? 260 : 320 }
+    )
+  }, [archiveMode, openContextMenuFromEvent])
 
   const clearDragState = () => {
     dragSessionRef.current = null
@@ -578,7 +513,7 @@ export function ProductsClient({
 
     setDraggingProductId(productId)
     setDragOffset({ x: 0, y: 0 })
-    setContextMenu(null)
+    closeContextMenu()
   }
 
   useEffect(() => {
@@ -891,7 +826,7 @@ export function ProductsClient({
 
       <div className="surface-panel overflow-hidden">
         <div className="overflow-x-auto">
-          <table ref={listTableRef} className="w-full">
+          <table className="w-full">
             <thead>
               <tr className="border-b border-slate-100">
                 {archiveMode && selectionMode && (
@@ -941,6 +876,7 @@ export function ProductsClient({
                     }}
                     data-product-row="true"
                     onClick={() => handleOpenProduct(product.id)}
+                    onContextMenu={(event) => handleProductRowContextMenu(event, product.id)}
                     className={cn(
                       'relative cursor-pointer transition-all duration-150 hover:bg-slate-50/70',
                       isDragging && 'bg-white shadow-[0_22px_44px_-30px_rgba(15,23,42,0.45)]',
@@ -1079,17 +1015,14 @@ export function ProductsClient({
         </div>
       </div>
 
-      <AnimatePresence>
-        {contextMenu && contextProduct && typeof document !== 'undefined' && createPortal(
-          <motion.div
-            ref={contextMenuRef}
-            className="fixed z-[90] w-60 rounded-xl border border-slate-200 bg-white p-2 shadow-2xl"
-            style={{ left: contextMenu.x, top: contextMenu.y }}
-            initial={{ opacity: 0, scale: 0.96, y: -6 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.98, y: -4 }}
-            transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
-          >
+      {contextMenu && contextProduct && (
+        <FloatingContextMenu
+          open
+          x={contextMenu.x}
+          y={contextMenu.y}
+          menuRef={contextMenuRef}
+          className="fixed z-[90] w-60 rounded-xl border border-slate-200 bg-white p-2 shadow-2xl"
+        >
             <div className="border-b border-slate-100 px-2.5 py-2">
               <div className="truncate text-sm font-semibold text-slate-800">{contextProduct.name}</div>
               <div className="mt-0.5 text-xs text-slate-400">Быстрые действия по продукту</div>
@@ -1098,7 +1031,7 @@ export function ProductsClient({
             <div className="py-1">
               <button
                 onClick={() => {
-                  setContextMenu(null)
+                  closeContextMenu()
                   router.push(buildProductHref(contextProduct.id, currentRoute))
                 }}
                 className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
@@ -1161,10 +1094,8 @@ export function ProductsClient({
                 </>
               )}
             </div>
-          </motion.div>,
-          document.body
-        )}
-      </AnimatePresence>
+        </FloatingContextMenu>
+      )}
 
       <ConfirmDialog
         open={Boolean(pendingArchiveProduct)}
