@@ -23,6 +23,7 @@
 - Products:
   - `src/app/api/products/route.ts`
   - `src/app/api/products/[id]/route.ts`
+  - `src/app/api/products/bulk/route.ts`
   - `src/app/api/products/reorder/route.ts`
 - Stages:
   - `src/app/api/stage-templates/route.ts`
@@ -65,4 +66,3 @@
   - product API owner
 - Notifications badge:
   - header UI + notifications API
-

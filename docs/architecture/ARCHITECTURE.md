@@ -16,6 +16,7 @@ Before changing business logic, routes, or UI flows, start here and verify the o
 - Product API:
   - `src/app/api/products/route.ts`
   - `src/app/api/products/[id]/route.ts`
+  - `src/app/api/products/bulk/route.ts`
   - `src/app/api/products/reorder/route.ts`
 
 ### Stages
@@ -41,6 +42,7 @@ Before changing business logic, routes, or UI flows, start here and verify the o
 - Archive is soft-state on `products`, not a separate data silo.
 - Archive page: `src/app/(dashboard)/archive/page.tsx`
 - Archive/close/restore product actions owner: `src/app/api/products/[id]/route.ts`
+- Archive bulk restore/delete owner: `src/app/api/products/bulk/route.ts`
 
 ## Source-of-truth rules
 
@@ -86,4 +88,3 @@ Before changing business logic, routes, or UI flows, start here and verify the o
 5. UI rendering
 6. Loading/error states
 7. Local verification
-

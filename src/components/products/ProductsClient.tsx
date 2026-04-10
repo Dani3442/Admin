@@ -12,6 +12,7 @@ import {
   Pin,
   PinOff,
   Plus,
+  RotateCcw,
   Search,
   Star,
   Trash2,
@@ -134,6 +135,10 @@ export function ProductsClient({
   const [pendingDeleteProduct, setPendingDeleteProduct] = useState<{ id: string; name: string } | null>(null)
   const [archivingProductId, setArchivingProductId] = useState<string | null>(null)
   const [pendingArchiveProduct, setPendingArchiveProduct] = useState<{ id: string; name: string } | null>(null)
+  const [selectionMode, setSelectionMode] = useState(false)
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([])
+  const [bulkAction, setBulkAction] = useState<'restore' | 'deleteArchived' | null>(null)
+  const [bulkActionPending, setBulkActionPending] = useState(false)
   const [savingProductId, setSavingProductId] = useState<string | null>(null)
   const [draggingProductId, setDraggingProductId] = useState<string | null>(null)
   const [dragOverState, setDragOverState] = useState<{ productId: string; position: 'before' | 'after' } | null>(null)
@@ -161,6 +166,19 @@ export function ProductsClient({
   useEffect(() => {
     setProducts(initialProducts)
   }, [initialProducts])
+
+  useEffect(() => {
+    if (!archiveMode) {
+      setSelectionMode(false)
+      setSelectedProductIds([])
+      setBulkAction(null)
+      return
+    }
+
+    setSelectedProductIds((currentIds) =>
+      currentIds.filter((id) => initialProducts.some((product) => product.id === id))
+    )
+  }, [archiveMode, initialProducts])
 
   useEffect(() => {
     productsRef.current = products
@@ -262,6 +280,11 @@ export function ProductsClient({
   const visibleProducts = useMemo(() => sortProducts(filteredProducts, effectiveSortField, effectiveSortDirection), [effectiveSortDirection, effectiveSortField, filteredProducts])
   const canReorder = canManageProducts && effectiveSortField === 'manual' && !hasActiveFilters
   const contextProduct = contextMenu ? products.find((product) => product.id === contextMenu.productId) || null : null
+  const visibleSelectedCount = useMemo(
+    () => visibleProducts.filter((product) => selectedProductIds.includes(product.id)).length,
+    [selectedProductIds, visibleProducts]
+  )
+  const allVisibleSelected = archiveMode && visibleProducts.length > 0 && visibleSelectedCount === visibleProducts.length
 
   useEffect(() => {
     visibleProductsRef.current = visibleProducts
@@ -380,6 +403,62 @@ export function ProductsClient({
       window.alert(error.message || 'Не удалось архивировать продукт')
     } finally {
       setArchivingProductId(null)
+    }
+  }
+
+  const toggleSelectedProduct = (productId: string) => {
+    setSelectionMode(true)
+    setSelectedProductIds((currentIds) =>
+      currentIds.includes(productId)
+        ? currentIds.filter((id) => id !== productId)
+        : [...currentIds, productId]
+    )
+  }
+
+  const handleSelectAllVisible = () => {
+    setSelectionMode(true)
+    setSelectedProductIds(visibleProducts.map((product) => product.id))
+  }
+
+  const handleClearSelection = () => {
+    setSelectionMode(false)
+    setSelectedProductIds([])
+  }
+
+  const confirmBulkArchiveAction = async () => {
+    if (!bulkAction || selectedProductIds.length === 0) return
+
+    const previousProducts = products
+    const affectedIds = new Set(selectedProductIds)
+
+    setBulkActionPending(true)
+    setContextMenu(null)
+    setProducts((currentProducts) => currentProducts.filter((product) => !affectedIds.has(product.id)))
+
+    try {
+      const response = await fetch('/api/products/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: bulkAction,
+          ids: selectedProductIds,
+        }),
+      })
+      const data = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'Не удалось выполнить действие над архивом')
+      }
+
+      setSelectedProductIds([])
+      setSelectionMode(false)
+      setBulkAction(null)
+      router.refresh()
+    } catch (error: any) {
+      setProducts(previousProducts)
+      window.alert(error.message || 'Не удалось выполнить действие над архивом')
+    } finally {
+      setBulkActionPending(false)
     }
   }
 
@@ -752,6 +831,60 @@ export function ProductsClient({
           </AnimatePresence>
 
           {layoutSwitcher && <div className="pt-1">{layoutSwitcher}</div>}
+
+          {archiveMode && (
+            <div className="flex flex-wrap items-center gap-3 border-t border-slate-100 pt-3">
+              <button
+                type="button"
+                onClick={() => setSelectionMode(true)}
+                className="btn-secondary"
+              >
+                Выбрать
+              </button>
+              <button
+                type="button"
+                onClick={handleSelectAllVisible}
+                className="btn-secondary"
+                disabled={!visibleProducts.length}
+              >
+                Выбрать все
+              </button>
+
+              {(selectionMode || selectedProductIds.length > 0) && (
+                <>
+                  <div className="text-sm text-slate-500">
+                    Выбрано: <span className="font-medium text-slate-700">{selectedProductIds.length}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setBulkAction('restore')}
+                    className="btn-secondary"
+                    disabled={!selectedProductIds.length || bulkActionPending}
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                    Восстановить
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBulkAction('deleteArchived')}
+                    className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={!selectedProductIds.length || bulkActionPending}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Удалить
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleClearSelection}
+                    className="btn-secondary"
+                    disabled={bulkActionPending}
+                  >
+                    Снять выбор
+                  </button>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
       )}
@@ -761,6 +894,23 @@ export function ProductsClient({
           <table ref={listTableRef} className="w-full">
             <thead>
               <tr className="border-b border-slate-100">
+                {archiveMode && selectionMode && (
+                  <th className="table-header w-10 text-center">
+                    <input
+                      type="checkbox"
+                      checked={allVisibleSelected}
+                      onChange={(event) => {
+                        if (event.target.checked) {
+                          handleSelectAllVisible()
+                        } else {
+                          setSelectedProductIds([])
+                        }
+                      }}
+                      className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                      aria-label="Выбрать все архивные продукты"
+                    />
+                  </th>
+                )}
                 <th className="table-header w-12 text-center">#</th>
                 <th className="table-header w-14 text-center">Порядок</th>
                 <th className="table-header min-w-[280px]">Продукт</th>
@@ -802,6 +952,20 @@ export function ProductsClient({
                       zIndex: 30,
                     } : undefined}
                   >
+                    {archiveMode && selectionMode && (
+                      <td
+                        className={cn('table-cell w-10 text-center', isDragging && 'bg-white')}
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedProductIds.includes(product.id)}
+                          onChange={() => toggleSelectedProduct(product.id)}
+                          className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                          aria-label={`Выбрать продукт ${product.name}`}
+                        />
+                      </td>
+                    )}
                     <td className={cn('table-cell text-center text-slate-400 text-xs', isDragging && 'bg-white')}>
                       <div className="flex items-center justify-center">
                         <span>{index + 1}</span>
@@ -1031,6 +1195,24 @@ export function ProductsClient({
         loading={Boolean(pendingDeleteProduct && deletingProductId === pendingDeleteProduct.id)}
         onCancel={() => setPendingDeleteProduct(null)}
         onConfirm={confirmDeleteProduct}
+      />
+
+      <ConfirmDialog
+        open={bulkAction !== null}
+        title={bulkAction === 'restore' ? 'Восстановить выбранные продукты?' : 'Удалить выбранные архивные продукты?'}
+        description={
+          bulkAction === 'restore'
+            ? `Выбранные архивные продукты (${selectedProductIds.length}) вернутся в активный список.`
+            : `Выбранные архивные продукты (${selectedProductIds.length}) будут удалены навсегда вместе со всеми этапами, комментариями и историей.`
+        }
+        confirmLabel={bulkAction === 'restore' ? 'Восстановить выбранные' : 'Удалить выбранные'}
+        confirmTone={bulkAction === 'restore' ? 'primary' : 'danger'}
+        loading={bulkActionPending}
+        onCancel={() => {
+          if (bulkActionPending) return
+          setBulkAction(null)
+        }}
+        onConfirm={confirmBulkArchiveAction}
       />
     </div>
   )

@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
-import { AlertTriangle, Trash2, X } from 'lucide-react'
+import { AlertTriangle, Loader2, Trash2, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface ConfirmDialogProps {
@@ -29,6 +29,8 @@ export function ConfirmDialog({
   onCancel,
 }: ConfirmDialogProps) {
   if (typeof document === 'undefined') return null
+
+  const loadingLabel = confirmTone === 'danger' ? 'Удаляем...' : 'Выполняется...'
 
   return createPortal(
     <AnimatePresence>
@@ -78,13 +80,26 @@ export function ConfirmDialog({
                 onClick={onConfirm}
                 disabled={loading}
                 className={cn(
-                  'inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60',
+                  'relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-full px-5 py-2.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-70',
                   confirmTone === 'danger'
                     ? 'bg-red-600 text-white hover:bg-red-500'
                     : 'bg-brand-950 text-white hover:bg-brand-900'
                 )}
               >
-                {loading ? 'Выполняется...' : confirmLabel}
+                {loading && (
+                  <motion.span
+                    aria-hidden="true"
+                    className="absolute inset-0 bg-white/10"
+                    initial={{ x: '-100%' }}
+                    animate={{ x: '100%' }}
+                    transition={{ duration: 0.9, ease: 'linear', repeat: Infinity }}
+                  />
+                )}
+
+                <span className="relative z-[1] inline-flex items-center justify-center gap-2">
+                  {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {loading ? loadingLabel : confirmLabel}
+                </span>
               </button>
             </div>
           </motion.div>

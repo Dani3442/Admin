@@ -12,6 +12,7 @@
 - Table mode owns stage interactions, not product context actions.
 - Product creation logic should remain centralized.
 - Archive should stay as soft-state on `products`, not separate archive tables.
+- Archive bulk actions belong to the archive list owner (`ProductsClient.tsx`) and the bulk product API owner (`src/app/api/products/bulk/route.ts`).
 
 ### Rollout note
 - Schema-dependent features must document whether local/prod DB changes are required.
