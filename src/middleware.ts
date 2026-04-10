@@ -1,24 +1,25 @@
-import { NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
+import { NextResponse, type NextRequest } from 'next/server'
+import { updateSession } from '@/lib/supabase/middleware'
 
-export default auth((req) => {
+export default async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
-  const isAuthenticated = Boolean(req.auth?.user)
+  const { response, user } = await updateSession(req)
+  const isAuthenticated = Boolean(user)
 
   if (pathname.startsWith('/login') || pathname.startsWith('/api/auth')) {
     if (pathname.startsWith('/login') && isAuthenticated) {
       return NextResponse.redirect(new URL('/dashboard', req.url))
     }
 
-    return NextResponse.next()
+    return response
   }
 
   if (!isAuthenticated) {
     return NextResponse.redirect(new URL('/login', req.url))
   }
 
-  return NextResponse.next()
-})
+  return response
+}
 
 export const config = {
   matcher: ['/((?!_next/static|_next/image|favicon.ico|public).*)'],

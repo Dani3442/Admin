@@ -12,6 +12,7 @@ import { recalculateProductDerivedFields } from '@/lib/product-derived-fields'
 import { createProductStageCompat } from '@/lib/product-stage-compat'
 import { getOverlapAcceptedMap, persistOverlapAccepted } from '@/lib/overlap-acceptance'
 import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
+import { sanitizeDeepStrings, sanitizeTextValue } from '@/lib/input-security'
 
 async function normalizeProductStageOrders(
   tx: {
@@ -133,7 +134,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } })
   }
 
-  const body = await req.json()
+  const body = sanitizeDeepStrings(await req.json(), { preserveNewlines: true }) as any
   const { stageId, stageIds, updates, applyAutomations = true, swapWithStageId, productId, stageTemplateId, stageOrder, stageName } = body
   const [hasAutoshiftColumn, hasOverlapAcceptedColumn, hasStageTemplateAffectsFinalDateColumn] = await Promise.all([
     supportsProductStageAutoshiftColumn(),
@@ -236,6 +237,8 @@ export async function PATCH(req: NextRequest) {
       product: updatedProduct,
     })
   }
+
+  const sanitizedStageName = sanitizeTextValue(stageName, { maxLength: 160 })
 
   let existingStage = stageId
     ? await prisma.productStage.findUnique({
@@ -364,7 +367,7 @@ export async function PATCH(req: NextRequest) {
           productId,
           stageTemplateId,
           stageOrder: tempStageOrder,
-          stageName: typeof stageName === 'string' && stageName.trim() ? stageName.trim() : template.name,
+          stageName: sanitizedStageName || template.name,
           dateValue: initialDateValue,
           plannedDate: initialDateValue,
           isCritical: template.isCritical,
@@ -379,7 +382,7 @@ export async function PATCH(req: NextRequest) {
           productId,
           stageOrder: tempStageOrder,
           stageTemplateId,
-          stageName: typeof stageName === 'string' && stageName.trim() ? stageName.trim() : template.name,
+          stageName: sanitizedStageName || template.name,
           dateValue: initialDateValue,
         }
         createdMissingStage = true

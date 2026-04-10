@@ -3,6 +3,7 @@ import { auth, hasPermission, Permission } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { differenceInDays, addDays } from 'date-fns'
 import { getVisibleProductWhere } from '@/lib/product-access'
+import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -10,6 +11,15 @@ export async function GET(req: NextRequest) {
   const viewer = session.user as any
   if (!hasPermission(viewer.role, Permission.VIEW_ANALYTICS)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const rateLimit = consumeRateLimit({
+    key: `api:analytics:read:${viewer.id}:${getClientIpFromHeaders(req.headers)}`,
+    limit: 60,
+    windowMs: 60 * 1000,
+  })
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } })
   }
 
   const now = new Date()

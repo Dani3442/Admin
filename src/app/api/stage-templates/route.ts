@@ -7,6 +7,7 @@ import {
   supportsStageTemplateAffectsFinalDateColumn,
 } from '@/lib/schema-compat'
 import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
+import { sanitizeDeepStrings, sanitizeTextValue } from '@/lib/input-security'
 
 async function updateProductProgress(productId: string) {
   const stages = await prisma.productStage.findMany({
@@ -184,8 +185,10 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const body = await req.json()
-    const { name, durationText, isCritical = false } = body
+    const body = sanitizeDeepStrings(await req.json(), { preserveNewlines: true }) as any
+    const name = sanitizeTextValue(body?.name, { maxLength: 160 })
+    const durationText = sanitizeTextValue(body?.durationText, { maxLength: 160 }) || null
+    const isCritical = body?.isCritical === true
     const hasStageTemplateAffectsFinalDateColumn = await supportsStageTemplateAffectsFinalDateColumn()
 
     if (!name?.trim()) {
@@ -204,7 +207,7 @@ export async function POST(req: NextRequest) {
             data: {
               name: name.trim(),
               order: newOrder,
-              durationText: durationText || null,
+              durationText,
               isCritical,
             },
             select: {
@@ -222,7 +225,7 @@ export async function POST(req: NextRequest) {
             data: {
               name: name.trim(),
               order: newOrder,
-              durationText: durationText || null,
+              durationText,
               isCritical,
             },
             select: {
@@ -296,8 +299,11 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': String(updateRateLimit.retryAfterSeconds) } })
   }
 
-  const body = await req.json()
-  const { id, action, name, participatesInAutoshift } = body
+  const body = sanitizeDeepStrings(await req.json(), { preserveNewlines: true }) as any
+  const id = sanitizeTextValue(body?.id, { maxLength: 128 })
+  const action = sanitizeTextValue(body?.action, { maxLength: 32 })
+  const name = sanitizeTextValue(body?.name, { maxLength: 160 })
+  const participatesInAutoshift = body?.participatesInAutoshift
   const hasStageTemplateAffectsFinalDateColumn = await supportsStageTemplateAffectsFinalDateColumn()
 
   if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 })

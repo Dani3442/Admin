@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getCommentDisplayText } from '@/lib/comment-mentions'
 import { getVisibleProductWhere } from '@/lib/product-access'
+import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
 
 async function getNotificationData(currentUserId: string, viewer: { id?: string | null; role?: string | null }) {
   const now = new Date()
@@ -118,6 +119,15 @@ export async function GET(req: NextRequest) {
   const currentUserId = (session.user as any).id as string
   const viewer = session.user as any
 
+  const readRateLimit = consumeRateLimit({
+    key: `api:notifications:read:${currentUserId}:${getClientIpFromHeaders(req.headers)}`,
+    limit: 120,
+    windowMs: 60 * 1000,
+  })
+  if (!readRateLimit.allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': String(readRateLimit.retryAfterSeconds) } })
+  }
+
   const { now, recentChanges, overdueStages, riskProducts, recentMentions, isUnread } = await getNotificationData(currentUserId, viewer)
 
   const unreadMentions = recentMentions.filter((comment) => isUnread(comment.product.id, comment.createdAt))
@@ -200,11 +210,20 @@ export async function GET(req: NextRequest) {
   })
 }
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const currentUserId = (session.user as any).id as string
   const viewer = session.user as any
+
+  const writeRateLimit = consumeRateLimit({
+    key: `api:notifications:write:${currentUserId}:${getClientIpFromHeaders(req.headers)}`,
+    limit: 60,
+    windowMs: 60 * 1000,
+  })
+  if (!writeRateLimit.allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': String(writeRateLimit.retryAfterSeconds) } })
+  }
 
   const { now, recentChanges, overdueStages, riskProducts, recentMentions, isUnread } = await getNotificationData(currentUserId, viewer)
 

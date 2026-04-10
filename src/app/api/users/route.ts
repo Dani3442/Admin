@@ -2,18 +2,20 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
-import { canCreateUser, EMPLOYEE_TYPE_OPTIONS, PROFILE_ROLE_OPTIONS } from '@/lib/user-profile'
+import { canCreateUser, EMPLOYEE_TYPE_OPTIONS, PROFILE_ROLE_OPTIONS, sanitizedEmailSchema } from '@/lib/user-profile'
 import { z } from 'zod'
 import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
+import { sanitizeTextValue } from '@/lib/input-security'
+import { ensureSupabaseUserForLocalUser } from '@/lib/supabase/admin-users'
 
 const createUserSchema = z.object({
-  email: z.string().trim().email('Некорректный email'),
-  name: z.string().trim().min(2, 'Укажите имя').max(60),
-  lastName: z.string().trim().max(60).optional().nullable(),
+  email: sanitizedEmailSchema,
+  name: z.string().transform((value) => sanitizeTextValue(value, { maxLength: 60 })).pipe(z.string().min(2, 'Укажите имя').max(60)),
+  lastName: z.string().transform((value) => sanitizeTextValue(value, { maxLength: 60 })).optional().nullable(),
   password: z.string().min(8, 'Пароль должен содержать минимум 8 символов'),
   userRole: z.enum([...PROFILE_ROLE_OPTIONS] as [string, ...string[]]).default('EMPLOYEE'),
-  jobTitle: z.string().trim().max(80).optional().nullable(),
-  department: z.string().trim().max(80).optional().nullable(),
+  jobTitle: z.string().transform((value) => sanitizeTextValue(value, { maxLength: 80 })).optional().nullable(),
+  department: z.string().transform((value) => sanitizeTextValue(value, { maxLength: 80 })).optional().nullable(),
   employeeType: z.enum([...EMPLOYEE_TYPE_OPTIONS] as [string, ...string[]]).default('INTERNAL'),
 })
 
@@ -22,6 +24,16 @@ export async function GET(req: NextRequest) {
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!['ADMIN', 'DIRECTOR'].includes((session.user as any).role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const userId = (session.user as any).id
+  const rateLimit = consumeRateLimit({
+    key: `api:users:list:${userId}:${getClientIpFromHeaders(req.headers)}`,
+    limit: 60,
+    windowMs: 60 * 1000,
+  })
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } })
   }
 
   const users = await prisma.user.findMany({
@@ -70,6 +82,13 @@ export async function POST(req: NextRequest) {
 
   const existing = await prisma.user.findUnique({ where: { email } })
   if (existing) return NextResponse.json({ error: 'Пользователь уже существует' }, { status: 400 })
+
+  await ensureSupabaseUserForLocalUser({
+    email,
+    password,
+    name,
+    lastName,
+  })
 
   const hashed = await bcrypt.hash(password, 12)
   const user = await prisma.user.create({

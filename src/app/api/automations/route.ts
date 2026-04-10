@@ -3,6 +3,7 @@ import { auth, hasPermission, Permission } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { ensureDefaultShiftFollowingAutomation } from '@/lib/automation'
 import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
+import { sanitizeDeepStrings, sanitizeTextValue } from '@/lib/input-security'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -40,17 +41,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': String(createRateLimit.retryAfterSeconds) } })
   }
 
-  const body = await req.json()
-  const { name, description, productId, actionType, config, excludeStageOrders, isActive } = body
+  const body = sanitizeDeepStrings(await req.json(), { preserveNewlines: true }) as any
+  const { productId, actionType, excludeStageOrders, isActive } = body
+  const name = sanitizeTextValue(body?.name, { maxLength: 160 })
+  const description = sanitizeTextValue(body?.description, { preserveNewlines: true, maxLength: 1000 }) || null
+  const config = sanitizeDeepStrings(body?.config ?? {}, { preserveNewlines: true }) as unknown
 
   const automation = await prisma.automation.create({
     data: {
       name,
       description,
-      productId: productId || null,
+      productId: sanitizeTextValue(productId, { maxLength: 128 }) || null,
       isTemplate: !productId,
       actionType,
-      config: typeof config === 'object' ? JSON.stringify(config) : (config || '{}'),
+      config: typeof config === 'object' ? JSON.stringify(config) : String(config || '{}'),
       excludeStageOrders: JSON.stringify(excludeStageOrders || []),
       isActive: isActive ?? true,
     },
@@ -76,12 +80,29 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': String(updateRateLimit.retryAfterSeconds) } })
   }
 
-  const body = await req.json()
+  const body = sanitizeDeepStrings(await req.json(), { preserveNewlines: true }) as any
   const { id, ...updates } = body
 
   const automation = await prisma.automation.update({
-    where: { id },
-    data: updates,
+    where: { id: sanitizeTextValue(id, { maxLength: 128 }) },
+    data: {
+      ...updates,
+      ...(typeof updates.name === 'string' ? { name: sanitizeTextValue(updates.name, { maxLength: 160 }) } : {}),
+      ...(typeof updates.description === 'string'
+        ? { description: sanitizeTextValue(updates.description, { preserveNewlines: true, maxLength: 1000 }) }
+        : {}),
+      ...(updates.productId !== undefined
+        ? { productId: sanitizeTextValue(updates.productId, { maxLength: 128 }) || null }
+        : {}),
+      ...(updates.config !== undefined
+        ? {
+            config:
+              typeof updates.config === 'object'
+                ? JSON.stringify(sanitizeDeepStrings(updates.config, { preserveNewlines: true }))
+                : updates.config,
+          }
+        : {}),
+    },
   })
 
   return NextResponse.json(automation)

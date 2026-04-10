@@ -1,9 +1,5 @@
-import NextAuth from 'next-auth'
-import bcrypt from 'bcryptjs'
-import Credentials from 'next-auth/providers/credentials'
-import { authConfig } from './auth.config'
 import { prisma } from './prisma'
-import { clearRateLimit, consumeRateLimit, getClientIpFromHeaders } from './rate-limit'
+import { createClient as createServerSupabaseClient } from './supabase/server'
 
 function normalizeSessionAvatar(avatar: string | null | undefined) {
   if (!avatar) return null
@@ -16,80 +12,56 @@ function normalizeSessionAvatar(avatar: string | null | undefined) {
   return trimmed
 }
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
-  ...authConfig,
-  providers: [
-    Credentials({
-      name: 'credentials',
-      credentials: {
-        email: { label: 'Email', type: 'email' },
-        password: { label: 'Password', type: 'password' },
-      },
-      async authorize(credentials, request) {
-        if (!credentials?.email || !credentials?.password) return null
+export type AppSession = {
+  user: {
+    id: string
+    email: string
+    name: string
+    lastName: string | null
+    role: string
+    avatar: string | null
+  }
+} | null
 
-        const email = String(credentials.email).trim().toLowerCase()
-        const password = String(credentials.password)
-        const loginRateLimitKey = `login:${getClientIpFromHeaders(request?.headers)}:${email}`
-        const loginRateLimit = consumeRateLimit({
-          key: loginRateLimitKey,
-          limit: 10,
-          windowMs: 15 * 60 * 1000,
-        })
+export async function auth(): Promise<AppSession> {
+  const supabase = await createServerSupabaseClient()
+  const {
+    data: { user: supabaseUser },
+  } = await supabase.auth.getUser()
 
-        if (!loginRateLimit.allowed) {
-          console.warn('[auth] Login rate limit exceeded', { email })
-          return null
-        }
+  const email = supabaseUser?.email?.trim().toLowerCase()
+  if (!email) {
+    return null
+  }
 
-        let user = await prisma.user.findUnique({
-          where: { email },
-          select: {
-            id: true,
-            email: true,
-            name: true,
-            lastName: true,
-            password: true,
-            role: true,
-            avatar: true,
-            isActive: true,
-          },
-        })
+  const user = await prisma.user.findUnique({
+    where: { email },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      lastName: true,
+      role: true,
+      avatar: true,
+      isActive: true,
+    },
+  })
 
-        if (!user) {
-          console.warn('[auth] Login rejected: user not found', { email })
-          return null
-        }
+  if (!user || !user.isActive) {
+    return null
+  }
 
-        if (!user.isActive) {
-          console.warn('[auth] Login rejected: inactive user', { email })
-          return null
-        }
-
-        const isValid = await bcrypt.compare(
-          password,
-          user.password
-        )
-
-        if (!isValid) {
-          console.warn('[auth] Login rejected: invalid password', { email })
-          return null
-        }
-
-        clearRateLimit(loginRateLimitKey)
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          lastName: user.lastName,
-          role: user.role,
-          avatar: normalizeSessionAvatar(user.avatar),
-        }
-      },
-    }),
-  ],
-})
+  return {
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      lastName: user.lastName,
+      role: user.role,
+      avatar: normalizeSessionAvatar(user.avatar),
+    },
+  }
+}
 
 // Permission system (string-based roles for SQLite)
 export enum Permission {

@@ -3,7 +3,6 @@
 import Link from 'next/link'
 import { useState, useEffect, useRef } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { signOut } from 'next-auth/react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   Bell,
@@ -27,6 +26,7 @@ import {
 import { UserAvatar } from '@/components/users/UserAvatar'
 import { cn, getRoleLabel, getUserDisplayName } from '@/lib/utils'
 import { buildProductHref, getRouteWithSearch } from '@/lib/navigation'
+import { createClient } from '@/lib/supabase/client'
 
 interface Notification {
   id: string
@@ -56,6 +56,7 @@ const NAV_ITEMS: Array<{
 ]
 
 export function Header({ user }: HeaderProps) {
+  const [supabase] = useState(() => createClient())
   const [profileUser, setProfileUser] = useState(user)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
@@ -444,7 +445,11 @@ export function Header({ user }: HeaderProps) {
 
                     <div className="mt-2 border-t border-slate-100 pt-2">
                       <button
-                        onClick={() => signOut({ callbackUrl: '/login' })}
+                        onClick={async () => {
+                          await supabase.auth.signOut()
+                          router.push('/login')
+                          router.refresh()
+                        }}
                         className="flex w-full items-center justify-between rounded-[18px] px-3 py-2.5 text-sm text-red-600 transition hover:bg-red-50"
                       >
                         <span className="flex items-center gap-2">

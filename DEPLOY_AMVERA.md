@@ -50,17 +50,14 @@ git push amvera main
 | Переменная | Значение | Описание |
 |-----------|---------|----------|
 | `DATABASE_URL` | `postgresql://user:pass@host:5432/db` | Строка из шага 1 |
-| `AUTH_SECRET` | сгенерируйте (см. ниже) | Секрет для JWT |
-| `NEXTAUTH_URL` | `https://ваш-домен.amvera.io` | URL вашего приложения |
+| `NEXT_PUBLIC_SUPABASE_URL` | `https://your-project.supabase.co` | URL проекта Supabase |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | publishable / anon key из Supabase | Публичный ключ для browser SSR-клиента |
+| `SUPABASE_SERVICE_ROLE_KEY` | service role key из Supabase | Серверный ключ для создания и миграции пользователей |
 | `ADMIN_EMAIL` | `admin@company.com` | Email администратора |
 | `ADMIN_PASSWORD` | `Admin1234!` | Пароль (измените!) |
 | `ADMIN_NAME` | `Данила` | Имя администратора |
 
-**Генерация AUTH_SECRET:**
-```bash
-openssl rand -hex 32
-```
-Или используйте: https://generate-secret.vercel.app/32
+`SUPABASE_SERVICE_ROLE_KEY` храните только на сервере и никогда не передавайте во фронтенд.
 
 ---
 

@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
+import { sanitizeDeepStrings, sanitizeTextValue } from '@/lib/input-security'
 
 interface ImportStage {
   stageName: string
@@ -44,7 +45,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const body = await req.json()
+    const body = sanitizeDeepStrings(await req.json(), { preserveNewlines: true }) as any
     const { products }: { products: ImportProduct[] } = body
 
     if (!Array.isArray(products) || products.length === 0) {
@@ -78,8 +79,9 @@ export async function POST(req: NextRequest) {
 
       try {
         // Check if product already exists
+        const productName = sanitizeTextValue(prod.name, { maxLength: 160 })
         const exists = await prisma.product.findFirst({
-          where: { name: prod.name.trim() },
+          where: { name: productName },
         })
 
         if (exists) {
@@ -95,10 +97,10 @@ export async function POST(req: NextRequest) {
           return {
             stageTemplateId: template?.id ?? '',
             stageOrder: s.stageOrder ?? template?.order ?? 999,
-            stageName: s.stageName || template?.name || 'Этап',
+            stageName: sanitizeTextValue(s.stageName || template?.name || 'Этап', { maxLength: 160 }),
             dateValue: s.dateValue ? new Date(s.dateValue) : null,
             durationDays: s.durationDays ?? template?.durationDays ?? null,
-            comment: s.comment || null,
+            comment: sanitizeTextValue(s.comment, { preserveNewlines: true, maxLength: 2000 }) || null,
             isCritical: s.isCritical ?? template?.isCritical ?? false,
             isCompleted: s.isCompleted ?? false,
             affectsFinalDate: template?.affectsFinalDate ?? true,
@@ -132,12 +134,12 @@ export async function POST(req: NextRequest) {
 
         await prisma.product.create({
           data: {
-            name: prod.name.trim(),
-            country: prod.country?.trim() || null,
-            category: prod.category?.trim() || null,
-            sku: prod.sku?.trim() || null,
+            name: productName,
+            country: sanitizeTextValue(prod.country, { maxLength: 80 }) || null,
+            category: sanitizeTextValue(prod.category, { maxLength: 80 }) || null,
+            sku: sanitizeTextValue(prod.sku, { maxLength: 80 }) || null,
             priority: prod.priority || 'MEDIUM',
-            notes: prod.notes?.trim() || null,
+            notes: sanitizeTextValue(prod.notes, { preserveNewlines: true, maxLength: 4000 }) || null,
             status: 'PLANNED',
             finalDate,
             stages: { create: finalStages },

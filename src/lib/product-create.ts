@@ -6,6 +6,7 @@ import {
   supportsProductTemplateStageDurationDaysColumn,
 } from '@/lib/schema-compat'
 import { recalculateSequentialStageDates } from '@/lib/stage-schedule'
+import { sanitizeNullableText, sanitizeTextValue, sanitizeUrlValue } from '@/lib/input-security'
 
 export interface CreateProductStageOverrideInput {
   id?: string
@@ -32,12 +33,11 @@ export interface CreateProductInput {
 function normalizeNullableString(value: unknown) {
   if (typeof value !== 'string') return value ?? null
 
-  const trimmed = value.trim()
-  return trimmed ? trimmed : null
+  return sanitizeNullableText(value)
 }
 
 export async function createProduct(input: CreateProductInput) {
-  const name = input.name?.trim()
+  const name = sanitizeTextValue(input.name, { maxLength: 160 })
 
   if (!name) {
     throw new Error('Name is required')
@@ -111,7 +111,7 @@ export async function createProduct(input: CreateProductInput) {
           .map((stage, index) => ({
             stageTemplateId: String(stage?.stageTemplateId || ''),
             stageOrder: typeof stage?.stageOrder === 'number' ? stage.stageOrder : index,
-            stageName: String(stage?.stageName || '').trim(),
+            stageName: sanitizeTextValue(stage?.stageName, { maxLength: 160 }),
             dateValue: stage?.plannedDate ? new Date(stage.plannedDate) : null,
             durationDays:
               typeof stage?.durationDays === 'number' && Number.isFinite(stage.durationDays)
@@ -166,7 +166,8 @@ export async function createProduct(input: CreateProductInput) {
       sku: normalizeNullableString(input.sku),
       priority: input.priority || 'MEDIUM',
       responsibleId: normalizeNullableString(input.responsibleId),
-      notes: normalizeNullableString(input.notes),
+      competitorUrl: sanitizeUrlValue((input as any).competitorUrl),
+      notes: sanitizeNullableText(input.notes, { preserveNewlines: true, maxLength: 4000 }),
       sortOrder: (sortOrderAggregate._max.sortOrder ?? -1) + 1,
       finalDate: null,
     }

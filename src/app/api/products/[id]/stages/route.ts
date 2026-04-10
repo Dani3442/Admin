@@ -8,6 +8,7 @@ import {
   supportsStageTemplateAffectsFinalDateColumn,
 } from '@/lib/schema-compat'
 import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
+import { sanitizeTextValue } from '@/lib/input-security'
 
 async function normalizeRemainingProductStages(
   tx: {
@@ -166,7 +167,7 @@ export async function POST(
 
   try {
     const body = await req.json()
-    const stageName = String(body.stageName || '').trim()
+    const stageName = sanitizeTextValue(body?.stageName, { maxLength: 160 })
     const dateValue = body.dateValue ? new Date(body.dateValue) : null
     const participatesInAutoshift = body.participatesInAutoshift !== false
     const hasStageTemplateAffectsFinalDateColumn = await supportsStageTemplateAffectsFinalDateColumn()

@@ -4,9 +4,10 @@ import { prisma } from '@/lib/prisma'
 import { buildSequentialStageSchedule } from '@/lib/stage-schedule'
 import { supportsProductTemplateStageDurationDaysColumn } from '@/lib/schema-compat'
 import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
+import { sanitizeDeepStrings, sanitizeTextValue } from '@/lib/input-security'
 
 function normalizeStageName(name: string) {
-  return name.trim().replace(/\s+/g, ' ')
+  return sanitizeTextValue(name, { maxLength: 160 })
 }
 
 type TemplateStagePayload = {
@@ -39,10 +40,10 @@ export async function PATCH(
 
   try {
     const { id } = await params
-    const body = await req.json()
+    const body = sanitizeDeepStrings(await req.json(), { preserveNewlines: true }) as any
     const hasDurationDaysColumn = await supportsProductTemplateStageDurationDaysColumn()
-    const templateName = String(body?.name || '').trim()
-    const description = typeof body?.description === 'string' ? body.description.trim() : ''
+    const templateName = sanitizeTextValue(body?.name, { maxLength: 160 })
+    const description = sanitizeTextValue(body?.description, { preserveNewlines: true, maxLength: 1000 })
     const rawStages = Array.isArray(body?.stages) ? body.stages : []
 
     if (!templateName) {

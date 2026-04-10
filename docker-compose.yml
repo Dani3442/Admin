@@ -27,8 +27,9 @@ services:
       - "3000:3000"
     environment:
       DATABASE_URL: "postgresql://postgres:postgres123@postgres:5432/product_admin"
-      AUTH_SECRET: "your-super-secret-key-32-chars-min-change-this"
-      NEXTAUTH_URL: "http://localhost:3000"
+      NEXT_PUBLIC_SUPABASE_URL: "https://your-project.supabase.co"
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "your-supabase-publishable-key"
+      SUPABASE_SERVICE_ROLE_KEY: "your-supabase-service-role-key"
       ADMIN_EMAIL: "admin@company.com"
       ADMIN_PASSWORD: "Admin1234!"
       ADMIN_NAME: "Данила"

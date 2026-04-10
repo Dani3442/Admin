@@ -13,6 +13,7 @@ import {
   userProfileSelect,
 } from '@/lib/user-profile'
 import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
+import { deleteSupabaseUserByEmail } from '@/lib/supabase/admin-users'
 
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -149,9 +150,18 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   }
 
   try {
+    const targetUser = await prisma.user.findUnique({
+      where: { id: target.id },
+      select: { email: true },
+    })
+
     await prisma.user.delete({
       where: { id: target.id },
     })
+
+    if (targetUser?.email) {
+      await deleteSupabaseUserByEmail(targetUser.email)
+    }
 
     return NextResponse.json({ success: true })
   } catch (error: any) {

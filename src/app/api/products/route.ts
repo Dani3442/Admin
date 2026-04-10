@@ -4,11 +4,21 @@ import { prisma } from '@/lib/prisma'
 import { createProduct } from '@/lib/product-create'
 import { getVisibleProductWhere } from '@/lib/product-access'
 import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
+import { sanitizeDeepStrings, sanitizeTextValue } from '@/lib/input-security'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const viewer = session.user as any
+
+  const rateLimit = consumeRateLimit({
+    key: `api:products:list:${viewer.id}:${getClientIpFromHeaders(req.headers)}`,
+    limit: 120,
+    windowMs: 60 * 1000,
+  })
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } })
+  }
 
   const { searchParams } = new URL(req.url)
   const status = searchParams.get('status')
@@ -23,9 +33,9 @@ export async function GET(req: NextRequest) {
   const where: any = { isArchived: false }
   if (status) where.status = status
   if (priority) where.priority = priority
-  if (search) where.name = { contains: search }
-  if (responsible) where.responsibleId = responsible
-  if (country) where.country = country
+  if (search) where.name = { contains: sanitizeTextValue(search, { maxLength: 160 }) }
+  if (responsible) where.responsibleId = sanitizeTextValue(responsible, { maxLength: 128 })
+  if (country) where.country = sanitizeTextValue(country, { maxLength: 80 })
 
   const productListSelect = {
     id: true,
@@ -123,7 +133,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const body = await req.json()
+    const body = sanitizeDeepStrings(await req.json(), { preserveNewlines: true }) as any
     const product = await createProduct(body)
 
     return NextResponse.json({ id: product.id }, { status: 201 })

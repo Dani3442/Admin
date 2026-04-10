@@ -4,11 +4,21 @@ import { prisma } from '@/lib/prisma'
 import { getCommentDisplayText } from '@/lib/comment-mentions'
 import { getVisibleProductWhere } from '@/lib/product-access'
 import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
+import { sanitizeTextValue } from '@/lib/input-security'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const currentUserId = (session.user as any).id as string
+
+  const rateLimit = consumeRateLimit({
+    key: `api:comments:read:${currentUserId}:${getClientIpFromHeaders(req.headers)}`,
+    limit: 180,
+    windowMs: 60 * 1000,
+  })
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } })
+  }
 
   const productId = req.nextUrl.searchParams.get('productId')
   if (!productId) {
@@ -69,7 +79,9 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { content, productId, productStageId } = body
+  const content = sanitizeTextValue(body?.content, { preserveNewlines: true, maxLength: 4000 })
+  const productId = sanitizeTextValue(body?.productId, { maxLength: 128 })
+  const productStageId = sanitizeTextValue(body?.productStageId, { maxLength: 128 }) || null
 
   if (!content?.trim() || !productId) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -111,7 +123,7 @@ export async function POST(req: NextRequest) {
       content: content.trim(),
       authorId: (session.user as any).id,
       productId,
-      productStageId: productStageId || null,
+      productStageId,
     },
     include: {
       author: { select: { id: true, name: true, lastName: true, avatar: true } },

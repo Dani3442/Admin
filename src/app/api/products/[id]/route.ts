@@ -6,6 +6,7 @@ import { getOverlapAcceptedMap } from '@/lib/overlap-acceptance'
 import { supportsProductLifecycleColumns } from '@/lib/schema-compat'
 import { getVisibleProductWhere } from '@/lib/product-access'
 import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
+import { sanitizeDeepStrings, sanitizeTextValue, sanitizeUrlValue } from '@/lib/input-security'
 
 function getProductSelect(hasProductLifecycleColumns: boolean) {
   return {
@@ -107,6 +108,14 @@ export async function GET(
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const viewer = session.user as any
+  const rateLimit = consumeRateLimit({
+    key: `api:products:read:${viewer.id}:${getClientIpFromHeaders(req.headers)}`,
+    limit: 120,
+    windowMs: 60 * 1000,
+  })
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } })
+  }
   const hasProductLifecycleColumns = await supportsProductLifecycleColumns()
 
   const product = await prisma.product.findFirst({
@@ -166,7 +175,7 @@ export async function PATCH(
     return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } })
   }
 
-  const body = await req.json()
+  const body = sanitizeDeepStrings(await req.json(), { preserveNewlines: true }) as any
   const action = body?.action as 'close' | 'archive' | 'restore' | undefined
   const hasProductLifecycleColumns = await supportsProductLifecycleColumns()
 
@@ -179,7 +188,7 @@ export async function PATCH(
     }
 
     const nextStatus = body?.status === 'CANCELLED' ? 'CANCELLED' : 'COMPLETED'
-    const closureComment = typeof body?.closureComment === 'string' ? body.closureComment.trim() : ''
+    const closureComment = sanitizeTextValue(body?.closureComment, { preserveNewlines: true, maxLength: 1000 })
 
     const product = await prisma.product.update({
       where: { id },
@@ -219,7 +228,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const archiveReason = typeof body?.archiveReason === 'string' ? body.archiveReason.trim() : ''
+    const archiveReason = sanitizeTextValue(body?.archiveReason, { preserveNewlines: true, maxLength: 1000 })
 
     const product = await prisma.product.update({
       where: { id },
@@ -315,17 +324,24 @@ export async function PATCH(
     data.finalDate = new Date(data.finalDate as string)
   }
 
+  if ('name' in data) data.name = sanitizeTextValue(data.name, { maxLength: 160 })
+  if ('country' in data) data.country = sanitizeTextValue(data.country, { maxLength: 80 }) || null
+  if ('category' in data) data.category = sanitizeTextValue(data.category, { maxLength: 80 }) || null
+  if ('sku' in data) data.sku = sanitizeTextValue(data.sku, { maxLength: 80 }) || null
+  if ('competitorUrl' in data) data.competitorUrl = sanitizeUrlValue(data.competitorUrl)
+  if ('notes' in data) data.notes = sanitizeTextValue(data.notes, { preserveNewlines: true, maxLength: 4000 }) || null
+
   const product = await prisma.product.update({
     where: { id },
     data,
     include: {
-      responsible: true,
-      ...(hasProductLifecycleColumns
-        ? {
-            closedBy: { select: { id: true, name: true, email: true } },
-            archivedBy: { select: { id: true, name: true, email: true } },
-          }
-        : {}),
+          responsible: true,
+          ...(hasProductLifecycleColumns
+            ? {
+            closedBy: { select: { id: true, name: true } },
+            archivedBy: { select: { id: true, name: true } },
+              }
+            : {}),
       _count: { select: { comments: true } },
     },
   })

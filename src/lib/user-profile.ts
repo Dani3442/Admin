@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client'
 import { z } from 'zod'
 import type { EmployeeType, UserRole, VerificationStatus } from '@/types'
+import { sanitizeEmailValue, sanitizeTextValue } from '@/lib/input-security'
 
 export const EMPLOYEE_TYPE_OPTIONS = ['INTERNAL', 'CONTRACTOR', 'PARTNER'] as const satisfies readonly EmployeeType[]
 export const VERIFICATION_STATUS_OPTIONS = ['UNVERIFIED', 'PENDING', 'VERIFIED'] as const satisfies readonly VerificationStatus[]
@@ -12,17 +13,19 @@ const MAX_AVATAR_SIZE = 1024 * 1024
 const optionalText = (max: number) =>
   z
     .string()
-    .trim()
     .max(max, `Максимум ${max} символов`)
     .optional()
     .nullable()
     .transform((value) => {
-      const nextValue = value?.trim()
+      const nextValue = value == null ? null : sanitizeTextValue(value, { maxLength: max })
       return nextValue ? nextValue : null
     })
 
 export const selfProfileSchema = z.object({
-  name: z.string().trim().min(2, 'Имя должно содержать минимум 2 символа').max(60, 'Максимум 60 символов'),
+  name: z
+    .string()
+    .transform((value) => sanitizeTextValue(value, { maxLength: 60 }))
+    .pipe(z.string().min(2, 'Имя должно содержать минимум 2 символа').max(60, 'Максимум 60 символов')),
   lastName: optionalText(60),
   jobTitle: optionalText(80),
   avatar: z.any().optional(),
@@ -98,6 +101,11 @@ export const userProfileSelect = {
     },
   },
 } satisfies Prisma.UserSelect
+
+export const sanitizedEmailSchema = z
+  .string()
+  .transform((value) => sanitizeEmailValue(value))
+  .pipe(z.string().email('Некорректный email'))
 
 export function canViewUserProfile(viewerRole: string, viewerId: string, targetId: string) {
   if (viewerId === targetId) return true

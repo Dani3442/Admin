@@ -4,10 +4,19 @@ import { prisma } from '@/lib/prisma'
 import { normalizeAvatarValue, selfProfileSchema, userProfileSelect } from '@/lib/user-profile'
 import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = await auth()
   const userId = (session?.user as any)?.id
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const rateLimit = consumeRateLimit({
+    key: `api:profile:read:${userId}:${getClientIpFromHeaders(req.headers)}`,
+    limit: 120,
+    windowMs: 60 * 1000,
+  })
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } })
+  }
 
   const profile = await prisma.user.findUnique({
     where: { id: userId },
