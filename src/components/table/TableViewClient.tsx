@@ -4,7 +4,7 @@ import { useState, useRef, useCallback, useEffect, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { Search, CheckCircle2, AlertTriangle, Plus, ChevronLeft, ChevronRight, Pencil, X, Trash2, Filter, Archive, Pin, PinOff, Star } from 'lucide-react'
+import { Search, CheckCircle2, AlertTriangle, Plus, ChevronLeft, ChevronRight, Pencil, X, Trash2, Filter } from 'lucide-react'
 import { cn, formatDate, detectStageOverlaps, getPriorityLabel, getStatusLabel } from '@/lib/utils'
 import { DatePicker } from '@/components/ui/DatePicker'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -60,12 +60,6 @@ interface EditingCellState {
 type StageMenuState =
   | { kind: 'header'; stageId: string; x: number; y: number }
   | { kind: 'cell'; stageId: string; productId: string; x: number; y: number }
-
-interface ProductMenuState {
-  productId: string
-  x: number
-  y: number
-}
 
 const ALL_STATUSES = ['PLANNED', 'IN_PROGRESS', 'AT_RISK', 'DELAYED', 'COMPLETED', 'CANCELLED'] as const
 const ALL_PRIORITIES = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] as const
@@ -171,7 +165,6 @@ export function TableViewClient({
 
   // Stage management state
   const [stageMenu, setStageMenu] = useState<StageMenuState | null>(null)
-  const [productMenu, setProductMenu] = useState<ProductMenuState | null>(null)
   const [renamingStage, setRenamingStage] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [showNewStageForm, setShowNewStageForm] = useState(false)
@@ -180,15 +173,7 @@ export function TableViewClient({
   const [newStageAutoshift, setNewStageAutoshift] = useState(true)
   const menuRef = useRef<HTMLDivElement>(null)
   const canEditTable = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUserRole) && !archiveMode
-  const canManageProducts = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUserRole) && !archiveMode
-  const canArchiveProducts = ['ADMIN', 'DIRECTOR'].includes(currentUserRole) && !archiveMode
-  const canDeleteProducts = ['ADMIN', 'DIRECTOR'].includes(currentUserRole)
-  const [savingProductId, setSavingProductId] = useState<string | null>(null)
-  const [deletingProductId, setDeletingProductId] = useState<string | null>(null)
-  const [archivingProductId, setArchivingProductId] = useState<string | null>(null)
   const [pendingDeleteStageId, setPendingDeleteStageId] = useState<string | null>(null)
-  const [pendingDeleteProduct, setPendingDeleteProduct] = useState<{ id: string; name: string } | null>(null)
-  const [pendingArchiveProduct, setPendingArchiveProduct] = useState<{ id: string; name: string } | null>(null)
   const userOptions = Array.from(
     new Map(
       products
@@ -217,12 +202,11 @@ export function TableViewClient({
     const handleClick = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setStageMenu(null)
-        setProductMenu(null)
       }
     }
-    if (stageMenu || productMenu) document.addEventListener('mousedown', handleClick)
+    if (stageMenu) document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
-  }, [productMenu, stageMenu])
+  }, [stageMenu])
 
   // Column resize state
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
@@ -432,7 +416,6 @@ export function TableViewClient({
     if (!canEditTable || !stage) return
     e.preventDefault()
     e.stopPropagation()
-    setProductMenu(null)
     const { x, y } = clampMenuPosition(e.clientX, e.clientY, 220, 120)
     setStageMenu({
       kind: 'cell',
@@ -448,98 +431,6 @@ export function TableViewClient({
     setRenamingStage(stage.id)
     setRenameValue(stage.name)
     setStageMenu(null)
-  }
-
-  const handleOpenProductContextMenu = (event: React.MouseEvent, productId: string) => {
-    event.preventDefault()
-    event.stopPropagation()
-    setStageMenu(null)
-    const { x, y } = clampMenuPosition(event.clientX, event.clientY, 240, 240)
-    setProductMenu({ productId, x, y })
-  }
-
-  const handleToggleProductFlag = async (
-    product: Product,
-    field: 'isPinned' | 'isFavorite',
-    nextValue: boolean
-  ) => {
-    if (!canManageProducts) return
-
-    const previousProducts = products
-    setSavingProductId(product.id)
-    setProducts((current) =>
-      current.map((item) =>
-        item.id === product.id
-          ? { ...item, [field]: nextValue }
-          : item
-      )
-    )
-    setProductMenu(null)
-
-    try {
-      const response = await fetch(`/api/products/${product.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ [field]: nextValue }),
-      })
-      const data = await response.json().catch(() => null)
-
-      if (!response.ok) {
-        throw new Error(data?.error || 'Не удалось обновить продукт')
-      }
-
-      router.refresh()
-    } catch (error: any) {
-      setProducts(previousProducts)
-      window.alert(error.message || 'Не удалось обновить продукт')
-    } finally {
-      setSavingProductId(null)
-    }
-  }
-
-  const handleDeleteProduct = async () => {
-    if (!pendingDeleteProduct) return
-    setDeletingProductId(pendingDeleteProduct.id)
-    setProductMenu(null)
-    try {
-      const response = await fetch(`/api/products/${pendingDeleteProduct.id}`, { method: 'DELETE' })
-      const data = await response.json().catch(() => null)
-      if (!response.ok) {
-        throw new Error(data?.error || 'Не удалось удалить продукт')
-      }
-      setProducts((prev) => prev.filter((product) => product.id !== pendingDeleteProduct.id))
-      setPendingDeleteProduct(null)
-      router.refresh()
-    } catch (error: any) {
-      window.alert(error.message || 'Не удалось удалить продукт')
-    } finally {
-      setDeletingProductId(null)
-    }
-  }
-
-  const handleArchiveProduct = async () => {
-    if (!pendingArchiveProduct) return
-    setArchivingProductId(pendingArchiveProduct.id)
-    try {
-      const response = await fetch(`/api/products/${pendingArchiveProduct.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'archive' }),
-      })
-      const data = await response.json().catch(() => null)
-
-      if (!response.ok) {
-        throw new Error(data?.error || 'Не удалось архивировать продукт')
-      }
-
-      setProducts((prev) => prev.filter((product) => product.id !== pendingArchiveProduct.id))
-      setPendingArchiveProduct(null)
-      router.refresh()
-    } catch (error: any) {
-      alert(error.message || 'Не удалось архивировать продукт')
-    } finally {
-      setArchivingProductId(null)
-    }
   }
 
   const handleToggleStageTemplateAutoshift = async (stage: Stage, nextValue: boolean) => {
@@ -959,7 +850,6 @@ export function TableViewClient({
                     <td
                       className={cn('sticky left-0 z-10 border-r border-slate-100 px-3 py-2', rowIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50')}
                       style={{ width: columnWidths.__product, minWidth: 120, maxWidth: columnWidths.__product }}
-                      onContextMenu={(event) => handleOpenProductContextMenu(event, product.id)}
                     >
                       <Link href={buildProductHref(product.id, currentRoute)} className="block">
                         <div className="truncate text-[17px] font-medium leading-[1.2] text-slate-800 hover:text-brand-700" title={product.name}>
@@ -1053,7 +943,7 @@ export function TableViewClient({
         </div>
       </div>
 
-      {(stageMenu || productMenu) && typeof document !== 'undefined' && createPortal(
+      {stageMenu && typeof document !== 'undefined' && createPortal(
         <>
           {canEditTable && stageMenu && (
             <div
@@ -1127,83 +1017,6 @@ export function TableViewClient({
             </div>
           )}
 
-          {productMenu && (
-            <div
-              ref={menuRef}
-              className="fixed z-[90] min-w-[200px] rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
-              style={{ left: productMenu.x, top: productMenu.y }}
-            >
-              {(() => {
-                const product = products.find((item) => item.id === productMenu.productId)
-                if (!product) return null
-
-                return (
-                  <>
-                    <button
-                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
-                      onClick={() => {
-                        setProductMenu(null)
-                        router.push(buildProductHref(product.id, currentRoute))
-                      }}
-                    >
-                      <Search className="h-4 w-4 text-slate-400" />
-                      Открыть продукт
-                    </button>
-                    {canManageProducts && (
-                      <>
-                        <button
-                          onClick={() => handleToggleProductFlag(product, 'isPinned', !Boolean(product.isPinned))}
-                          disabled={savingProductId === product.id}
-                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-                        >
-                          {product.isPinned ? (
-                            <PinOff className="h-4 w-4 text-slate-400" />
-                          ) : (
-                            <Pin className="h-4 w-4 text-slate-400" />
-                          )}
-                          {product.isPinned ? 'Открепить' : 'Закрепить наверху'}
-                        </button>
-                        <button
-                          onClick={() => handleToggleProductFlag(product, 'isFavorite', !Boolean(product.isFavorite))}
-                          disabled={savingProductId === product.id}
-                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-                        >
-                          <Star className={cn('h-4 w-4', product.isFavorite ? 'fill-slate-300 text-slate-500' : 'text-slate-400')} />
-                          {product.isFavorite ? 'Убрать из избранного' : 'Добавить в избранное'}
-                        </button>
-                      </>
-                    )}
-                    {canArchiveProducts && (
-                      <>
-                        <div className="my-1 border-t border-slate-100" />
-                        <button
-                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-amber-700 hover:bg-amber-50 disabled:opacity-60"
-                          onClick={() => setPendingArchiveProduct({ id: product.id, name: product.name })}
-                          disabled={archivingProductId === product.id}
-                        >
-                          <Archive className="h-4 w-4 text-amber-600" />
-                          {archivingProductId === product.id ? 'Архивация...' : 'Архивировать продукт'}
-                        </button>
-                      </>
-                    )}
-
-                    {archiveMode && canDeleteProducts && (
-                      <>
-                        <div className="my-1 border-t border-slate-100" />
-                        <button
-                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
-                          onClick={() => setPendingDeleteProduct({ id: product.id, name: product.name })}
-                        >
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                          Удалить архивный продукт
-                        </button>
-                      </>
-                    )}
-                  </>
-                )
-              })()}
-            </div>
-          )}
         </>,
         document.body
       )}
@@ -1215,37 +1028,6 @@ export function TableViewClient({
         confirmLabel="Удалить этап"
         onCancel={() => setPendingDeleteStageId(null)}
         onConfirm={confirmDeleteStage}
-      />
-
-      <ConfirmDialog
-        open={Boolean(pendingArchiveProduct)}
-        title="Архивировать продукт?"
-        description={
-          pendingArchiveProduct
-            ? `Продукт «${pendingArchiveProduct.name}» исчезнет из активных списков, но этапы, комментарии и история сохранятся.`
-            : ''
-        }
-        confirmLabel="Архивировать"
-        confirmTone="primary"
-        loading={Boolean(pendingArchiveProduct && archivingProductId === pendingArchiveProduct.id)}
-        onCancel={() => setPendingArchiveProduct(null)}
-        onConfirm={handleArchiveProduct}
-      />
-
-      <ConfirmDialog
-        open={Boolean(pendingDeleteProduct)}
-        title={archiveMode ? 'Удалить архивный продукт?' : 'Удалить продукт?'}
-        description={
-          pendingDeleteProduct
-            ? archiveMode
-              ? `Архивный продукт «${pendingDeleteProduct.name}» будет удалён навсегда вместе со всеми этапами, комментариями и историей.`
-              : `Продукт «${pendingDeleteProduct.name}» будет удалён вместе со всеми этапами, комментариями и историей.`
-            : ''
-        }
-        confirmLabel={archiveMode ? 'Удалить навсегда' : 'Удалить продукт'}
-        loading={Boolean(pendingDeleteProduct && deletingProductId === pendingDeleteProduct.id)}
-        onCancel={() => setPendingDeleteProduct(null)}
-        onConfirm={handleDeleteProduct}
       />
 
       {/* New stage modal */}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -107,6 +107,7 @@ export function ProductsClient({
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const contextMenuRef = useRef<HTMLDivElement>(null)
+  const listTableRef = useRef<HTMLTableElement>(null)
   const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({})
   const suppressNavigationRef = useRef(false)
   const dragSessionRef = useRef<{
@@ -382,18 +383,51 @@ export function ProductsClient({
     }
   }
 
-  const handleOpenContextMenu = (event: React.MouseEvent, productId: string) => {
-    event.preventDefault()
-    event.stopPropagation()
+  const openProductContextMenuAt = useCallback((productId: string, clientX: number, clientY: number) => {
+    suppressNavigationRef.current = true
+    window.setTimeout(() => {
+      suppressNavigationRef.current = false
+    }, 120)
 
-    const { x, y } = clampMenuPosition(event.clientX, event.clientY, 240, archiveMode ? 260 : 280)
+    const { x, y } = clampMenuPosition(clientX, clientY, 240, archiveMode ? 260 : 320)
 
     setContextMenu({
       productId,
       x,
       y,
     })
-  }
+  }, [archiveMode])
+
+  useEffect(() => {
+    const handleNativeContextMenu = (event: MouseEvent) => {
+      const table = listTableRef.current
+      if (!table) return
+
+      const path = typeof event.composedPath === 'function' ? event.composedPath() : []
+      const rowFromPath = path.find(
+        (node): node is HTMLElement =>
+          node instanceof HTMLElement && Boolean(node.dataset.productContextId)
+      )
+
+      const fallbackTarget =
+        event.target instanceof HTMLElement ? event.target.closest<HTMLElement>('[data-product-context-id]') : null
+
+      const row = rowFromPath ?? fallbackTarget
+      if (!row || !table.contains(row)) return
+
+      const productId = row.dataset.productContextId
+      if (!productId) return
+
+      event.preventDefault()
+      event.stopPropagation()
+      openProductContextMenuAt(productId, event.clientX, event.clientY)
+    }
+
+    document.addEventListener('contextmenu', handleNativeContextMenu, true)
+    return () => {
+      document.removeEventListener('contextmenu', handleNativeContextMenu, true)
+    }
+  }, [openProductContextMenuAt])
 
   const clearDragState = () => {
     dragSessionRef.current = null
@@ -724,7 +758,7 @@ export function ProductsClient({
 
       <div className="surface-panel overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table ref={listTableRef} className="w-full">
             <thead>
               <tr className="border-b border-slate-100">
                 <th className="table-header w-12 text-center">#</th>
@@ -751,12 +785,12 @@ export function ProductsClient({
                 return (
                   <tr
                     key={product.id}
+                    data-product-context-id={product.id}
                     ref={(node) => {
                       rowRefs.current[product.id] = node
                     }}
                     data-product-row="true"
                     onClick={() => handleOpenProduct(product.id)}
-                    onContextMenuCapture={(event) => handleOpenContextMenu(event, product.id)}
                     className={cn(
                       'relative cursor-pointer transition-all duration-150 hover:bg-slate-50/70',
                       isDragging && 'bg-white shadow-[0_22px_44px_-30px_rgba(15,23,42,0.45)]',
@@ -790,23 +824,16 @@ export function ProductsClient({
                         <GripVertical className="w-4 h-4" />
                       </button>
                     </td>
-                    <td
-                      className={cn('table-cell', isDragging && 'bg-white')}
-                      onContextMenuCapture={(event) => handleOpenContextMenu(event, product.id)}
-                    >
+                    <td className={cn('table-cell', isDragging && 'bg-white')}>
                       <div className="flex items-start gap-3">
                           <div className="mt-0.5 flex items-center gap-1">
                           <Pin className={cn('w-3.5 h-3.5', product.isPinned ? 'text-slate-700 fill-slate-200' : 'text-slate-300')} />
                           <Star className={cn('w-3.5 h-3.5', product.isFavorite ? 'text-slate-700 fill-slate-200' : 'text-slate-300')} />
                         </div>
                         <div className="min-w-0">
-                          <Link
-                            href={buildProductHref(product.id, currentRoute)}
-                            onContextMenuCapture={(event) => handleOpenContextMenu(event, product.id)}
-                            className="text-[19px] font-medium leading-[1.25] tracking-normal text-slate-800 hover:text-brand-700 transition-colors"
-                          >
+                          <div className="text-[19px] font-medium leading-[1.25] tracking-normal text-slate-800 transition-colors">
                             {product.name.length > 70 ? `${product.name.slice(0, 70)}…` : product.name}
-                          </Link>
+                          </div>
                           <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[15px] leading-6 text-slate-400">
                             <span>{product._count.stages} этапов</span>
                             <span>•</span>
