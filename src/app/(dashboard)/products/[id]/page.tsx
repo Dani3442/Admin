@@ -5,11 +5,12 @@ import { ProductCardClient } from '@/components/products/ProductCardClient'
 import { getFinalDateFromStages } from '@/lib/product-derived-fields'
 import { getOverlapAcceptedMap } from '@/lib/overlap-acceptance'
 import { supportsProductLifecycleColumns } from '@/lib/schema-compat'
+import { getVisibleProductWhere } from '@/lib/product-access'
 
-async function getProduct(id: string) {
+async function getProduct(id: string, viewer: { id?: string | null; role?: string | null }) {
   const hasProductLifecycleColumns = await supportsProductLifecycleColumns()
-  const product = await prisma.product.findUnique({
-    where: { id },
+  const product = await prisma.product.findFirst({
+    where: getVisibleProductWhere(viewer, { id }),
     select: {
       id: true,
       name: true,
@@ -39,11 +40,11 @@ async function getProduct(id: string) {
             archivedAt: true,
             archivedById: true,
             archiveReason: true,
-            closedBy: { select: { id: true, name: true, email: true } },
-            archivedBy: { select: { id: true, name: true, email: true } },
+            closedBy: { select: { id: true, name: true } },
+            archivedBy: { select: { id: true, name: true } },
           }
         : {}),
-      responsible: { select: { id: true, name: true, email: true } },
+      responsible: { select: { id: true, name: true } },
       stages: {
         orderBy: { stageOrder: 'asc' },
         select: {
@@ -138,11 +139,12 @@ export default async function ProductPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
+  const session = await auth()
+  const viewer = (session?.user as any) ?? null
 
-  const [product, users, session] = await Promise.all([
-    getProduct(id),
+  const [product, users] = await Promise.all([
+    getProduct(id, viewer),
     getUsers(),
-    auth(),
   ])
 
   if (!product) notFound()

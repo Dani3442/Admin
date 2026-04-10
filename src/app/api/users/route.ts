@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { canCreateUser, EMPLOYEE_TYPE_OPTIONS, PROFILE_ROLE_OPTIONS } from '@/lib/user-profile'
 import { z } from 'zod'
+import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
 
 const createUserSchema = z.object({
   email: z.string().trim().email('Некорректный email'),
@@ -42,6 +43,16 @@ export async function POST(req: NextRequest) {
   const viewerRole = (session.user as any).role
   if (!['ADMIN', 'DIRECTOR'].includes(viewerRole)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const userId = (session.user as any).id
+  const rateLimit = consumeRateLimit({
+    key: `api:users:create:${userId}:${getClientIpFromHeaders(req.headers)}`,
+    limit: 10,
+    windowMs: 60 * 1000,
+  })
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } })
   }
 
   const body = await req.json()

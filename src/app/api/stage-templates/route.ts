@@ -6,6 +6,7 @@ import { createProductStageCompat } from '@/lib/product-stage-compat'
 import {
   supportsStageTemplateAffectsFinalDateColumn,
 } from '@/lib/schema-compat'
+import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
 
 async function updateProductProgress(productId: string) {
   const stages = await prisma.productStage.findMany({
@@ -172,6 +173,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
+  const userId = (session.user as any).id
+  const createRateLimit = consumeRateLimit({
+    key: `api:stage-templates:create:${userId}:${getClientIpFromHeaders(req.headers)}`,
+    limit: 20,
+    windowMs: 60 * 1000,
+  })
+  if (!createRateLimit.allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': String(createRateLimit.retryAfterSeconds) } })
+  }
+
   try {
     const body = await req.json()
     const { name, durationText, isCritical = false } = body
@@ -273,6 +284,16 @@ export async function PATCH(req: NextRequest) {
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasPermission((session.user as any).role, Permission.EDIT_STAGES)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const userId = (session.user as any).id
+  const updateRateLimit = consumeRateLimit({
+    key: `api:stage-templates:update:${userId}:${getClientIpFromHeaders(req.headers)}`,
+    limit: 30,
+    windowMs: 60 * 1000,
+  })
+  if (!updateRateLimit.allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': String(updateRateLimit.retryAfterSeconds) } })
   }
 
   const body = await req.json()
@@ -400,6 +421,16 @@ export async function DELETE(req: NextRequest) {
   const role = (session.user as any).role
   if (!['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const userId = (session.user as any).id
+  const deleteRateLimit = consumeRateLimit({
+    key: `api:stage-templates:delete:${userId}:${getClientIpFromHeaders(req.headers)}`,
+    limit: 20,
+    windowMs: 60 * 1000,
+  })
+  if (!deleteRateLimit.allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': String(deleteRateLimit.retryAfterSeconds) } })
   }
 
   try {

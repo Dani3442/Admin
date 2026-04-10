@@ -12,6 +12,7 @@ import {
   selfProfileSchema,
   userProfileSelect,
 } from '@/lib/user-profile'
+import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
 
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -58,6 +59,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   if (!canViewUserProfile(viewer.role, viewer.id, target.id)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const rateLimit = consumeRateLimit({
+    key: `api:users:update:${viewer.id}:${getClientIpFromHeaders(req.headers)}`,
+    limit: 20,
+    windowMs: 60 * 1000,
+  })
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } })
   }
 
   try {
@@ -107,7 +117,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 }
 
-export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
   const viewer = session?.user as any
   const { id } = await params
@@ -127,6 +137,15 @@ export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id:
 
   if (!canDeleteUser(viewer.role, viewer.id, target.id, target.role)) {
     return NextResponse.json({ error: 'Недостаточно прав для удаления сотрудника' }, { status: 403 })
+  }
+
+  const rateLimit = consumeRateLimit({
+    key: `api:users:delete:${viewer.id}:${getClientIpFromHeaders(req.headers)}`,
+    limit: 10,
+    windowMs: 60 * 1000,
+  })
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } })
   }
 
   try {

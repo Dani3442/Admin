@@ -4,14 +4,16 @@ import { auth } from '@/lib/auth'
 import { ProductsWorkspace } from '@/components/products/ProductsWorkspace'
 import { recalculateAllRisks } from '@/lib/risk'
 import { supportsProductTemplateStageDurationDaysColumn } from '@/lib/schema-compat'
+import { getVisibleProductWhere } from '@/lib/product-access'
 
-async function getProductsWorkspaceData(archived = false) {
+async function getProductsWorkspaceData(viewer: { id?: string | null; role?: string | null }, archived = false) {
   await recalculateAllRisks()
   const hasTemplateStageDurationDaysColumn = await supportsProductTemplateStageDurationDaysColumn()
+  const visibleProductsWhere = getVisibleProductWhere(viewer, { isArchived: archived })
 
   const [listProducts, tableProducts, users, stages, productTemplates, stageSuggestions] = await Promise.all([
     prisma.product.findMany({
-      where: { isArchived: archived },
+      where: visibleProductsWhere,
       select: {
         id: true,
         name: true,
@@ -46,7 +48,7 @@ async function getProductsWorkspaceData(archived = false) {
       orderBy: [{ isPinned: 'desc' }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
     }),
     prisma.product.findMany({
-      where: { isArchived: archived },
+      where: visibleProductsWhere,
       select: {
         id: true,
         name: true,
@@ -144,12 +146,12 @@ export default async function ProductsPage({
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>
 }) {
-  const [resolvedSearchParamsRaw, data, session] = await Promise.all([
+  const [resolvedSearchParamsRaw, session] = await Promise.all([
     searchParams ?? Promise.resolve({}),
-    getProductsWorkspaceData(false),
     auth(),
   ])
   const resolvedSearchParams = resolvedSearchParamsRaw as Record<string, string | string[] | undefined>
+  const viewer = (session?.user as any) ?? null
 
   const rawCreate = resolvedSearchParams?.create
   const createRequested = Array.isArray(rawCreate) ? rawCreate[0] === '1' : rawCreate === '1'
@@ -163,6 +165,8 @@ export default async function ProductsPage({
 
     redirect(`/products/new?returnTo=${encodeURIComponent(returnTo)}`)
   }
+
+  const data = await getProductsWorkspaceData(viewer, false)
 
   return (
     <ProductsWorkspace

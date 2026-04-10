@@ -7,6 +7,7 @@ import { createProductStageCompat } from '@/lib/product-stage-compat'
 import {
   supportsStageTemplateAffectsFinalDateColumn,
 } from '@/lib/schema-compat'
+import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
 
 async function normalizeRemainingProductStages(
   tx: {
@@ -153,6 +154,16 @@ export async function POST(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
+  const userId = (session.user as any).id
+  const createRateLimit = consumeRateLimit({
+    key: `api:product-stages:create:${userId}:${getClientIpFromHeaders(req.headers)}`,
+    limit: 40,
+    windowMs: 60 * 1000,
+  })
+  if (!createRateLimit.allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': String(createRateLimit.retryAfterSeconds) } })
+  }
+
   try {
     const body = await req.json()
     const stageName = String(body.stageName || '').trim()
@@ -220,7 +231,7 @@ export async function POST(
       return NextResponse.json({ error: 'Продукт не найден' }, { status: 404 })
     }
 
-    const fallbackTemplateId =
+    let fallbackTemplateId =
       product.stages[0]?.stageTemplateId ||
       (
         await prisma.stageTemplate.findFirst({
@@ -230,7 +241,35 @@ export async function POST(
       )?.id
 
     if (!fallbackTemplateId) {
-      return NextResponse.json({ error: 'Не найден базовый шаблон этапа' }, { status: 400 })
+      const lastTemplate = await prisma.stageTemplate.findFirst({
+        select: { order: true },
+        orderBy: [{ order: 'desc' }],
+      })
+
+      const createdTemplate = hasStageTemplateAffectsFinalDateColumn
+        ? await prisma.stageTemplate.create({
+            data: {
+              name: stageName,
+              order: (lastTemplate?.order ?? -1) + 1,
+              durationText: null,
+              isCritical: false,
+              affectsFinalDate: false,
+              participatesInAutoshift,
+            },
+            select: { id: true },
+          })
+        : await prisma.stageTemplate.create({
+            data: {
+              name: stageName,
+              order: (lastTemplate?.order ?? -1) + 1,
+              durationText: null,
+              isCritical: false,
+              participatesInAutoshift,
+            },
+            select: { id: true },
+          })
+
+      fallbackTemplateId = createdTemplate.id
     }
 
     await createProductStageCompat(prisma as any, {
@@ -277,6 +316,16 @@ export async function DELETE(
   const role = (session.user as any).role
   if (!['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const userId = (session.user as any).id
+  const deleteRateLimit = consumeRateLimit({
+    key: `api:product-stages:delete:${userId}:${getClientIpFromHeaders(req.headers)}`,
+    limit: 40,
+    windowMs: 60 * 1000,
+  })
+  if (!deleteRateLimit.allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': String(deleteRateLimit.retryAfterSeconds) } })
   }
 
   try {

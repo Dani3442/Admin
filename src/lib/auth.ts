@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs'
 import Credentials from 'next-auth/providers/credentials'
 import { authConfig } from './auth.config'
 import { prisma } from './prisma'
+import { clearRateLimit, consumeRateLimit, getClientIpFromHeaders } from './rate-limit'
 
 function normalizeSessionAvatar(avatar: string | null | undefined) {
   if (!avatar) return null
@@ -15,35 +16,6 @@ function normalizeSessionAvatar(avatar: string | null | undefined) {
   return trimmed
 }
 
-async function ensureDefaultAdminUser(email: string, password: string) {
-  const adminEmail = (process.env.ADMIN_EMAIL || 'admin@company.com').trim().toLowerCase()
-  const adminPassword = process.env.ADMIN_PASSWORD || 'Admin1234!'
-
-  if (email !== adminEmail || password !== adminPassword) {
-    return null
-  }
-
-  const passwordHash = await bcrypt.hash(adminPassword, 12)
-
-  try {
-    return await prisma.user.create({
-      data: {
-        email: adminEmail,
-        name: process.env.ADMIN_NAME || 'Данила',
-        password: passwordHash,
-        role: 'ADMIN',
-        verificationStatus: 'VERIFIED',
-        employeeType: 'INTERNAL',
-        isActive: true,
-      },
-    })
-  } catch {
-    return prisma.user.findUnique({
-      where: { email: adminEmail },
-    })
-  }
-}
-
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
   providers: [
@@ -53,11 +25,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         email: { label: 'Email', type: 'email' },
         password: { label: 'Password', type: 'password' },
       },
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         if (!credentials?.email || !credentials?.password) return null
 
         const email = String(credentials.email).trim().toLowerCase()
         const password = String(credentials.password)
+        const loginRateLimitKey = `login:${getClientIpFromHeaders(request?.headers)}:${email}`
+        const loginRateLimit = consumeRateLimit({
+          key: loginRateLimitKey,
+          limit: 10,
+          windowMs: 15 * 60 * 1000,
+        })
+
+        if (!loginRateLimit.allowed) {
+          console.warn('[auth] Login rate limit exceeded', { email })
+          return null
+        }
 
         let user = await prisma.user.findUnique({
           where: { email },
@@ -74,12 +57,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         })
 
         if (!user) {
-          user = await ensureDefaultAdminUser(email, password)
-
-          if (!user) {
-            console.warn('[auth] Login rejected: user not found', { email })
-            return null
-          }
+          console.warn('[auth] Login rejected: user not found', { email })
+          return null
         }
 
         if (!user.isActive) {
@@ -96,6 +75,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           console.warn('[auth] Login rejected: invalid password', { email })
           return null
         }
+
+        clearRateLimit(loginRateLimitKey)
 
         return {
           id: user.id,
@@ -140,7 +121,7 @@ export function hasPermission(role: string, permission: Permission): boolean {
       Permission.VIEW_ALL_PRODUCTS, Permission.EDIT_STAGES, Permission.EDIT_DATES,
       Permission.ADD_COMMENTS, Permission.VIEW_ANALYTICS, Permission.MANAGE_AUTOMATIONS,
     ],
-    EMPLOYEE: [Permission.VIEW_ALL_PRODUCTS, Permission.ADD_COMMENTS],
+    EMPLOYEE: [Permission.VIEW_OWN_PRODUCTS, Permission.ADD_COMMENTS, Permission.VIEW_ANALYTICS],
     VIEWER: [Permission.VIEW_ALL_PRODUCTS, Permission.VIEW_ANALYTICS],
   }
   return permissions[role]?.includes(permission) ?? false

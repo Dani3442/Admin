@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { supportsProductLifecycleColumns } from '@/lib/schema-compat'
+import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
 
 function getValidatedIds(body: any) {
   return Array.isArray(body?.ids)
@@ -16,6 +17,15 @@ export async function POST(req: NextRequest) {
   const user = session.user as any
   if (!['ADMIN', 'DIRECTOR'].includes(user.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const rateLimit = consumeRateLimit({
+    key: `api:products:bulk:${user.id}:${getClientIpFromHeaders(req.headers)}`,
+    limit: 10,
+    windowMs: 60 * 1000,
+  })
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } })
   }
 
   const hasProductLifecycleColumns = await supportsProductLifecycleColumns()

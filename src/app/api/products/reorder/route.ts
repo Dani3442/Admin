@@ -1,12 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth, hasPermission, Permission } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
 
 export async function POST(req: NextRequest) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasPermission((session.user as any).role, Permission.EDIT_STAGES)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const userId = (session.user as any).id
+  const rateLimit = consumeRateLimit({
+    key: `api:products:reorder:${userId}:${getClientIpFromHeaders(req.headers)}`,
+    limit: 20,
+    windowMs: 60 * 1000,
+  })
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } })
   }
 
   try {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { normalizeAvatarValue, selfProfileSchema, userProfileSelect } from '@/lib/user-profile'
+import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
 
 export async function GET() {
   const session = await auth()
@@ -24,6 +25,15 @@ export async function PATCH(req: NextRequest) {
   const session = await auth()
   const userId = (session?.user as any)?.id
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const rateLimit = consumeRateLimit({
+    key: `api:profile:update:${userId}:${getClientIpFromHeaders(req.headers)}`,
+    limit: 20,
+    windowMs: 60 * 1000,
+  })
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } })
+  }
 
   try {
     const body = await req.json()

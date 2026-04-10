@@ -2,10 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth, hasPermission, Permission } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { createProduct } from '@/lib/product-create'
+import { getVisibleProductWhere } from '@/lib/product-access'
+import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const viewer = session.user as any
 
   const { searchParams } = new URL(req.url)
   const status = searchParams.get('status')
@@ -45,7 +48,7 @@ export async function GET(req: NextRequest) {
     isArchived: true,
     createdAt: true,
     updatedAt: true,
-    responsible: { select: { id: true, name: true, email: true } },
+    responsible: { select: { id: true, name: true } },
     stages: includeStages
       ? {
           orderBy: { stageOrder: 'asc' as const },
@@ -90,13 +93,13 @@ export async function GET(req: NextRequest) {
 
   const [products, total] = await Promise.all([
     prisma.product.findMany({
-      where,
+      where: getVisibleProductWhere(viewer, where),
       select: productListSelect,
       orderBy: [{ isPinned: 'desc' }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
       skip: (page - 1) * limit,
       take: limit,
     }),
-    prisma.product.count({ where }),
+    prisma.product.count({ where: getVisibleProductWhere(viewer, where) }),
   ])
 
   return NextResponse.json({ products, total, page, limit })
@@ -105,8 +108,18 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const viewer = session.user as any
   if (!hasPermission((session.user as any).role, Permission.EDIT_STAGES)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const rateLimit = consumeRateLimit({
+    key: `api:products:create:${viewer.id}:${getClientIpFromHeaders(req.headers)}`,
+    limit: 20,
+    windowMs: 60 * 1000,
+  })
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } })
   }
 
   try {

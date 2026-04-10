@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma'
 import { getFinalDateFromStages } from '@/lib/product-derived-fields'
 import { getOverlapAcceptedMap } from '@/lib/overlap-acceptance'
 import { supportsProductLifecycleColumns } from '@/lib/schema-compat'
+import { getVisibleProductWhere } from '@/lib/product-access'
+import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
 
 function getProductSelect(hasProductLifecycleColumns: boolean) {
   return {
@@ -35,11 +37,11 @@ function getProductSelect(hasProductLifecycleColumns: boolean) {
           archivedAt: true,
           archivedById: true,
           archiveReason: true,
-          closedBy: { select: { id: true, name: true, email: true } },
-          archivedBy: { select: { id: true, name: true, email: true } },
+          closedBy: { select: { id: true, name: true } },
+          archivedBy: { select: { id: true, name: true } },
         }
       : {}),
-    responsible: { select: { id: true, name: true, email: true } },
+    responsible: { select: { id: true, name: true } },
     stages: {
       orderBy: { stageOrder: 'asc' as const },
       select: {
@@ -104,10 +106,11 @@ export async function GET(
   const { id } = await params
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const viewer = session.user as any
   const hasProductLifecycleColumns = await supportsProductLifecycleColumns()
 
-  const product = await prisma.product.findUnique({
-    where: { id },
+  const product = await prisma.product.findFirst({
+    where: getVisibleProductWhere(viewer, { id }),
     select: getProductSelect(hasProductLifecycleColumns),
   })
 
@@ -146,6 +149,23 @@ export async function PATCH(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
+  const existingProduct = await prisma.product.findFirst({
+    where: getVisibleProductWhere(user, { id }),
+    select: { id: true },
+  })
+  if (!existingProduct) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
+
+  const rateLimit = consumeRateLimit({
+    key: `api:products:update:${user.id}:${getClientIpFromHeaders(req.headers)}`,
+    limit: 60,
+    windowMs: 60 * 1000,
+  })
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } })
+  }
+
   const body = await req.json()
   const action = body?.action as 'close' | 'archive' | 'restore' | undefined
   const hasProductLifecycleColumns = await supportsProductLifecycleColumns()
@@ -170,9 +190,9 @@ export async function PATCH(
         closureComment: closureComment || null,
       },
       include: {
-        responsible: { select: { id: true, name: true, email: true } },
-        closedBy: { select: { id: true, name: true, email: true } },
-        archivedBy: { select: { id: true, name: true, email: true } },
+        responsible: { select: { id: true, name: true } },
+        closedBy: { select: { id: true, name: true } },
+        archivedBy: { select: { id: true, name: true } },
         _count: { select: { comments: true } },
       },
     })
@@ -210,9 +230,9 @@ export async function PATCH(
         archiveReason: archiveReason || null,
       },
       include: {
-        responsible: { select: { id: true, name: true, email: true } },
-        closedBy: { select: { id: true, name: true, email: true } },
-        archivedBy: { select: { id: true, name: true, email: true } },
+        responsible: { select: { id: true, name: true } },
+        closedBy: { select: { id: true, name: true } },
+        archivedBy: { select: { id: true, name: true } },
         _count: { select: { comments: true } },
       },
     })
@@ -248,9 +268,9 @@ export async function PATCH(
         archiveReason: null,
       },
       include: {
-        responsible: { select: { id: true, name: true, email: true } },
-        closedBy: { select: { id: true, name: true, email: true } },
-        archivedBy: { select: { id: true, name: true, email: true } },
+        responsible: { select: { id: true, name: true } },
+        closedBy: { select: { id: true, name: true } },
+        archivedBy: { select: { id: true, name: true } },
         _count: { select: { comments: true } },
       },
     })
@@ -334,9 +354,17 @@ export async function DELETE(
   if (!['ADMIN', 'DIRECTOR'].includes(role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
+  const rateLimit = consumeRateLimit({
+    key: `api:products:delete:${user.id}:${getClientIpFromHeaders(req.headers)}`,
+    limit: 20,
+    windowMs: 60 * 1000,
+  })
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } })
+  }
   const hasProductLifecycleColumns = await supportsProductLifecycleColumns()
-  const existingProduct = await prisma.product.findUnique({
-    where: { id },
+  const existingProduct = await prisma.product.findFirst({
+    where: getVisibleProductWhere(user, { id }),
     select: { id: true, isArchived: true },
   })
 

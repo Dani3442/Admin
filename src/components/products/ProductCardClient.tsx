@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { AnimatePresence, motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
-import { ArrowLeft, CalendarDays, CheckCircle2, Circle, AlertTriangle, MessageCircle, Clock, History, Zap, ExternalLink, Edit2, Save, Pencil, ChevronUp, ChevronDown, X, Trash2, SendHorizontal, Archive, ArchiveRestore } from 'lucide-react'
+import { ArrowLeft, CalendarDays, CheckCircle2, Circle, AlertTriangle, MessageCircle, Clock, History, Zap, ExternalLink, Edit2, Save, Pencil, ChevronUp, ChevronDown, X, Plus, Trash2, SendHorizontal, Archive, ArchiveRestore } from 'lucide-react'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { FloatingContextMenu } from '@/components/ui/FloatingContextMenu'
 import { cn, getStatusColor, getStatusLabel, getPriorityColor, getPriorityLabel, formatDate, formatDurationDays, detectStageOverlaps, formatStageOverlap } from '@/lib/utils'
@@ -53,6 +53,10 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
   const [editingStageId, setEditingStageId] = useState<string | null>(null)
   const [stageEditValues, setStageEditValues] = useState<Record<string, any>>({})
   const [saving, setSaving] = useState(false)
+  const [showAddStageForm, setShowAddStageForm] = useState(false)
+  const [newStageName, setNewStageName] = useState('')
+  const [newStageDate, setNewStageDate] = useState<Date | null>(null)
+  const [newStageAutoshift, setNewStageAutoshift] = useState(true)
 
   const [renamingStageId, setRenamingStageId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
@@ -462,6 +466,50 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
     }
   }
 
+  const resetNewStageDraft = () => {
+    setShowAddStageForm(false)
+    setNewStageName('')
+    setNewStageDate(null)
+    setNewStageAutoshift(true)
+  }
+
+  const handleAddStage = async () => {
+    const stageName = newStageName.trim()
+    if (!stageName) return
+
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/products/${product.id}/stages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          stageName,
+          dateValue: newStageDate || null,
+          participatesInAutoshift: newStageAutoshift,
+        }),
+      })
+      const data = await res.json().catch(() => null)
+
+      if (!res.ok) {
+        throw new Error(data?.error || 'Не удалось добавить этап')
+      }
+
+      setProduct((prev: any) => ({
+        ...prev,
+        stages: data.stages,
+        finalDate: data.finalDate ?? prev.finalDate,
+        progressPercent: data.progressPercent,
+        riskScore: data.riskScore,
+        status: data.status,
+      }))
+      resetNewStageDraft()
+    } catch (error: any) {
+      alert(error.message || 'Не удалось добавить этап')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const handleToggleStageAutoshift = async (stage: any, nextValue: boolean) => {
     setSaving(true)
     try {
@@ -793,6 +841,67 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
               >
                 {tab === 'stages' && (
                   <div className="space-y-2">
+                    {canEdit && (
+                      <div className="mb-3 flex items-center justify-end gap-3">
+                        <button
+                          onClick={() => {
+                            if (showAddStageForm) {
+                              resetNewStageDraft()
+                              return
+                            }
+                            setShowAddStageForm(true)
+                          }}
+                          className="btn-primary text-sm"
+                          disabled={saving}
+                        >
+                          <Plus className="w-4 h-4" />
+                          Добавить этап
+                        </button>
+                      </div>
+                    )}
+                    {canEdit && showAddStageForm && (
+                      <div className="mb-3 flex items-center gap-2 rounded-[24px] bg-slate-50 p-3">
+                        <input
+                          type="text"
+                          value={newStageName}
+                          onChange={(e) => setNewStageName(e.target.value)}
+                          className="input flex-1 text-sm"
+                          placeholder="Название нового этапа"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleAddStage()
+                            if (e.key === 'Escape') resetNewStageDraft()
+                          }}
+                        />
+                        <DatePicker
+                          value={newStageDate}
+                          onChange={setNewStageDate}
+                          inputClassName="h-11 w-56 text-sm"
+                          panelClassName="w-[360px]"
+                          placeholder="Дата этапа"
+                        />
+                        <label className="flex h-11 items-center gap-2 rounded-[18px] bg-white px-3 text-sm text-slate-600">
+                          <span className="whitespace-nowrap">Автосдвиг</span>
+                          <input
+                            type="checkbox"
+                            checked={newStageAutoshift}
+                            onChange={(e) => setNewStageAutoshift(e.target.checked)}
+                            className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                          />
+                        </label>
+                        <button onClick={handleAddStage} className="btn-primary text-sm" disabled={!newStageName.trim() || saving}>
+                          <Save className="w-4 h-4" />
+                          Сохранить
+                        </button>
+                        <button
+                          onClick={resetNewStageDraft}
+                          className="btn-secondary text-sm"
+                          disabled={saving}
+                        >
+                          Отмена
+                        </button>
+                      </div>
+                    )}
                     {overlaps.length > 0 && (
                       <div className="mb-3 flex items-start gap-2 rounded-[24px] bg-orange-50 p-3">
                         <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-orange-500" />

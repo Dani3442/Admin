@@ -2,17 +2,20 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getCommentDisplayText } from '@/lib/comment-mentions'
+import { getVisibleProductWhere } from '@/lib/product-access'
 
-async function getNotificationData(currentUserId: string) {
+async function getNotificationData(currentUserId: string, viewer: { id?: string | null; role?: string | null }) {
   const now = new Date()
   const sevenDaysAgo = new Date(now.getTime() - 7 * 86400000)
   const mentionToken = `](${currentUserId})`
+  const visibleProductWhere = getVisibleProductWhere(viewer)
 
   const [recentChanges, overdueStages, riskProducts, recentMentions, notificationSeenEntries] = await Promise.all([
     prisma.changeHistory.findMany({
       where: {
         createdAt: { gte: sevenDaysAgo },
         field: { notIn: ['notificationsSeenAt', 'mentionsSeenAt'] },
+        product: visibleProductWhere,
       },
       include: {
         changedBy: { select: { name: true } },
@@ -26,7 +29,10 @@ async function getNotificationData(currentUserId: string) {
       where: {
         isCompleted: false,
         dateValue: { lt: now },
-        product: { isArchived: false, status: { notIn: ['COMPLETED', 'CANCELLED'] } },
+        product: getVisibleProductWhere(viewer, {
+          isArchived: false,
+          status: { notIn: ['COMPLETED', 'CANCELLED'] },
+        }),
       },
       select: {
         id: true,
@@ -40,8 +46,10 @@ async function getNotificationData(currentUserId: string) {
 
     prisma.product.findMany({
       where: {
-        isArchived: false,
-        status: { in: ['AT_RISK', 'DELAYED'] },
+        ...getVisibleProductWhere(viewer, {
+          isArchived: false,
+          status: { in: ['AT_RISK', 'DELAYED'] },
+        }),
       },
       select: { id: true, name: true, status: true, riskScore: true, finalDate: true, updatedAt: true },
       orderBy: { riskScore: 'desc' },
@@ -53,6 +61,7 @@ async function getNotificationData(currentUserId: string) {
         authorId: { not: currentUserId },
         createdAt: { gte: sevenDaysAgo },
         content: { contains: mentionToken },
+        product: visibleProductWhere,
       },
       include: {
         author: { select: { id: true, name: true, lastName: true } },
@@ -67,6 +76,7 @@ async function getNotificationData(currentUserId: string) {
       where: {
         changedById: currentUserId,
         field: 'notificationsSeenAt',
+        product: visibleProductWhere,
       },
       select: {
         productId: true,
@@ -106,8 +116,9 @@ export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const currentUserId = (session.user as any).id as string
+  const viewer = session.user as any
 
-  const { now, recentChanges, overdueStages, riskProducts, recentMentions, isUnread } = await getNotificationData(currentUserId)
+  const { now, recentChanges, overdueStages, riskProducts, recentMentions, isUnread } = await getNotificationData(currentUserId, viewer)
 
   const unreadMentions = recentMentions.filter((comment) => isUnread(comment.product.id, comment.createdAt))
   const unreadOverdueStages = overdueStages.filter((stage) => isUnread(stage.product.id, stage.dateValue!))
@@ -193,8 +204,9 @@ export async function POST() {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const currentUserId = (session.user as any).id as string
+  const viewer = session.user as any
 
-  const { now, recentChanges, overdueStages, riskProducts, recentMentions, isUnread } = await getNotificationData(currentUserId)
+  const { now, recentChanges, overdueStages, riskProducts, recentMentions, isUnread } = await getNotificationData(currentUserId, viewer)
 
   const productIds = new Set<string>()
 

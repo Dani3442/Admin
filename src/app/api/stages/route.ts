@@ -11,6 +11,7 @@ import {
 import { recalculateProductDerivedFields } from '@/lib/product-derived-fields'
 import { createProductStageCompat } from '@/lib/product-stage-compat'
 import { getOverlapAcceptedMap, persistOverlapAccepted } from '@/lib/overlap-acceptance'
+import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
 
 async function normalizeProductStageOrders(
   tx: {
@@ -122,9 +123,18 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
+  const userId = (session.user as any).id
+  const rateLimit = consumeRateLimit({
+    key: `api:stages:update:${userId}:${getClientIpFromHeaders(req.headers)}`,
+    limit: 60,
+    windowMs: 60 * 1000,
+  })
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } })
+  }
+
   const body = await req.json()
   const { stageId, stageIds, updates, applyAutomations = true, swapWithStageId, productId, stageTemplateId, stageOrder, stageName } = body
-  const userId = (session.user as any).id
   const [hasAutoshiftColumn, hasOverlapAcceptedColumn, hasStageTemplateAffectsFinalDateColumn] = await Promise.all([
     supportsProductStageAutoshiftColumn(),
     supportsProductStageOverlapAcceptedColumn(),

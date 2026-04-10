@@ -8,8 +8,9 @@ import { AnalyticsClient } from '@/components/dashboard/AnalyticsClient'
 import { recalculateAllRisks } from '@/lib/risk'
 import { addDays } from 'date-fns'
 import { detectStageOverlaps, formatStageOverlap } from '@/lib/utils'
+import { getVisibleProductWhere } from '@/lib/product-access'
 
-async function getDashboardData() {
+async function getDashboardData(viewer: { id?: string | null; role?: string | null }) {
   // Recalculate risks on every page load
   await recalculateAllRisks()
 
@@ -17,6 +18,7 @@ async function getDashboardData() {
   const in7 = addDays(now, 7)
   const in14 = addDays(now, 14)
   const in30 = addDays(now, 30)
+  const activeVisibleProductsWhere = getVisibleProductWhere(viewer, { isArchived: false })
 
   const productDashboardSelect = {
     id: true,
@@ -40,17 +42,17 @@ async function getDashboardData() {
   }
 
   const [total, inProgress, completed, atRisk, delayed, planned, dueSoon7, dueSoon14, dueSoon30, products, stageTemplates] = await Promise.all([
-    prisma.product.count({ where: { isArchived: false } }),
-    prisma.product.count({ where: { isArchived: false, status: 'IN_PROGRESS' } }),
-    prisma.product.count({ where: { isArchived: false, status: 'COMPLETED' } }),
-    prisma.product.count({ where: { isArchived: false, status: 'AT_RISK' } }),
-    prisma.product.count({ where: { isArchived: false, status: 'DELAYED' } }),
-    prisma.product.count({ where: { isArchived: false, status: 'PLANNED' } }),
-    prisma.product.count({ where: { isArchived: false, finalDate: { gte: now, lte: in7 } } }),
-    prisma.product.count({ where: { isArchived: false, finalDate: { gte: now, lte: in14 } } }),
-    prisma.product.count({ where: { isArchived: false, finalDate: { gte: now, lte: in30 } } }),
+    prisma.product.count({ where: activeVisibleProductsWhere }),
+    prisma.product.count({ where: getVisibleProductWhere(viewer, { isArchived: false, status: 'IN_PROGRESS' }) }),
+    prisma.product.count({ where: getVisibleProductWhere(viewer, { isArchived: false, status: 'COMPLETED' }) }),
+    prisma.product.count({ where: getVisibleProductWhere(viewer, { isArchived: false, status: 'AT_RISK' }) }),
+    prisma.product.count({ where: getVisibleProductWhere(viewer, { isArchived: false, status: 'DELAYED' }) }),
+    prisma.product.count({ where: getVisibleProductWhere(viewer, { isArchived: false, status: 'PLANNED' }) }),
+    prisma.product.count({ where: getVisibleProductWhere(viewer, { isArchived: false, finalDate: { gte: now, lte: in7 } }) }),
+    prisma.product.count({ where: getVisibleProductWhere(viewer, { isArchived: false, finalDate: { gte: now, lte: in14 } }) }),
+    prisma.product.count({ where: getVisibleProductWhere(viewer, { isArchived: false, finalDate: { gte: now, lte: in30 } }) }),
     prisma.product.findMany({
-      where: { isArchived: false },
+      where: activeVisibleProductsWhere,
       select: productDashboardSelect,
       orderBy: [{ riskScore: 'desc' }, { finalDate: 'asc' }],
     }),
@@ -198,7 +200,8 @@ async function getDashboardData() {
 }
 
 export default async function DashboardPage() {
-  const data = await getDashboardData()
+  const session = await auth()
+  const data = await getDashboardData((session?.user as any) ?? null)
 
   return (
     <div className="page-section animate-fade-in">

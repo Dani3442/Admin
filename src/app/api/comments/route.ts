@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
+import { auth, hasPermission, Permission } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getCommentDisplayText } from '@/lib/comment-mentions'
+import { getVisibleProductWhere } from '@/lib/product-access'
+import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -33,6 +35,15 @@ export async function GET(req: NextRequest) {
     ])
   }
 
+  const visibleProduct = await prisma.product.findFirst({
+    where: getVisibleProductWhere(session.user as any, { id: productId }),
+    select: { id: true },
+  })
+
+  if (!visibleProduct) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
+
   const comments = await prisma.comment.findMany({
     where: { productId, productStageId: null },
     include: {
@@ -52,12 +63,47 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const viewer = session.user as any
+  if (!hasPermission(viewer.role, Permission.ADD_COMMENTS)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
   const body = await req.json()
   const { content, productId, productStageId } = body
 
   if (!content?.trim() || !productId) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+  }
+
+  const rateLimit = consumeRateLimit({
+    key: `api:comments:create:${viewer.id}:${getClientIpFromHeaders(req.headers)}`,
+    limit: 30,
+    windowMs: 60 * 1000,
+  })
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } })
+  }
+
+  const visibleProduct = await prisma.product.findFirst({
+    where: getVisibleProductWhere(viewer, { id: productId }),
+    select: { id: true },
+  })
+  if (!visibleProduct) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
+
+  if (productStageId) {
+    const stage = await prisma.productStage.findFirst({
+      where: {
+        id: productStageId,
+        productId,
+      },
+      select: { id: true },
+    })
+
+    if (!stage) {
+      return NextResponse.json({ error: 'Stage not found' }, { status: 404 })
+    }
   }
 
   const comment = await prisma.comment.create({

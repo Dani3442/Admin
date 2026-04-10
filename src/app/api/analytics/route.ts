@@ -1,16 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
+import { auth, hasPermission, Permission } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { differenceInDays, addDays } from 'date-fns'
+import { getVisibleProductWhere } from '@/lib/product-access'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const viewer = session.user as any
+  if (!hasPermission(viewer.role, Permission.VIEW_ANALYTICS)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
 
   const now = new Date()
   const in7 = addDays(now, 7)
   const in14 = addDays(now, 14)
   const in30 = addDays(now, 30)
+  const activeVisibleProductsWhere = getVisibleProductWhere(viewer, { isArchived: false })
 
   const analyticsProductSelect = {
     id: true,
@@ -46,15 +52,15 @@ export async function GET(req: NextRequest) {
     stageTemplates,
     products,
   ] = await Promise.all([
-    prisma.product.count({ where: { isArchived: false } }),
-    prisma.product.count({ where: { isArchived: false, status: 'IN_PROGRESS' } }),
-    prisma.product.count({ where: { isArchived: false, status: 'COMPLETED' } }),
-    prisma.product.count({ where: { isArchived: false, status: 'AT_RISK' } }),
-    prisma.product.count({ where: { isArchived: false, status: 'DELAYED' } }),
-    prisma.product.count({ where: { isArchived: false, status: 'PLANNED' } }),
-    prisma.product.count({ where: { isArchived: false, finalDate: { gte: now, lte: in7 } } }),
-    prisma.product.count({ where: { isArchived: false, finalDate: { gte: now, lte: in14 } } }),
-    prisma.product.count({ where: { isArchived: false, finalDate: { gte: now, lte: in30 } } }),
+    prisma.product.count({ where: activeVisibleProductsWhere }),
+    prisma.product.count({ where: getVisibleProductWhere(viewer, { isArchived: false, status: 'IN_PROGRESS' }) }),
+    prisma.product.count({ where: getVisibleProductWhere(viewer, { isArchived: false, status: 'COMPLETED' }) }),
+    prisma.product.count({ where: getVisibleProductWhere(viewer, { isArchived: false, status: 'AT_RISK' }) }),
+    prisma.product.count({ where: getVisibleProductWhere(viewer, { isArchived: false, status: 'DELAYED' }) }),
+    prisma.product.count({ where: getVisibleProductWhere(viewer, { isArchived: false, status: 'PLANNED' }) }),
+    prisma.product.count({ where: getVisibleProductWhere(viewer, { isArchived: false, finalDate: { gte: now, lte: in7 } }) }),
+    prisma.product.count({ where: getVisibleProductWhere(viewer, { isArchived: false, finalDate: { gte: now, lte: in14 } }) }),
+    prisma.product.count({ where: getVisibleProductWhere(viewer, { isArchived: false, finalDate: { gte: now, lte: in30 } }) }),
     prisma.stageTemplate.findMany({
       select: {
         id: true,
@@ -64,7 +70,7 @@ export async function GET(req: NextRequest) {
       orderBy: { order: 'asc' },
     }),
     prisma.product.findMany({
-      where: { isArchived: false },
+      where: activeVisibleProductsWhere,
       select: analyticsProductSelect,
     }),
   ])

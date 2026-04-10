@@ -1,27 +1,24 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { auth } from '@/lib/auth'
 
-function hasSessionToken(req: NextRequest) {
-  return (
-    req.cookies.has('authjs.session-token') ||
-    req.cookies.has('__Secure-authjs.session-token') ||
-    req.cookies.has('next-auth.session-token') ||
-    req.cookies.has('__Secure-next-auth.session-token')
-  )
-}
-
-export default function middleware(req: NextRequest) {
+export default auth((req) => {
   const { pathname } = req.nextUrl
+  const isAuthenticated = Boolean(req.auth?.user)
 
   if (pathname.startsWith('/login') || pathname.startsWith('/api/auth')) {
+    if (pathname.startsWith('/login') && isAuthenticated) {
+      return NextResponse.redirect(new URL('/dashboard', req.url))
+    }
+
     return NextResponse.next()
   }
 
-  if (!hasSessionToken(req)) {
+  if (!isAuthenticated) {
     return NextResponse.redirect(new URL('/login', req.url))
   }
 
   return NextResponse.next()
-}
+})
 
 export const config = {
   matcher: ['/((?!_next/static|_next/image|favicon.ico|public).*)'],

@@ -1,9 +1,11 @@
 import { prisma } from '@/lib/prisma'
+import { auth } from '@/lib/auth'
 import { TimelineClient } from '@/components/TimelineClient'
+import { getVisibleProductWhere } from '@/lib/product-access'
 
-async function getData() {
+async function getData(viewer: { id?: string | null; role?: string | null }) {
   const products = await prisma.product.findMany({
-    where: { isArchived: false, finalDate: { not: null } },
+    where: getVisibleProductWhere(viewer, { isArchived: false, finalDate: { not: null } }),
     select: {
       id: true,
       name: true,
@@ -25,6 +27,7 @@ async function getData() {
 }
 
 export default async function TimelinePage() {
-  const products = await getData()
+  const session = await auth()
+  const products = await getData((session?.user as any) ?? null)
   return <TimelineClient products={products as any} />
 }

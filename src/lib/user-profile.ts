@@ -49,7 +49,7 @@ export function normalizeAvatarValue(value: unknown) {
   const trimmed = value.trim()
   if (!trimmed) return null
 
-  if (trimmed.startsWith('https://') || trimmed.startsWith('http://') || trimmed.startsWith('/')) {
+  if (trimmed.startsWith('https://') || trimmed.startsWith('/')) {
     if (trimmed.length > MAX_AVATAR_SIZE) {
       throw new Error('Ссылка на аватар слишком длинная')
     }
@@ -63,7 +63,7 @@ export function normalizeAvatarValue(value: unknown) {
     return trimmed
   }
 
-  throw new Error('Разрешены только ссылки на изображения или загруженные изображения')
+  throw new Error('Разрешены только HTTPS-ссылки, локальные пути или загруженные изображения')
 }
 
 export const userProfileSelect = {

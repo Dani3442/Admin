@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
 
 interface ImportStage {
   stageName: string
@@ -30,6 +31,16 @@ export async function POST(req: NextRequest) {
   const role = (session.user as any).role
   if (!['ADMIN', 'PRODUCT_MANAGER'].includes(role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const userId = (session.user as any).id
+  const rateLimit = consumeRateLimit({
+    key: `api:import:${userId}:${getClientIpFromHeaders(req.headers)}`,
+    limit: 5,
+    windowMs: 10 * 60 * 1000,
+  })
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } })
   }
 
   try {
