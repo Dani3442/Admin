@@ -82,10 +82,6 @@ async function getProduct(id: string, viewer: { id?: string | null; role?: strin
             },
           },
           responsible: { select: { id: true, name: true } },
-          comments: {
-            include: { author: { select: { id: true, name: true, lastName: true, avatar: true } } },
-            orderBy: { createdAt: 'desc' },
-          },
         },
       },
       comments: {

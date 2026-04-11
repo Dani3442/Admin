@@ -1,18 +1,30 @@
+import dynamic from 'next/dynamic'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { DashboardMetricsCards } from '@/components/dashboard/MetricsCards'
-import { DashboardCharts } from '@/components/dashboard/Charts'
 import { RiskList } from '@/components/dashboard/RiskList'
 import { Recommendations } from '@/components/dashboard/Recommendations'
-import { AnalyticsClient } from '@/components/dashboard/AnalyticsClient'
-import { recalculateAllRisks } from '@/lib/risk'
+import { recalculateAllRisksIfNeeded } from '@/lib/risk'
 import { addDays } from 'date-fns'
 import { detectStageOverlaps, formatStageOverlap } from '@/lib/utils'
 import { getVisibleProductWhere } from '@/lib/product-access'
 
+const DashboardCharts = dynamic(
+  () => import('@/components/dashboard/Charts').then((mod) => mod.DashboardCharts),
+  {
+    loading: () => <div className="card-panel min-h-[420px] animate-pulse bg-muted/35" />,
+  }
+)
+
+const AnalyticsClient = dynamic(
+  () => import('@/components/dashboard/AnalyticsClient').then((mod) => mod.AnalyticsClient),
+  {
+    loading: () => <div className="card-panel min-h-[520px] animate-pulse bg-muted/35" />,
+  }
+)
+
 async function getDashboardData(viewer: { id?: string | null; role?: string | null }) {
-  // Recalculate risks on every page load
-  await recalculateAllRisks()
+  await recalculateAllRisksIfNeeded()
 
   const now = new Date()
   const in7 = addDays(now, 7)

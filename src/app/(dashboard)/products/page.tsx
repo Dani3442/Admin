@@ -2,84 +2,59 @@ import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { ProductsWorkspace } from '@/components/products/ProductsWorkspace'
-import { recalculateAllRisks } from '@/lib/risk'
+import { recalculateAllRisksIfNeeded } from '@/lib/risk'
 import { supportsProductTemplateStageDurationDaysColumn } from '@/lib/schema-compat'
 import { getVisibleProductWhere } from '@/lib/product-access'
 
 async function getProductsWorkspaceData(viewer: { id?: string | null; role?: string | null }, archived = false) {
-  await recalculateAllRisks()
+  await recalculateAllRisksIfNeeded()
   const hasTemplateStageDurationDaysColumn = await supportsProductTemplateStageDurationDaysColumn()
   const visibleProductsWhere = getVisibleProductWhere(viewer, { isArchived: archived })
 
-  const [listProducts, tableProducts, users, stages, productTemplates, stageSuggestions] = await Promise.all([
-    prisma.product.findMany({
-      where: visibleProductsWhere,
+  const productWorkspaceSelect = {
+    id: true,
+    name: true,
+    category: true,
+    sku: true,
+    country: true,
+    competitorUrl: true,
+    status: true,
+    priority: true,
+    finalDate: true,
+    responsibleId: true,
+    productTemplateId: true,
+    riskScore: true,
+    progressPercent: true,
+    notes: true,
+    sortOrder: true,
+    isPinned: true,
+    isFavorite: true,
+    isArchived: true,
+    createdAt: true,
+    updatedAt: true,
+    responsible: { select: { id: true, name: true } },
+    _count: { select: { comments: true, stages: true } },
+    stages: {
+      orderBy: { stageOrder: 'asc' as const },
       select: {
         id: true,
-        name: true,
-        category: true,
-        sku: true,
-        country: true,
-        competitorUrl: true,
+        stageTemplateId: true,
+        stageOrder: true,
+        stageName: true,
+        dateValue: true,
+        dateRaw: true,
+        isCompleted: true,
+        isCritical: true,
         status: true,
-        priority: true,
-        finalDate: true,
-        responsibleId: true,
-        productTemplateId: true,
-        riskScore: true,
-        progressPercent: true,
-        notes: true,
-        sortOrder: true,
-        isPinned: true,
-        isFavorite: true,
-        isArchived: true,
-        createdAt: true,
-        updatedAt: true,
-        responsible: { select: { id: true, name: true } },
-        _count: { select: { comments: true, stages: true } },
-        stages: {
-          select: {
-            id: true, stageOrder: true, isCompleted: true, dateValue: true,
-            isCritical: true, status: true, stageName: true, participatesInAutoshift: true,
-          },
-          orderBy: { stageOrder: 'asc' },
-        },
+        participatesInAutoshift: true,
       },
-      orderBy: [{ isPinned: 'desc' }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
-    }),
+    },
+  }
+
+  const [products, users, stages, productTemplates, stageSuggestions] = await Promise.all([
     prisma.product.findMany({
       where: visibleProductsWhere,
-      select: {
-        id: true,
-        name: true,
-        category: true,
-        sku: true,
-        country: true,
-        competitorUrl: true,
-        status: true,
-        priority: true,
-        finalDate: true,
-        responsibleId: true,
-        productTemplateId: true,
-        riskScore: true,
-        progressPercent: true,
-        notes: true,
-        sortOrder: true,
-        isPinned: true,
-        isFavorite: true,
-        isArchived: true,
-        createdAt: true,
-        updatedAt: true,
-        responsible: { select: { id: true, name: true } },
-        stages: {
-          orderBy: { stageOrder: 'asc' },
-          select: {
-            id: true, stageTemplateId: true, stageOrder: true, stageName: true,
-            dateValue: true, dateRaw: true, isCompleted: true,
-            isCritical: true, status: true, participatesInAutoshift: true,
-          },
-        },
-      },
+      select: productWorkspaceSelect,
       orderBy: [{ isPinned: 'desc' }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
     }),
     prisma.user.findMany({
@@ -131,8 +106,8 @@ async function getProductsWorkspaceData(viewer: { id?: string | null; role?: str
   ])
 
   return {
-    listProducts,
-    tableProducts,
+    listProducts: products,
+    tableProducts: products,
     users,
     stages,
     productTemplates,

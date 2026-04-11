@@ -81,37 +81,6 @@ export function Header({ user }: HeaderProps) {
   }, [user])
 
   useEffect(() => {
-    let isMounted = true
-
-    const fetchProfileUser = async () => {
-      try {
-        const res = await fetch('/api/profile', { cache: 'no-store', credentials: 'include' })
-        if (!res.ok) return
-
-        const profile = await res.json()
-        if (!isMounted) return
-
-        setProfileUser((current) => ({
-          ...current,
-          name: profile?.name ?? current.name,
-          lastName: profile?.lastName ?? current.lastName,
-          email: profile?.email ?? current.email,
-          role: profile?.role ?? current.role,
-          avatar: profile?.avatar ?? current.avatar,
-        }))
-      } catch {
-        // Keep header stable even if profile prefetch fails.
-      }
-    }
-
-    fetchProfileUser()
-
-    return () => {
-      isMounted = false
-    }
-  }, [])
-
-  useEffect(() => {
     setMobileNavOpen(false)
     setNotificationsOpen(false)
     setProfileOpen(false)
@@ -168,10 +137,6 @@ export function Header({ user }: HeaderProps) {
       // Keep the panel usable even if the mark-seen request fails.
     }
   }
-
-  useEffect(() => {
-    fetchNotifications()
-  }, [])
 
   useEffect(() => {
     fetchNotifications()

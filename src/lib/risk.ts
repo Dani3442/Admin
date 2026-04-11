@@ -3,6 +3,9 @@ import { prisma } from './prisma'
 import { supportsProductStageOverlapAcceptedColumn } from './schema-compat'
 import { getOverlapAcceptedMapForProducts } from './overlap-acceptance'
 
+let lastFullRiskRecalculationAt = 0
+let fullRiskRecalculationPromise: Promise<void> | null = null
+
 /**
  * Recalculates risk scores and statuses for all active products.
  * Called on page loads and after stage updates to keep risk data fresh.
@@ -135,6 +138,30 @@ export async function recalculateAllRisks() {
         data: { riskScore, status: newStatus },
       })
     }
+  }
+}
+
+export async function recalculateAllRisksIfNeeded(maxAgeMs = 180000) {
+  const now = Date.now()
+
+  if (now - lastFullRiskRecalculationAt < maxAgeMs) {
+    return
+  }
+
+  if (fullRiskRecalculationPromise) {
+    await fullRiskRecalculationPromise
+    return
+  }
+
+  fullRiskRecalculationPromise = (async () => {
+    await recalculateAllRisks()
+    lastFullRiskRecalculationAt = Date.now()
+  })()
+
+  try {
+    await fullRiskRecalculationPromise
+  } finally {
+    fullRiskRecalculationPromise = null
   }
 }
 

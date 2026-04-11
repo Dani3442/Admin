@@ -165,7 +165,10 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
     }
 
     syncComments()
-    const intervalId = window.setInterval(syncComments, 4000)
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      syncComments()
+    }, 12000)
 
     return () => {
       cancelled = true
