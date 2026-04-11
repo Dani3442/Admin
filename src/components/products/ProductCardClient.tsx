@@ -369,7 +369,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
       if (daysLeft <= 7) return 'text-amber-700 bg-amber-50'
     }
     if (stage.dateRaw) return 'text-blue-700 bg-blue-50'
-    return 'text-slate-400 bg-slate-50'
+    return 'bg-muted text-muted-foreground'
   }
 
   // Right-click context menu handler
@@ -669,7 +669,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
             key={`${segment.userId}-${index}`}
             className={cn(
               'rounded-full px-2 py-0.5 font-medium',
-              ownMessage ? 'bg-slate-100 text-slate-700' : 'bg-brand-50 text-brand-700'
+              ownMessage ? 'bg-muted text-foreground' : 'bg-brand-50 text-brand-700 dark:text-blue-300'
             )}
           >
             {segment.text}
@@ -687,16 +687,16 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
   return (
     <div className="space-y-5 animate-fade-in">
       {/* Back */}
-      <div className="flex items-center justify-between gap-3">
-        <Link href={backNavigation.href} className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 transition-colors">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <Link href={backNavigation.href} className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground">
           <ArrowLeft className="w-4 h-4" /> {backNavigation.label}
         </Link>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
           {canArchiveProduct && !product.isArchived && (
             <button
               onClick={handleArchiveProduct}
               disabled={deletingProduct}
-              className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-60"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-500/10 disabled:opacity-60 sm:w-auto"
             >
               <Archive className="h-4 w-4" />
               {deletingProduct ? 'Архивация...' : 'Архивировать'}
@@ -706,7 +706,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
             <button
               onClick={() => setConfirmRestoreProductOpen(true)}
               disabled={lifecycleSaving}
-              className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-50 disabled:opacity-60"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-500/10 disabled:opacity-60 sm:w-auto"
             >
               <ArchiveRestore className="h-4 w-4" />
               Восстановить
@@ -718,67 +718,67 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
       {/* Header Card */}
       <div className="card">
         {(product.closedAt || product.isArchived) && (
-          <div className="mb-4 rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+          <div className="mb-4 rounded-[20px] border border-border/70 bg-muted/75 px-4 py-3 text-sm text-muted-foreground">
             <div className="flex flex-wrap items-center gap-4">
               {product.closedAt && (
                 <span>
-                  Закрыт: <span className="font-medium text-slate-800">{formatDate(product.closedAt)}</span>
+                  Закрыт: <span className="font-medium text-foreground">{formatDate(product.closedAt)}</span>
                   {product.closedBy?.name ? (
                     <>
-                      {' '}• <span className="font-medium text-slate-800">{product.closedBy.name}</span>
+                      {' '}• <span className="font-medium text-foreground">{product.closedBy.name}</span>
                     </>
                   ) : null}
                 </span>
               )}
               {product.isArchived && (
                 <span>
-                  В архиве: <span className="font-medium text-slate-800">{formatDate(product.archivedAt)}</span>
+                  В архиве: <span className="font-medium text-foreground">{formatDate(product.archivedAt)}</span>
                   {product.archivedBy?.name ? (
                     <>
-                      {' '}• <span className="font-medium text-slate-800">{product.archivedBy.name}</span>
+                      {' '}• <span className="font-medium text-foreground">{product.archivedBy.name}</span>
                     </>
                   ) : null}
                 </span>
               )}
             </div>
             {product.closureComment && (
-              <p className="mt-2 text-slate-500">Комментарий при закрытии: <span className="text-slate-700">{product.closureComment}</span></p>
+              <p className="mt-2 text-muted-foreground">Комментарий при закрытии: <span className="text-foreground">{product.closureComment}</span></p>
             )}
             {product.archiveReason && (
-              <p className="mt-1 text-slate-500">Причина архивации: <span className="text-slate-700">{product.archiveReason}</span></p>
+              <p className="mt-1 text-muted-foreground">Причина архивации: <span className="text-foreground">{product.archiveReason}</span></p>
             )}
           </div>
         )}
-        <div className="flex items-start gap-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 flex-wrap mb-2">
               <span className={cn('badge border', getPriorityColor(product.priority))}>{getPriorityLabel(product.priority)}</span>
               <span className={cn('badge', getStatusColor(product.status))}>{getStatusLabel(product.status)}</span>
-              {product.country && <span className="badge bg-slate-100 text-slate-600">{product.country}</span>}
+              {product.country && <span className="badge bg-muted text-muted-foreground">{product.country}</span>}
             </div>
-            <h1 className="text-xl font-bold text-slate-900 leading-tight mb-2">{product.name}</h1>
-            <div className="flex items-center gap-4 text-sm text-slate-500 flex-wrap">
-              <span>Ответственный: <span className="font-medium text-slate-700">{product.responsible?.name || '—'}</span></span>
-              <span>Финальная дата: <span className={cn('font-medium', product.finalDate && new Date(product.finalDate) < now ? 'text-red-600' : 'text-slate-700')}>{formatDate(product.finalDate)}</span></span>
+            <h1 className="mb-2 text-xl font-bold leading-tight text-foreground">{product.name}</h1>
+            <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+              <span>Ответственный: <span className="font-medium text-foreground">{product.responsible?.name || '—'}</span></span>
+              <span>Финальная дата: <span className={cn('font-medium', product.finalDate && new Date(product.finalDate) < now ? 'text-red-600 dark:text-red-300' : 'text-foreground')}>{formatDate(product.finalDate)}</span></span>
               {product.competitorUrl && (
-                <a href={product.competitorUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-brand-600 hover:text-brand-700">
+                <a href={product.competitorUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-primary transition-colors hover:text-primary/80">
                   <ExternalLink className="w-3.5 h-3.5" /> Конкурент
                 </a>
               )}
             </div>
           </div>
           {/* Risk + Progress */}
-          <div className="flex-shrink-0 text-right space-y-2">
+          <div className="flex flex-shrink-0 items-end justify-between gap-4 rounded-[24px] bg-muted/45 px-4 py-3 text-left lg:block lg:min-w-[170px] lg:bg-transparent lg:px-0 lg:py-0 lg:text-right">
             <div>
-              <div className="text-xs text-slate-500 mb-1">Прогресс</div>
-              <div className="text-2xl font-bold text-slate-800">{progress}%</div>
-              <div className="text-xs text-slate-400">{completedStages}/{totalStages} этапов</div>
+              <div className="mb-1 text-xs text-muted-foreground">Прогресс</div>
+              <div className="text-2xl font-bold text-foreground">{progress}%</div>
+              <div className="text-xs text-muted-foreground">{completedStages}/{totalStages} этапов</div>
             </div>
             <div className={cn(
               'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold',
-              product.riskScore >= 70 ? 'bg-red-100 text-red-700' :
-              product.riskScore >= 40 ? 'bg-amber-100 text-amber-700' :
-              'bg-slate-100 text-slate-600'
+              product.riskScore >= 70 ? 'bg-red-100 text-red-700 dark:text-red-300' :
+              product.riskScore >= 40 ? 'bg-amber-100 text-amber-700 dark:text-amber-300' :
+              'bg-muted text-muted-foreground'
             )}>
               <AlertTriangle className="w-3 h-3" />
               Риск: {product.riskScore}/100
@@ -800,8 +800,8 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
       {/* Workspace */}
       <div className="surface-panel overflow-hidden p-0">
         <div className="grid lg:grid-cols-[220px,minmax(0,1fr)]">
-          <aside className="border-b border-slate-100 bg-slate-50/80 p-3 lg:border-b-0 lg:border-r">
-            <div className="space-y-1">
+          <aside className="border-b border-border/70 bg-muted/55 p-3 lg:border-b-0 lg:border-r">
+            <div className="no-scrollbar flex gap-2 overflow-x-auto lg:block lg:space-y-1">
               {TABS.map((t) => {
                 const Icon = t.icon
                 const active = tab === t.id
@@ -811,14 +811,14 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                     key={t.id}
                     onClick={() => updateActiveTab(t.id)}
                     className={cn(
-                      'relative flex w-full items-center gap-3 rounded-[20px] px-4 py-3 text-left text-sm font-medium transition-colors',
-                      active ? 'text-white' : 'text-slate-500 hover:bg-white hover:text-slate-800'
+                      'relative flex min-h-11 min-w-max flex-shrink-0 items-center gap-3 rounded-[18px] px-4 py-3 text-left text-sm font-medium transition-colors lg:w-full lg:min-w-0 lg:rounded-[20px]',
+                      active ? 'text-primary-foreground' : 'text-muted-foreground hover:bg-card/80 hover:text-foreground'
                     )}
                   >
                     {active && (
                       <motion.span
                         layoutId="product-tab-indicator"
-                        className="absolute inset-0 rounded-[20px] bg-brand-950"
+                        className="absolute inset-0 rounded-[20px] bg-primary"
                         transition={{ type: 'spring', stiffness: 390, damping: 34 }}
                       />
                     )}
@@ -830,7 +830,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
             </div>
           </aside>
 
-          <div className="min-w-0 p-5">
+          <div className="min-w-0 p-4 sm:p-5">
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
                 key={tab}
@@ -842,7 +842,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                 {tab === 'stages' && (
                   <div className="space-y-2">
                     {canEdit && (
-                      <div className="mb-3 flex items-center justify-end gap-3">
+                      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
                         <button
                           onClick={() => {
                             if (showAddStageForm) {
@@ -851,7 +851,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                             }
                             setShowAddStageForm(true)
                           }}
-                          className="btn-primary text-sm"
+                          className="btn-primary w-full justify-center text-sm sm:w-auto"
                           disabled={saving}
                         >
                           <Plus className="w-4 h-4" />
@@ -860,12 +860,12 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                       </div>
                     )}
                     {canEdit && showAddStageForm && (
-                      <div className="mb-3 flex items-center gap-2 rounded-[24px] bg-slate-50 p-3">
+                      <div className="mb-3 flex flex-col gap-3 rounded-[24px] bg-muted/75 p-3">
                         <input
                           type="text"
                           value={newStageName}
                           onChange={(e) => setNewStageName(e.target.value)}
-                          className="input flex-1 text-sm"
+                          className="input w-full text-sm"
                           placeholder="Название нового этапа"
                           autoFocus
                           onKeyDown={(e) => {
@@ -876,26 +876,26 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                         <DatePicker
                           value={newStageDate}
                           onChange={setNewStageDate}
-                          inputClassName="h-11 w-56 text-sm"
-                          panelClassName="w-[360px]"
+                          inputClassName="h-11 w-full text-sm sm:w-56"
+                          panelClassName="w-[min(22rem,calc(100vw-24px))]"
                           placeholder="Дата этапа"
                         />
-                        <label className="flex h-11 items-center gap-2 rounded-[18px] bg-white px-3 text-sm text-slate-600">
+                        <label className="flex min-h-11 items-center justify-between gap-3 rounded-[18px] border border-border/70 bg-card px-3 py-2 text-sm text-muted-foreground sm:h-11 sm:justify-start">
                           <span className="whitespace-nowrap">Автосдвиг</span>
                           <input
                             type="checkbox"
                             checked={newStageAutoshift}
                             onChange={(e) => setNewStageAutoshift(e.target.checked)}
-                            className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                            className="h-4 w-4 rounded border-border text-primary focus:ring-ring"
                           />
                         </label>
-                        <button onClick={handleAddStage} className="btn-primary text-sm" disabled={!newStageName.trim() || saving}>
+                        <button onClick={handleAddStage} className="btn-primary w-full justify-center text-sm sm:w-auto" disabled={!newStageName.trim() || saving}>
                           <Save className="w-4 h-4" />
                           Сохранить
                         </button>
                         <button
                           onClick={resetNewStageDraft}
-                          className="btn-secondary text-sm"
+                          className="btn-secondary w-full justify-center text-sm sm:w-auto"
                           disabled={saving}
                         >
                           Отмена
@@ -903,19 +903,19 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                       </div>
                     )}
                     {overlaps.length > 0 && (
-                      <div className="mb-3 flex items-start gap-2 rounded-[24px] bg-orange-50 p-3">
-                        <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-orange-500" />
+                      <div className="mb-3 flex items-start gap-2 rounded-[24px] border border-amber-500/20 bg-amber-500/10 p-3">
+                        <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-500 dark:text-amber-300" />
                         <div className="flex-1">
-                          <p className="text-sm font-medium text-orange-800">Обнаружены пересечения дат</p>
+                          <p className="text-sm font-medium text-amber-800 dark:text-amber-200">Обнаружены пересечения дат</p>
                           <ul className="mt-2 space-y-2">
                             {overlaps.map((o, i) => (
-                              <li key={i} className="flex items-start justify-between gap-3 rounded-[16px] bg-white/70 px-3 py-2 text-xs text-orange-700">
+                              <li key={i} className="flex items-start justify-between gap-3 rounded-[16px] border border-amber-500/10 bg-card/70 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
                                 <span>{formatStageOverlap(o)}{o.dateLabel ? ` (${o.dateLabel})` : ''}</span>
                                 {canEdit && (
                                   <button
                                     type="button"
                                     onClick={() => handleAcceptOverlap(o.stageIds)}
-                                    className="flex-shrink-0 rounded-[14px] px-2.5 py-1 font-medium text-orange-700 transition hover:bg-orange-100"
+                                    className="flex-shrink-0 rounded-[14px] px-2.5 py-1 font-medium text-amber-700 transition hover:bg-amber-500/10 dark:text-amber-300"
                                     disabled={saving}
                                   >
                                     Принять
@@ -937,28 +937,29 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                           key={stage.id}
                           onContextMenu={(e) => handleStageContextMenu(e, stage)}
                           className={cn(
-                            'flex items-center gap-3 rounded-[24px] p-3 transition-all',
-                            hasOverlap ? 'bg-orange-50/60 ring-1 ring-orange-200' :
-                            stage.isCompleted ? 'bg-emerald-50/40' : 'bg-slate-50/70 hover:bg-slate-100/80'
+                            'flex flex-col gap-3 rounded-[24px] p-3 transition-all sm:flex-row sm:items-center',
+                            hasOverlap ? 'bg-amber-500/10 ring-1 ring-amber-500/20' :
+                            stage.isCompleted ? 'bg-emerald-500/10' : 'bg-muted/70 hover:bg-accent/70'
                           )}
                         >
+                          <div className="flex w-full items-start gap-3 sm:w-auto sm:items-center">
                           {canEdit ? (
                             <button onClick={() => toggleStageComplete(stage)} className="flex-shrink-0">
                               {stage.isCompleted
                                 ? <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                                : <Circle className="h-5 w-5 text-slate-300 hover:text-slate-400" />
+                                : <Circle className="h-5 w-5 text-muted-foreground/60 hover:text-muted-foreground" />
                               }
                             </button>
                           ) : (
                             <div className="flex-shrink-0">
                               {stage.isCompleted
                                 ? <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                                : <Circle className="h-5 w-5 text-slate-200" />
+                                : <Circle className="h-5 w-5 text-muted-foreground/40" />
                               }
                             </div>
                           )}
 
-                          <div className="w-6 flex-shrink-0 text-center text-xs text-slate-400">{idx + 1}</div>
+                          <div className="w-6 flex-shrink-0 pt-0.5 text-center text-xs text-muted-foreground sm:pt-0">{idx + 1}</div>
 
                           <div className="min-w-0 flex-1">
                             {renamingStageId === stage.id ? (
@@ -975,20 +976,22 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                                 onBlur={() => handleRenameStage(stage.id)}
                               />
                             ) : (
-                              <p className={cn('text-sm font-medium', stage.isCompleted ? 'line-through text-slate-400' : 'text-slate-700')}>
+                              <p className={cn('text-sm font-medium', stage.isCompleted ? 'line-through text-muted-foreground' : 'text-foreground')}>
                                 {stage.stageName}
-                                {stage.isCritical && <span className="ml-1.5 text-xs font-semibold text-red-500">КРИТИЧНЫЙ</span>}
+                                {stage.isCritical && <span className="ml-1.5 text-xs font-semibold text-red-500 dark:text-red-300">КРИТИЧНЫЙ</span>}
                                 {stage.participatesInAutoshift === false && (
-                                  <span className="ml-1.5 text-xs font-semibold text-slate-500">АВТОСДВИГ ВЫКЛ.</span>
+                                  <span className="ml-1.5 text-xs font-semibold text-muted-foreground">АВТОСДВИГ ВЫКЛ.</span>
                                 )}
-                                {hasOverlap && <span className="ml-1.5 text-xs font-semibold text-orange-600">⚠ ПЕРЕСЕЧЕНИЕ</span>}
+                                {hasOverlap && <span className="ml-1.5 text-xs font-semibold text-amber-600 dark:text-amber-300">⚠ ПЕРЕСЕЧЕНИЕ</span>}
                               </p>
                             )}
                             {stage.comment && !isEditing && renamingStageId !== stage.id && (
-                              <p className="mt-0.5 truncate text-xs text-slate-400">{stage.comment}</p>
+                              <p className="mt-0.5 truncate text-xs text-muted-foreground">{stage.comment}</p>
                             )}
                           </div>
+                          </div>
 
+                          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
                           <div className="flex-shrink-0">
                             {isEditing ? (
                               <DatePicker
@@ -1004,8 +1007,8 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                                   })
                                 }
                                 onCancel={() => setEditingStageId(null)}
-                                inputClassName="h-10 w-48 text-xs"
-                                panelClassName="w-[360px]"
+                                inputClassName="h-10 w-full text-xs sm:w-48"
+                                panelClassName="w-[min(22rem,calc(100vw-24px))]"
                               />
                             ) : (
                               <div className={cn('rounded-[16px] px-2.5 py-1.5 text-xs font-medium', cellStyle)}>
@@ -1015,13 +1018,13 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                           </div>
 
                           {Boolean(stage.durationDays ?? stage.stageTemplate?.durationDays) && (
-                            <div className="w-16 flex-shrink-0 text-center text-xs text-slate-400">
+                            <div className="w-full flex-shrink-0 text-left text-xs text-muted-foreground sm:w-16 sm:text-center">
                               {formatDurationDays(stage.durationDays ?? stage.stageTemplate?.durationDays ?? null)}
                             </div>
                           )}
 
                           {canEdit && (
-                            <div className="flex flex-shrink-0 items-center gap-1">
+                            <div className="flex flex-shrink-0 items-center justify-end gap-1">
                               {isEditing ? (
                                 <>
                                   <button onClick={() => updateStage(stage.id)} disabled={saving} className="btn-primary px-2 py-1 text-xs">
@@ -1034,13 +1037,14 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                               ) : (
                                 <button
                                   onClick={() => setEditingStageId(stage.id)}
-                                  className="rounded-lg p-1.5 text-slate-300 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                                  className="rounded-lg p-1.5 text-muted-foreground/60 transition-colors hover:bg-accent hover:text-foreground"
                                 >
                                   <Edit2 className="h-3.5 w-3.5" />
                                 </button>
                               )}
                             </div>
                           )}
+                          </div>
                         </div>
                       )
                     })}
@@ -1049,12 +1053,12 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
 
                 {tab === 'comments' && (
                   <div>
-                    <div className="rounded-[28px] bg-slate-50 p-4">
-                      <div className="flex h-[min(72vh,760px)] min-h-[480px] flex-col overflow-hidden rounded-[24px] bg-white shadow-[inset_0_0_0_1px_rgba(226,232,240,0.7)]">
-                        <div className="border-b border-slate-100 px-4 py-3">
+                    <div className="rounded-[28px] bg-muted/70 p-4">
+                      <div className="flex h-[min(76vh,760px)] min-h-[360px] flex-col overflow-hidden rounded-[24px] bg-card shadow-[inset_0_0_0_1px_hsl(var(--border)/0.7)] sm:min-h-[480px]">
+                        <div className="border-b border-border/70 px-4 py-3">
                           <div className="flex items-center justify-between gap-3">
-                            <h3 className="text-sm font-semibold text-slate-800">Комментарии</h3>
-                            <span className="text-xs font-medium text-slate-400">{product.comments.length}</span>
+                            <h3 className="text-sm font-semibold text-foreground">Комментарии</h3>
+                            <span className="text-xs font-medium text-muted-foreground">{product.comments.length}</span>
                           </div>
                         </div>
 
@@ -1064,12 +1068,12 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                               initial={{ opacity: 0, scale: 0.98, y: 10 }}
                               animate={{ opacity: 1, scale: 1, y: 0 }}
                               transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
-                              className="flex h-full min-h-[280px] items-center justify-center rounded-[20px] border border-dashed border-slate-200 bg-slate-50/80 text-center"
+                              className="flex h-full min-h-[280px] items-center justify-center rounded-[20px] border border-dashed border-border/70 bg-muted/60 text-center"
                             >
                               <div>
-                                <MessageCircle className="mx-auto mb-2 h-8 w-8 text-slate-300" />
-                                <p className="text-sm font-medium text-slate-500">Комментариев пока нет</p>
-                                <p className="mt-1 text-xs text-slate-400">Начни обсуждение прямо отсюда.</p>
+                                <MessageCircle className="mx-auto mb-2 h-8 w-8 text-muted-foreground/50" />
+                                <p className="text-sm font-medium text-muted-foreground">Комментариев пока нет</p>
+                                <p className="mt-1 text-xs text-muted-foreground">Начни обсуждение прямо отсюда.</p>
                               </div>
                             </motion.div>
                           ) : (
@@ -1092,15 +1096,15 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                                     className={cn('flex gap-3', ownMessage ? 'justify-end' : 'justify-start')}
                                   >
                                     {!ownMessage && <UserAvatar user={comment.author} size="sm" className="mt-7" />}
-                                    <div className="max-w-[62%] space-y-1">
-                                      <div className={cn('flex items-center gap-2 text-xs text-slate-400', ownMessage && 'justify-end')}>
-                                        <span className="font-semibold text-slate-700">{authorName}</span>
+                                    <div className="max-w-[84%] space-y-1 sm:max-w-[72%] lg:max-w-[62%]">
+                                      <div className={cn('flex items-center gap-2 text-xs text-muted-foreground', ownMessage && 'justify-end')}>
+                                        <span className="font-semibold text-foreground">{authorName}</span>
                                         <span>{formatCommentTimestamp(comment.createdAt)}</span>
                                       </div>
                                       <div
                                         className={cn(
                                           'px-0.5 py-0.5 text-sm leading-6',
-                                          ownMessage ? 'text-slate-800' : 'text-slate-600'
+                                          ownMessage ? 'text-foreground' : 'text-muted-foreground'
                                         )}
                                       >
                                         <div className={cn('flex flex-wrap items-center gap-1.5', ownMessage && 'justify-end')}>
@@ -1118,7 +1122,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                         </div>
 
                         {canComment && (
-                          <div className="border-t border-slate-100 px-4 py-4">
+                          <div className="border-t border-border/70 px-4 py-4">
                             <div className="relative">
                               <textarea
                                 ref={commentInputRef}
@@ -1135,8 +1139,8 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                                 className="input min-h-[52px] resize-none pr-16 py-3 leading-6"
                               />
                               {mentionState && activeMentionSuggestions.length > 0 && (
-                                <div className="absolute bottom-[calc(100%+10px)] left-0 z-20 w-full max-w-sm overflow-hidden rounded-[22px] border border-slate-200 bg-white p-2 shadow-[0_22px_60px_-32px_rgba(15,23,42,0.45)]">
-                                  <div className="mb-1 px-2 text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">
+                                <div className="absolute bottom-[calc(100%+10px)] left-0 z-20 w-full max-w-[min(100%,22rem)] overflow-hidden rounded-[22px] border border-border/80 bg-popover p-2 shadow-modal">
+                                  <div className="mb-1 px-2 text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
                                     Выбери пользователя
                                   </div>
                                   <div className="space-y-1">
@@ -1145,12 +1149,12 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                                         key={user.id}
                                         type="button"
                                         onClick={() => insertMention(user)}
-                                        className="flex w-full items-center gap-2 rounded-[16px] px-3 py-2.5 text-left transition-colors hover:bg-slate-50"
+                                        className="flex w-full items-center gap-2 rounded-[16px] px-3 py-2.5 text-left transition-colors hover:bg-accent"
                                       >
                                         <UserAvatar user={user} size="sm" />
                                         <div className="min-w-0">
-                                          <p className="truncate text-sm font-medium text-slate-700">{user.displayName}</p>
-                                          <p className="text-xs text-slate-400">@{user.name}</p>
+                                          <p className="truncate text-sm font-medium text-foreground">{user.displayName}</p>
+                                          <p className="text-xs text-muted-foreground">@{user.name}</p>
                                         </div>
                                       </button>
                                     ))}
@@ -1190,36 +1194,36 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                 )}
 
                 {tab === 'history' && (
-                  <div className="rounded-[28px] bg-slate-50 p-4">
-                    <div className="flex h-[min(72vh,760px)] min-h-[480px] flex-col overflow-hidden rounded-[24px] bg-white shadow-[inset_0_0_0_1px_rgba(226,232,240,0.7)]">
-                      <div className="border-b border-slate-100 px-4 py-3">
+                  <div className="rounded-[28px] bg-muted/70 p-4">
+                    <div className="flex h-[min(76vh,760px)] min-h-[360px] flex-col overflow-hidden rounded-[24px] bg-card shadow-[inset_0_0_0_1px_hsl(var(--border)/0.7)] sm:min-h-[480px]">
+                      <div className="border-b border-border/70 px-4 py-3">
                         <div className="flex items-center justify-between gap-3">
-                          <h3 className="text-sm font-semibold text-slate-800">История</h3>
-                          <span className="text-xs font-medium text-slate-400">{product.changeHistory.length}</span>
+                          <h3 className="text-sm font-semibold text-foreground">История</h3>
+                          <span className="text-xs font-medium text-muted-foreground">{product.changeHistory.length}</span>
                         </div>
                       </div>
 
                       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
                         {product.changeHistory.length === 0 ? (
-                          <p className="py-8 text-center text-sm text-slate-400">История изменений пуста</p>
+                          <p className="py-8 text-center text-sm text-muted-foreground">История изменений пуста</p>
                         ) : (
                           <div className="space-y-2">
                             {product.changeHistory.map((h: any) => (
-                              <div key={h.id} className="flex items-start gap-3 border-b border-slate-50 py-2 last:border-0">
+                              <div key={h.id} className="flex items-start gap-3 border-b border-border/60 py-2 last:border-0">
                                 <div className="mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-brand-400" />
                                 <div className="min-w-0 flex-1">
-                                  <div className="flex items-center gap-2 text-xs text-slate-500">
-                                    <span className="font-medium text-slate-700">{h.changedBy.name}</span>
+                                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                    <span className="font-medium text-foreground">{h.changedBy.name}</span>
                                     <span>изменил(а)</span>
-                                    <span className="font-medium text-slate-700">{h.field}</span>
-                                    <span className="ml-auto text-slate-400">{formatDate(h.createdAt)}</span>
+                                    <span className="font-medium text-foreground">{h.field}</span>
+                                    <span className="sm:ml-auto">{formatDate(h.createdAt)}</span>
                                   </div>
                                   {h.oldValue && h.newValue && (
-                                    <div className="mt-0.5 text-xs text-slate-400">
-                                      <span className="line-through">{h.oldValue.slice(0, 30)}</span> → <span className="text-slate-600">{h.newValue.slice(0, 30)}</span>
+                                    <div className="mt-0.5 text-xs text-muted-foreground">
+                                      <span className="line-through">{h.oldValue.slice(0, 30)}</span> → <span className="text-foreground">{h.newValue.slice(0, 30)}</span>
                                     </div>
                                   )}
-                                  {h.reason && <div className="mt-0.5 text-xs italic text-slate-400">{h.reason}</div>}
+                                  {h.reason && <div className="mt-0.5 text-xs italic text-muted-foreground">{h.reason}</div>}
                                 </div>
                               </div>
                             ))}
@@ -1232,23 +1236,23 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
 
                 {tab === 'automations' && (
                   <div className="space-y-3">
-                    <p className="mb-4 text-sm text-slate-500">Активные автоматизации для этого продукта:</p>
+                    <p className="mb-4 text-sm text-muted-foreground">Активные автоматизации для этого продукта:</p>
                     {product.automations.length === 0 ? (
                       <div className="py-8 text-center">
-                        <Zap className="mx-auto mb-2 h-8 w-8 text-slate-200" />
-                        <p className="text-sm text-slate-400">Нет активных автоматизаций</p>
-                        <Link href="/automations" className="mt-1 inline-block text-xs text-brand-600 hover:text-brand-700">
+                        <Zap className="mx-auto mb-2 h-8 w-8 text-muted-foreground/30" />
+                        <p className="text-sm text-muted-foreground">Нет активных автоматизаций</p>
+                        <Link href="/automations" className="mt-1 inline-block text-xs text-primary hover:text-primary/80">
                           Настроить автоматизации →
                         </Link>
                       </div>
                     ) : (
                       product.automations.map((a: any) => (
-                        <div key={a.id} className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                        <div key={a.id} className="rounded-[22px] border border-amber-500/20 bg-amber-500/10 p-4">
                           <div className="mb-1 flex items-center gap-2">
-                            <Zap className="h-4 w-4 text-amber-600" />
-                            <span className="text-sm font-semibold text-amber-800">{a.name}</span>
+                            <Zap className="h-4 w-4 text-amber-600 dark:text-amber-300" />
+                            <span className="text-sm font-semibold text-amber-800 dark:text-amber-200">{a.name}</span>
                           </div>
-                          <p className="text-xs text-amber-700">{a.description}</p>
+                          <p className="text-xs text-amber-700 dark:text-amber-300">{a.description}</p>
                         </div>
                       ))
                     )}
@@ -1273,10 +1277,10 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
             x={stageMenu.x}
             y={stageMenu.y}
             menuRef={menuRef}
-            className="fixed z-[130] min-w-[220px] rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
+            className="fixed z-[130] min-w-[220px] rounded-lg border border-border/80 bg-popover py-1 text-popover-foreground shadow-modal"
           >
             <button
-              className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-popover-foreground hover:bg-accent"
               onClick={() => {
                 setEditingStageId(stage.id)
                 setStageEditValues((prev) => ({
@@ -1286,22 +1290,22 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                 closeStageMenu()
               }}
             >
-              <CalendarDays className="w-3.5 h-3.5 text-slate-400" />
+              <CalendarDays className="w-3.5 h-3.5 text-muted-foreground" />
               Изменить дату
             </button>
             <button
-              className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-popover-foreground hover:bg-accent"
               onClick={() => {
                 setRenamingStageId(stage.id)
                 setRenameValue(stage.stageName)
                 closeStageMenu()
               }}
             >
-              <Pencil className="w-3.5 h-3.5 text-slate-400" />
+              <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
               Переименовать
             </button>
             <button
-              className={cn('w-full px-3 py-2 text-left text-sm flex items-center gap-2', isFirst ? 'text-slate-300 cursor-not-allowed' : 'text-slate-700 hover:bg-slate-50')}
+              className={cn('flex w-full items-center gap-2 px-3 py-2 text-left text-sm', isFirst ? 'cursor-not-allowed text-muted-foreground/50' : 'text-popover-foreground hover:bg-accent')}
               onClick={() => !isFirst && handleMoveStage(stage.id, 'up')}
               disabled={isFirst}
             >
@@ -1309,16 +1313,16 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
               Переместить вверх
             </button>
             <button
-              className={cn('w-full px-3 py-2 text-left text-sm flex items-center gap-2', isLast ? 'text-slate-300 cursor-not-allowed' : 'text-slate-700 hover:bg-slate-50')}
+              className={cn('flex w-full items-center gap-2 px-3 py-2 text-left text-sm', isLast ? 'cursor-not-allowed text-muted-foreground/50' : 'text-popover-foreground hover:bg-accent')}
               onClick={() => !isLast && handleMoveStage(stage.id, 'down')}
               disabled={isLast}
             >
               <ChevronDown className="w-3.5 h-3.5" />
               Переместить вниз
             </button>
-            <div className="border-t border-slate-100 my-1" />
+            <div className="my-1 border-t border-border/70" />
             <button
-              className="w-full px-3 py-2 text-left text-sm text-amber-700 hover:bg-amber-50 flex items-center gap-2"
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-amber-700 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-500/10"
               onClick={() => {
                 setAutomationModal({ stageId: stage.id, stageOrder: stage.stageOrder, stageName: stage.stageName })
                 setAutomationName(`При изменении "${stage.stageName}"`)
@@ -1329,15 +1333,15 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
               Настроить автоматизацию
             </button>
             <button
-              className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-popover-foreground hover:bg-accent"
               onClick={() => handleToggleStageAutoshift(stage, stage.participatesInAutoshift === false)}
             >
-              <Zap className={cn('w-3.5 h-3.5', stage.participatesInAutoshift === false ? 'text-slate-400' : 'text-emerald-500')} />
+              <Zap className={cn('w-3.5 h-3.5', stage.participatesInAutoshift === false ? 'text-muted-foreground' : 'text-emerald-500 dark:text-emerald-300')} />
               {stage.participatesInAutoshift === false ? 'Включить автосдвиг' : 'Отключить автосдвиг'}
             </button>
-            <div className="border-t border-slate-100 my-1" />
+            <div className="my-1 border-t border-border/70" />
             <button
-              className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-500/10"
               onClick={() => handleDeleteStage(stage.id)}
             >
               <Trash2 className="w-3.5 h-3.5 text-red-500" />
@@ -1351,7 +1355,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
       <AnimatePresence>
       {automationModal && typeof document !== 'undefined' && createPortal(
         <motion.div
-          className="modal-backdrop flex items-center justify-center px-4"
+          className="modal-backdrop flex items-end justify-center px-4 pb-4 pt-8 sm:items-center"
           onClick={() => setAutomationModal(null)}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -1359,7 +1363,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
           transition={{ duration: 0.18 }}
         >
           <motion.div
-            className="w-full max-w-md space-y-4 rounded-[28px] bg-white p-6 shadow-xl"
+            className="max-h-[min(88vh,42rem)] w-full max-w-md space-y-4 overflow-y-auto rounded-[28px] bg-card p-4 shadow-modal sm:p-6"
             onClick={(e) => e.stopPropagation()}
             initial={{ opacity: 0, y: 18, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -1368,20 +1372,20 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Zap className="w-5 h-5 text-amber-500" />
-                <h3 className="text-lg font-semibold text-slate-900">Автоматизация этапа</h3>
+                <Zap className="w-5 h-5 text-amber-500 dark:text-amber-300" />
+                <h3 className="text-lg font-semibold text-foreground">Автоматизация этапа</h3>
               </div>
-              <button onClick={() => setAutomationModal(null)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => setAutomationModal(null)} className="text-muted-foreground hover:text-foreground">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <p className="text-sm text-slate-500">
-              Настройте действие при изменении даты этапа <span className="font-medium text-slate-700">{automationModal.stageName}</span>
+            <p className="text-sm text-muted-foreground">
+              Настройте действие при изменении даты этапа <span className="font-medium text-foreground">{automationModal.stageName}</span>
             </p>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Название</label>
+              <label className="mb-1 block text-sm font-medium text-foreground">Название</label>
               <input
                 type="text"
                 value={automationName}
@@ -1392,7 +1396,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Действие</label>
+              <label className="mb-1 block text-sm font-medium text-foreground">Действие</label>
               <select
                 value={automationAction}
                 onChange={(e) => setAutomationAction(e.target.value)}
@@ -1405,7 +1409,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Описание (опционально)</label>
+              <label className="mb-1 block text-sm font-medium text-foreground">Описание (опционально)</label>
               <textarea
                 value={automationDesc}
                 onChange={(e) => setAutomationDesc(e.target.value)}
@@ -1414,16 +1418,16 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
               />
             </div>
 
-            <div className="flex justify-end gap-3 pt-2">
+            <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
               <button
                 onClick={() => setAutomationModal(null)}
-                className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 transition-colors hover:text-slate-800"
+                className="btn-secondary w-full justify-center sm:w-auto"
               >
                 Отмена
               </button>
               <button
                 onClick={handleCreateAutomation}
-                className="btn-primary text-sm"
+                className="btn-primary w-full justify-center text-sm sm:w-auto"
                 disabled={!automationName.trim() || savingAutomation}
               >
                 <Zap className="w-4 h-4" />

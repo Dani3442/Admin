@@ -19,7 +19,7 @@ export function DashboardShell({
   children,
 }: DashboardShellProps) {
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-slate-50">
+    <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
       <Header user={user} />
       <main className="flex-1 overflow-y-auto">
         <div className="page-shell px-4 pb-8 pt-3 sm:px-6 lg:px-8">{children}</div>

@@ -8,11 +8,20 @@ interface ChartsProps {
 }
 
 export function DashboardCharts({ statusData, topBottlenecks }: ChartsProps) {
+  const tooltipStyle = {
+    borderRadius: 16,
+    border: '1px solid hsl(var(--border))',
+    fontSize: 12,
+    backgroundColor: 'hsl(var(--popover) / 0.96)',
+    color: 'hsl(var(--popover-foreground))',
+    boxShadow: '0 24px 50px -28px hsl(var(--shadow-color) / 0.55)',
+  }
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       {/* Status Distribution */}
       <div className="card">
-        <h3 className="text-sm font-semibold text-slate-700 mb-4">Статусы продуктов</h3>
+        <h3 className="mb-4 text-sm font-semibold text-foreground">Статусы продуктов</h3>
         <ResponsiveContainer width="100%" height={180}>
           <PieChart>
             <Pie
@@ -30,16 +39,16 @@ export function DashboardCharts({ statusData, topBottlenecks }: ChartsProps) {
             </Pie>
             <Tooltip
               formatter={(value, name) => [value, name]}
-              contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 12 }}
+              contentStyle={tooltipStyle}
             />
           </PieChart>
         </ResponsiveContainer>
         <div className="grid grid-cols-2 gap-1 mt-2">
           {statusData.filter((d) => d.value > 0).map((item, i) => (
-            <div key={i} className="flex items-center gap-2 text-xs text-slate-600">
+            <div key={i} className="flex items-center gap-2 text-xs text-muted-foreground">
               <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
               <span className="truncate">{item.name}</span>
-              <span className="ml-auto font-semibold text-slate-800">{item.value}</span>
+              <span className="ml-auto font-semibold text-foreground">{item.value}</span>
             </div>
           ))}
         </div>
@@ -47,9 +56,9 @@ export function DashboardCharts({ statusData, topBottlenecks }: ChartsProps) {
 
       {/* Bottleneck Stages */}
       <div className="card">
-        <h3 className="text-sm font-semibold text-slate-700 mb-4">Проблемные этапы</h3>
+        <h3 className="mb-4 text-sm font-semibold text-foreground">Проблемные этапы</h3>
         {topBottlenecks.length === 0 ? (
-          <div className="flex items-center justify-center h-40 text-slate-400 text-sm">
+          <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
             Задержек не найдено
           </div>
         ) : (
@@ -59,18 +68,20 @@ export function DashboardCharts({ statusData, topBottlenecks }: ChartsProps) {
               layout="vertical"
               margin={{ left: 0, right: 10 }}
             >
-              <XAxis type="number" tick={{ fontSize: 11 }} />
+              <XAxis type="number" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={{ stroke: 'hsl(var(--border))' }} tickLine={{ stroke: 'hsl(var(--border))' }} />
               <YAxis
                 type="category"
                 dataKey="name"
                 width={110}
-                tick={{ fontSize: 10 }}
+                tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                axisLine={{ stroke: 'hsl(var(--border))' }}
+                tickLine={{ stroke: 'hsl(var(--border))' }}
               />
               <Tooltip
                 formatter={(v) => [`${v} задержек`, 'Кол-во']}
-                contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 12 }}
+                contentStyle={tooltipStyle}
               />
-              <Bar dataKey="count" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+              <Bar dataKey="count" fill="hsl(var(--chart-1))" radius={[0, 4, 4, 0]} />
             </BarChart>
           </ResponsiveContainer>
         )}

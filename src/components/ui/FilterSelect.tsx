@@ -45,10 +45,12 @@ export function FilterSelect({
     if (!element) return
 
     const rect = element.getBoundingClientRect()
+    const viewportWidth = window.innerWidth
+    const width = Math.min(Math.max(rect.width, 240), viewportWidth - 24)
     setPosition({
       top: rect.bottom + 8,
-      left: Math.max(12, Math.min(rect.left, window.innerWidth - Math.max(rect.width, 260) - 12)),
-      width: Math.max(rect.width, 240),
+      left: Math.max(12, Math.min(rect.left, viewportWidth - width - 12)),
+      width,
     })
   }, [])
 
@@ -96,7 +98,7 @@ export function FilterSelect({
           ref={panelRef}
           onPointerDown={(event) => event.stopPropagation()}
           className={cn(
-            'fixed z-[85] overflow-hidden rounded-[22px] border border-slate-200 bg-white p-2 shadow-[0_22px_60px_-32px_rgba(15,23,42,0.45)]',
+            'fixed z-[85] overflow-hidden rounded-[22px] border border-border/80 bg-popover p-2 text-popover-foreground shadow-modal',
             panelClassName
           )}
           style={{ top: position.top, left: position.left, width: position.width }}
@@ -116,8 +118,8 @@ export function FilterSelect({
                   className={cn(
                     'flex w-full items-center justify-between gap-3 rounded-[16px] px-3 py-2.5 text-left text-sm font-medium transition-colors',
                     active
-                      ? 'bg-brand-50 text-brand-700'
-                      : 'text-slate-700 hover:bg-slate-50'
+                      ? 'bg-brand-50 text-brand-700 dark:text-blue-300'
+                      : 'text-foreground hover:bg-accent'
                   )}
                 >
                   <span className="truncate">{option.label}</span>
@@ -138,15 +140,15 @@ export function FilterSelect({
           type="button"
           onClick={() => (isOpen ? setIsOpen(false) : openSelect())}
           className={cn(
-            'flex h-11 w-full items-center justify-between gap-3 rounded-[20px] border border-slate-200 bg-white px-3.5 text-left text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50',
-            isOpen && 'border-brand-300 bg-brand-50/60 ring-2 ring-brand-100',
+            'flex h-11 w-full items-center justify-between gap-3 rounded-[20px] border border-border bg-card px-3.5 text-left text-sm font-medium text-foreground transition hover:border-border hover:bg-accent/70',
+            isOpen && 'border-primary/40 bg-brand-50/60 ring-2 ring-ring/20',
             triggerClassName
           )}
         >
-          <span className={cn('truncate', !selectedOption && 'text-slate-400')}>
+          <span className={cn('truncate', !selectedOption && 'text-muted-foreground')}>
             {selectedOption?.label || placeholder}
           </span>
-          <ChevronDown className={cn('h-4 w-4 flex-shrink-0 text-slate-400 transition-transform', isOpen && 'rotate-180 text-brand-600')} />
+          <ChevronDown className={cn('h-4 w-4 flex-shrink-0 text-muted-foreground transition-transform', isOpen && 'rotate-180 text-brand-600 dark:text-blue-300')} />
         </button>
       </div>
       {panel}

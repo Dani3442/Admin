@@ -31,7 +31,7 @@ export function Sidebar({ user, collapsed = false, onToggle }: SidebarProps) {
 
   return (
     <motion.aside
-      className={cn('relative flex h-full flex-shrink-0 flex-col overflow-hidden border-r border-slate-800/90 bg-sidebar')}
+      className={cn('relative flex h-full flex-shrink-0 flex-col overflow-hidden border-r border-sidebar-hover/80 bg-sidebar')}
       initial={{ opacity: 0, x: -12 }}
       style={{ width: collapsed ? 0 : undefined }}
       transition={{
@@ -47,21 +47,21 @@ export function Sidebar({ user, collapsed = false, onToggle }: SidebarProps) {
     >
       <div className="flex h-full w-[240px] flex-col">
         {/* Logo */}
-        <div className="border-b border-slate-800 px-5 py-5">
+        <div className="border-b border-sidebar-hover px-5 py-5">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-brand-600">
                 <Package2 className="w-4.5 h-4.5 text-white" style={{ width: 18, height: 18 }} />
               </div>
               <div>
-                <p className="text-sm font-semibold leading-tight text-white">Product Admin</p>
-                <p className="text-xs text-slate-500">Операционная система</p>
+                <p className="text-sm font-semibold leading-tight text-sidebar-text-active">Product Admin</p>
+                <p className="text-xs text-sidebar-text">Операционная система</p>
               </div>
             </div>
             <button
               type="button"
               onClick={onToggle}
-              className="mt-0.5 inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-sidebar-hover hover:text-white"
+              className="mt-0.5 inline-flex h-8 w-8 items-center justify-center rounded-lg text-sidebar-text transition hover:bg-sidebar-hover hover:text-sidebar-text-active"
               aria-label="Скрыть боковую панель"
               title="Скрыть меню"
             >
@@ -92,7 +92,7 @@ export function Sidebar({ user, collapsed = false, onToggle }: SidebarProps) {
                     transition={{ type: 'spring', stiffness: 380, damping: 34 }}
                   />
                 )}
-                <Icon className={cn('relative z-10 w-4 h-4 flex-shrink-0', active ? 'text-white' : 'text-slate-500 group-hover:text-slate-300')} />
+                <Icon className={cn('relative z-10 w-4 h-4 flex-shrink-0', active ? 'text-white' : 'text-sidebar-text group-hover:text-sidebar-text-active')} />
                 <span className="relative z-10 flex-1 font-medium">{item.label}</span>
                 {active && <ChevronRight className="relative z-10 w-3 h-3 text-white/60" />}
               </Link>
@@ -101,12 +101,12 @@ export function Sidebar({ user, collapsed = false, onToggle }: SidebarProps) {
         </nav>
 
         {/* User Info */}
-        <div className="border-t border-slate-800 px-3 py-4">
+        <div className="border-t border-sidebar-hover px-3 py-4">
           <Link href="/profile" className="flex items-center gap-3 rounded-xl px-3 py-3 transition hover:bg-sidebar-hover">
             <UserAvatar user={user} size="sm" />
             <div className="min-w-0 flex-1">
-              <p className="text-white text-sm font-medium truncate">{getUserDisplayName(user)}</p>
-              <p className="text-slate-400 text-xs truncate">{getRoleLabel(user.role)}</p>
+              <p className="text-sidebar-text-active text-sm font-medium truncate">{getUserDisplayName(user)}</p>
+              <p className="text-sidebar-text text-xs truncate">{getRoleLabel(user.role)}</p>
             </div>
           </Link>
         </div>

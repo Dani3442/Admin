@@ -202,14 +202,14 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
   }
 
   const renderPanelActions = (canSave: boolean) => (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
       {canSave && (
-        <button onClick={handleSave} disabled={saving} className="btn-primary">
+        <button onClick={handleSave} disabled={saving} className="btn-primary w-full justify-center sm:w-auto">
           <Save className="h-4 w-4" />
           {saving ? 'Сохранение...' : 'Сохранить'}
         </button>
       )}
-      <button onClick={closePanel} disabled={saving} className="btn-secondary">
+      <button onClick={closePanel} disabled={saving} className="btn-secondary w-full justify-center sm:w-auto">
         <X className="h-4 w-4" />
         Закрыть
       </button>
@@ -218,10 +218,10 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
 
   return (
     <div className="page-section animate-fade-in">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Link
           href={backNavigation.href}
-          className="inline-flex items-center gap-2 rounded-full px-2 py-1.5 text-[15px] font-medium text-brand-700 transition-colors hover:bg-brand-950/8"
+          className="inline-flex items-center gap-2 rounded-full px-2 py-1.5 text-[15px] font-medium text-primary transition-colors hover:bg-accent"
         >
           <ArrowLeft className="h-4 w-4" />
           {backNavigation.label}
@@ -239,15 +239,15 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
       />
 
       <div className="surface-panel overflow-hidden">
-        <div className="flex flex-col gap-5 p-6 lg:flex-row lg:items-start lg:justify-between">
-          <div className="flex items-start gap-4">
+        <div className="flex flex-col gap-5 p-4 sm:p-6 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
             <div className="relative shrink-0">
               <UserAvatar user={{ name: form.name, lastName: form.lastName, avatar: form.avatar }} size="xl" />
               {activePanel === 'edit' && permissions.canEditPersonal && (
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="absolute -bottom-1 right-2 inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/90 bg-slate-950 text-white shadow-lg transition hover:scale-[1.03] hover:bg-slate-800"
+                  className="absolute -bottom-1 right-2 inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/80 bg-card text-foreground shadow-card transition hover:scale-[1.03] hover:bg-accent"
                   aria-label="Обновить аватар"
                 >
                   <Camera className="h-3.5 w-3.5" />
@@ -257,10 +257,10 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
 
             <div className="min-w-0 space-y-4">
               <div>
-                <h1 className="text-[30px] font-semibold tracking-[-0.04em] text-slate-900">
+                <h1 className="text-[30px] font-semibold tracking-[-0.04em] text-foreground">
                   {getUserDisplayName({ name: form.name, lastName: form.lastName })}
                 </h1>
-                <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-slate-500">
+                <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                   <span className="inline-flex items-center gap-1.5">
                     <Mail className="h-3.5 w-3.5" />
                     {profile.email}
@@ -273,26 +273,26 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <span className="badge border border-slate-200 bg-slate-50 text-slate-700 text-xs">{getRoleLabel(profile.role)}</span>
+                <span className="badge border border-border/70 bg-muted/75 text-xs text-foreground">{getRoleLabel(profile.role)}</span>
                 <span className={cn('badge border text-xs', getVerificationStatusColor(profile.verificationStatus))}>
                   {getVerificationStatusLabel(profile.verificationStatus)}
                 </span>
-                <span className={cn('badge border text-xs', profile.isActive ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-200 bg-red-50 text-red-700')}>
+                <span className={cn('badge border text-xs', profile.isActive ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:text-emerald-300' : 'border-red-200 bg-red-50 text-red-700 dark:text-red-300')}>
                   {profile.isActive ? 'Активный аккаунт' : 'Аккаунт отключён'}
                 </span>
               </div>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
             {permissions.canEditPersonal && (
-              <button onClick={() => { setError(''); setSuccess(''); setActivePanel('edit') }} className="btn-primary">
+              <button onClick={() => { setError(''); setSuccess(''); setActivePanel('edit') }} className="btn-primary w-full justify-center sm:w-auto">
                 <UserCog className="h-4 w-4" />
                 Редактировать профиль
               </button>
             )}
             {canOpenSettingsPanel && (
-              <button onClick={() => { setError(''); setSuccess(''); setActivePanel('settings') }} className="btn-secondary px-3.5 py-2">
+              <button onClick={() => { setError(''); setSuccess(''); setActivePanel('settings') }} className="btn-secondary w-full justify-center px-3.5 py-2 sm:w-auto">
                 <Settings className="h-4 w-4" />
                 Настройки профиля
               </button>
@@ -303,7 +303,7 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
       </div>
 
       {(error || success) && (
-        <div className={cn('rounded-[24px] px-4 py-3 text-sm', error ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700')}>
+        <div className={cn('rounded-[24px] border px-4 py-3 text-sm', error ? 'border-destructive/20 bg-destructive/10 text-red-700 dark:text-red-300' : 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300')}>
           {error || success}
         </div>
       )}
@@ -311,11 +311,11 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
       <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
 
       {activePanel === 'edit' && (
-        <div className="surface-panel space-y-5 p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="surface-panel space-y-5 p-4 sm:p-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
-              <UserCircle2 className="h-4 w-4 text-brand-600" />
-              <h3 className="text-sm font-semibold text-slate-800">Редактирование профиля</h3>
+              <UserCircle2 className="h-4 w-4 text-primary" />
+              <h3 className="text-sm font-semibold text-foreground">Редактирование профиля</h3>
             </div>
             {renderPanelActions(true)}
           </div>
@@ -355,8 +355,8 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
 
               <label className="space-y-1.5">
                 <span className="label mb-0">Email</span>
-                <input value={profile.email} disabled className="input bg-slate-50 text-slate-500" />
-                <span className="text-xs text-slate-400">Email используется как логин и меняется только через администратора.</span>
+                <input value={profile.email} disabled className="input bg-muted/80 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">Email используется как логин и меняется только через администратора.</span>
               </label>
           </div>
         </div>
@@ -366,8 +366,8 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
         <div className="surface-panel space-y-5 p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4 text-brand-600" />
-              <h3 className="text-sm font-semibold text-slate-800">Настройки профиля</h3>
+              <ShieldCheck className="h-4 w-4 text-primary" />
+              <h3 className="text-sm font-semibold text-foreground">Настройки профиля</h3>
             </div>
             {renderPanelActions(canSaveSettings)}
           </div>
@@ -375,8 +375,8 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
           <div className="grid gap-6 lg:grid-cols-2">
             <div className="space-y-4">
               <div className="flex items-center gap-2">
-                <Building2 className="h-4 w-4 text-brand-600" />
-                <h4 className="text-sm font-semibold text-slate-800">Организационный статус</h4>
+                <Building2 className="h-4 w-4 text-primary" />
+                <h4 className="text-sm font-semibold text-foreground">Организационный статус</h4>
               </div>
 
               <div className="grid gap-4">
@@ -439,17 +439,17 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
                   </select>
                 </label>
 
-                <label className="flex items-center justify-between rounded-[24px] bg-slate-50 px-4 py-3.5">
+                <label className="flex items-center justify-between rounded-[24px] bg-muted/75 px-4 py-3.5">
                   <div>
-                    <div className="text-sm font-medium text-slate-700">Активность аккаунта</div>
-                    <div className="text-xs text-slate-400">Отключённый пользователь не сможет войти в систему.</div>
+                    <div className="text-sm font-medium text-foreground">Активность аккаунта</div>
+                    <div className="text-xs text-muted-foreground">Отключённый пользователь не сможет войти в систему.</div>
                   </div>
                   <input
                     type="checkbox"
                     checked={form.isActive}
                     onChange={(event) => updateField('isActive', event.target.checked)}
                     disabled={!permissions.canEditSensitive}
-                    className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                    className="h-4 w-4 rounded border-border text-primary focus:ring-ring"
                   />
                 </label>
               </div>
@@ -457,34 +457,34 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
 
             <div className="space-y-4">
               <div className="flex items-center gap-2">
-                <Settings className="h-4 w-4 text-brand-600" />
-                <h4 className="text-sm font-semibold text-slate-800">Системная информация</h4>
+                <Settings className="h-4 w-4 text-primary" />
+                <h4 className="text-sm font-semibold text-foreground">Системная информация</h4>
               </div>
 
-              <div className="surface-subtle space-y-3 px-4 py-4 text-sm text-slate-600">
-                <div className="flex justify-between gap-3 border-b border-slate-200/70 pb-2">
-                  <span className="text-slate-400">Профиль создан</span>
-                  <span className="font-medium text-slate-700">{formatDate(profile.createdAt)}</span>
+              <div className="surface-subtle space-y-3 px-4 py-4 text-sm text-muted-foreground">
+                <div className="flex justify-between gap-3 border-b border-border/70 pb-2">
+                  <span className="text-muted-foreground">Профиль создан</span>
+                  <span className="font-medium text-foreground">{formatDate(profile.createdAt)}</span>
                 </div>
-                <div className="flex justify-between gap-3 border-b border-slate-200/70 pb-2">
-                  <span className="text-slate-400">Последнее обновление</span>
-                  <span className="font-medium text-slate-700">{formatDate(profile.updatedAt)}</span>
+                <div className="flex justify-between gap-3 border-b border-border/70 pb-2">
+                  <span className="text-muted-foreground">Последнее обновление</span>
+                  <span className="font-medium text-foreground">{formatDate(profile.updatedAt)}</span>
                 </div>
                 <div className="flex justify-between gap-3">
-                  <span className="text-slate-400">Уровень доступа</span>
-                  <span className="max-w-[220px] text-right font-medium text-slate-700">{getAccessLevelLabel(profile.role)}</span>
+                  <span className="text-muted-foreground">Уровень доступа</span>
+                  <span className="max-w-[220px] text-right font-medium text-foreground">{getAccessLevelLabel(profile.role)}</span>
                 </div>
               </div>
             </div>
           </div>
 
           {permissions.canDeleteUser && !isSelf && (
-            <div className="border-t border-slate-100 pt-5">
+            <div className="border-t border-border/70 pt-5">
               <button
                 type="button"
                 onClick={handleDeleteUser}
                 disabled={saving}
-                className="inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Trash2 className="h-4 w-4" />
                 {saving ? 'Удаление...' : 'Удалить сотрудника'}
@@ -497,29 +497,29 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
       <div className="grid gap-6 xl:grid-cols-[300px_minmax(0,1fr)]">
         <div className="card">
           <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-brand-600" />
-            <h3 className="text-sm font-semibold text-slate-800">Сводка</h3>
+            <Sparkles className="h-4 w-4 text-primary" />
+            <h3 className="text-sm font-semibold text-foreground">Сводка</h3>
           </div>
           <div className="mt-4 grid gap-3">
             <div className="surface-subtle px-4 py-4">
-              <div className="text-xs text-slate-400">Назначено продуктов</div>
-              <div className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-slate-900">{profile._count.assignedProducts}</div>
+              <div className="text-xs text-muted-foreground">Назначено продуктов</div>
+              <div className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-foreground">{profile._count.assignedProducts}</div>
             </div>
             <div className="surface-subtle px-4 py-4">
-              <div className="text-xs text-slate-400">Комментариев оставлено</div>
-              <div className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-slate-900">{profile._count.comments}</div>
+              <div className="text-xs text-muted-foreground">Комментариев оставлено</div>
+              <div className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-foreground">{profile._count.comments}</div>
             </div>
             <div className="surface-subtle px-4 py-4">
-              <div className="text-xs text-slate-400">Назначений по этапам</div>
-              <div className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-slate-900">{profile._count.stageAssignments}</div>
+              <div className="text-xs text-muted-foreground">Назначений по этапам</div>
+              <div className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-foreground">{profile._count.stageAssignments}</div>
             </div>
           </div>
         </div>
 
         <div className="card">
           <div className="flex items-center gap-2">
-            <Building2 className="h-4 w-4 text-brand-600" />
-            <h3 className="text-sm font-semibold text-slate-800">Назначенные продукты</h3>
+            <Building2 className="h-4 w-4 text-primary" />
+            <h3 className="text-sm font-semibold text-foreground">Назначенные продукты</h3>
           </div>
 
           <div className="mt-4 space-y-2">
@@ -528,19 +528,19 @@ export function UserProfileClient({ profile: initialProfile, viewer, permissions
                 <Link
                   key={assignedProduct.id}
                   href={`/products/${assignedProduct.id}`}
-                  className="flex items-center justify-between rounded-[24px] bg-slate-50 px-4 py-3 transition hover:bg-slate-100"
+                  className="flex items-center justify-between rounded-[24px] bg-muted/75 px-4 py-3 transition hover:bg-accent"
                 >
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-medium text-slate-800">{assignedProduct.name}</div>
-                    <div className="mt-0.5 text-xs text-slate-400">{formatDate(assignedProduct.finalDate)}</div>
+                    <div className="truncate text-sm font-medium text-foreground">{assignedProduct.name}</div>
+                    <div className="mt-0.5 text-xs text-muted-foreground">{formatDate(assignedProduct.finalDate)}</div>
                   </div>
-                  <span className="badge bg-slate-100 text-slate-600 text-[11px]">
+                  <span className="badge bg-muted text-[11px] text-muted-foreground">
                     {assignedProduct.status}
                   </span>
                 </Link>
               ))
             ) : (
-              <div className="rounded-[24px] bg-slate-50 px-4 py-5 text-sm text-slate-400">
+              <div className="rounded-[24px] bg-muted/75 px-4 py-5 text-sm text-muted-foreground">
                 Для этого сотрудника пока не назначено продуктов.
               </div>
             )}

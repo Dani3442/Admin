@@ -398,19 +398,19 @@ export function NewProductForm({
       <input type="hidden" name="templateStagesOverride" value={serializedTemplateStageOverrides} />
       <div className="card p-6 space-y-5">
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">
+          <div className="rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-red-700 dark:text-red-300">
             {error}
           </div>
         )}
 
-        <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+        <div className="space-y-4 rounded-xl border border-border/70 bg-muted/55 p-4">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <div className="flex items-center gap-2 text-slate-900 font-semibold">
-                <Layers3 className="w-4 h-4 text-brand-600" />
+              <div className="flex items-center gap-2 font-semibold text-foreground">
+                <Layers3 className="h-4 w-4 text-primary" />
                 Шаблон этапов
               </div>
-              <p className="text-sm text-slate-500 mt-1">
+              <p className="mt-1 text-sm text-muted-foreground">
                 Выбери готовый шаблон, чтобы этапы и даты подтянулись сразу при создании продукта.
               </p>
             </div>
@@ -428,7 +428,7 @@ export function NewProductForm({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Использовать шаблон</label>
+            <label className="mb-1.5 block text-sm font-medium text-foreground">Использовать шаблон</label>
             <select
               value={form.productTemplateId}
               onChange={(e) => update('productTemplateId', e.target.value)}
@@ -441,35 +441,35 @@ export function NewProductForm({
                 </option>
               ))}
             </select>
-            <p className="text-xs text-slate-400 mt-1.5">
+            <p className="mt-1.5 text-xs text-muted-foreground">
               Если шаблон не выбран, продукт создастся со всеми текущими глобальными этапами.
             </p>
           </div>
 
           {selectedTemplate && (
-            <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <div className="rounded-xl border border-border/70 bg-card p-4">
               <div className="flex items-center justify-between gap-3 mb-3">
                 <div>
-                  <div className="text-sm font-semibold text-slate-800">{selectedTemplate.name}</div>
+                  <div className="text-sm font-semibold text-foreground">{selectedTemplate.name}</div>
                   {selectedTemplate.description && (
-                    <div className="text-xs text-slate-500 mt-0.5">{selectedTemplate.description}</div>
+                    <div className="mt-0.5 text-xs text-muted-foreground">{selectedTemplate.description}</div>
                   )}
                 </div>
-                <div className="text-xs text-slate-400">{selectedTemplate.stages.length} этапов</div>
+                <div className="text-xs text-muted-foreground">{selectedTemplate.stages.length} этапов</div>
               </div>
               <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
                 {selectedTemplateStages.map((stage, index) => (
                   <div
                     key={stage.id}
-                    className="grid gap-3 rounded-lg border border-slate-100 px-3 py-3 md:grid-cols-[minmax(0,1fr)_220px_150px_120px]"
+                    className="grid gap-3 rounded-lg border border-border/60 px-3 py-3 md:grid-cols-[minmax(0,1fr)_220px_150px_120px]"
                   >
                     <div className="min-w-0">
-                      <div className="text-sm font-medium text-slate-700">
+                      <div className="text-sm font-medium text-foreground">
                         {index + 1}. {stage.stageName}
                       </div>
                     </div>
                     <div>
-                      <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                      <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                         {index === 0 ? 'Старт этапа' : 'Рассчитанная дата'}
                       </div>
                       {index === 0 ? (
@@ -481,13 +481,13 @@ export function NewProductForm({
                           placeholder="Без даты"
                         />
                       ) : (
-                        <div className="flex h-9 items-center rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-600">
+                        <div className="flex h-9 items-center rounded-lg border border-border/70 bg-muted/75 px-3 text-xs font-medium text-muted-foreground">
                           {formatDate(stage.plannedDate)}
                         </div>
                       )}
                     </div>
                     <div>
-                      <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                      <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                         Количество дней
                       </div>
                       <input
@@ -505,7 +505,7 @@ export function NewProductForm({
                       />
                     </div>
                     <div className="flex items-end">
-                      <span className="flex h-9 w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600">
+                      <span className="flex h-9 w-full items-center justify-between rounded-lg border border-border/70 bg-card px-3 text-xs font-medium text-muted-foreground">
                         <span>Автосдвиг</span>
                         <input
                           type="checkbox"
@@ -515,7 +515,7 @@ export function NewProductForm({
                               participatesInAutoshift: e.target.checked,
                             })
                           }
-                          className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                          className="h-4 w-4 rounded border-border text-primary focus:ring-ring"
                         />
                       </span>
                     </div>
@@ -526,23 +526,23 @@ export function NewProductForm({
           )}
 
           {showTemplateBuilder && (
-            <div className="rounded-xl border border-brand-200 bg-white p-4 space-y-4">
+            <div className="space-y-4 rounded-xl border border-primary/20 bg-card p-4">
               <div>
-                <div className="text-sm font-semibold text-slate-800">Новый шаблон этапов</div>
-                <p className="text-xs text-slate-500 mt-1">
+                <div className="text-sm font-semibold text-foreground">Новый шаблон этапов</div>
+                <p className="mt-1 text-xs text-muted-foreground">
                   Укажи этапы в нужном порядке. Даты можно заполнить сразу, но это необязательно.
                 </p>
               </div>
 
               {templateError && (
-                <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">
+                <div className="rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-red-700 dark:text-red-300">
                   {templateError}
                 </div>
               )}
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  <label className="mb-1.5 block text-sm font-medium text-foreground">
                     Название шаблона <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -554,7 +554,7 @@ export function NewProductForm({
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Описание</label>
+                  <label className="mb-1.5 block text-sm font-medium text-foreground">Описание</label>
                   <input
                     type="text"
                     value={templateDraftDescription}
@@ -567,9 +567,9 @@ export function NewProductForm({
 
               <div className="space-y-3">
                 {templateStages.map((stage, index) => (
-                  <div key={stage.id} className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3 md:grid-cols-[minmax(0,1fr)_220px_140px_180px_44px]">
+                  <div key={stage.id} className="grid gap-3 rounded-xl border border-border/70 bg-muted/55 p-3 md:grid-cols-[minmax(0,1fr)_220px_140px_180px_44px]">
                     <div>
-                      <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1.5">
+                      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                         Этап {index + 1}
                       </label>
                       <input
@@ -582,7 +582,7 @@ export function NewProductForm({
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1.5">
+                      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                         {index === 0 ? 'Дата старта' : 'Рассчитанная дата'}
                       </label>
                       {index === 0 ? (
@@ -594,13 +594,13 @@ export function NewProductForm({
                           placeholder="Необязательно"
                         />
                       ) : (
-                        <div className="flex h-11 items-center rounded-[18px] border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600">
+                        <div className="flex h-11 items-center rounded-[18px] border border-border/70 bg-card px-3 text-sm font-medium text-muted-foreground">
                           {formatDate(stage.plannedDate)}
                         </div>
                       )}
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1.5">
+                      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                         Количество дней
                       </label>
                       <input
@@ -618,8 +618,8 @@ export function NewProductForm({
                       />
                     </div>
                     <label className="flex items-end">
-                      <span className="w-full rounded-[18px] border border-slate-200 bg-white px-3 py-3 text-sm text-slate-600">
-                        <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      <span className="w-full rounded-[18px] border border-border/70 bg-card px-3 py-3 text-sm text-muted-foreground">
+                        <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                           Автосдвиг
                         </span>
                         <span className="flex items-center justify-between gap-3">
@@ -628,7 +628,7 @@ export function NewProductForm({
                             type="checkbox"
                             checked={stage.participatesInAutoshift}
                             onChange={(e) => updateTemplateStage(stage.id, { participatesInAutoshift: e.target.checked })}
-                            className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                            className="h-4 w-4 rounded border-border text-primary focus:ring-ring"
                           />
                         </span>
                       </span>
@@ -637,7 +637,7 @@ export function NewProductForm({
                       <button
                         type="button"
                         onClick={() => removeTemplateStage(stage.id)}
-                        className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-red-100 text-red-500 transition hover:bg-red-50"
+                        className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-red-100 text-red-500 transition hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-500/10"
                         title="Удалить этап"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -652,7 +652,7 @@ export function NewProductForm({
                 Добавить этап
               </button>
 
-              <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
+              <div className="flex items-center justify-between gap-3 border-t border-border/70 pt-4">
                 <button type="button" onClick={resetTemplateBuilder} className="btn-secondary text-sm">
                   Отмена
                 </button>
@@ -672,7 +672,7 @@ export function NewProductForm({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">
+          <label className="mb-1.5 block text-sm font-medium text-foreground">
             Название продукта <span className="text-red-500">*</span>
           </label>
           <input
@@ -688,7 +688,7 @@ export function NewProductForm({
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Страна производства</label>
+            <label className="mb-1.5 block text-sm font-medium text-foreground">Страна производства</label>
             <input
               type="text"
               value={form.country}
@@ -698,7 +698,7 @@ export function NewProductForm({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Категория</label>
+            <label className="mb-1.5 block text-sm font-medium text-foreground">Категория</label>
             <input
               type="text"
               value={form.category}
@@ -711,7 +711,7 @@ export function NewProductForm({
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Артикул (SKU)</label>
+            <label className="mb-1.5 block text-sm font-medium text-foreground">Артикул (SKU)</label>
             <input
               type="text"
               value={form.sku}
@@ -721,7 +721,7 @@ export function NewProductForm({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Приоритет</label>
+            <label className="mb-1.5 block text-sm font-medium text-foreground">Приоритет</label>
             <select
               value={form.priority}
               onChange={(e) => update('priority', e.target.value)}
@@ -737,7 +737,7 @@ export function NewProductForm({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">Ответственный</label>
+          <label className="mb-1.5 block text-sm font-medium text-foreground">Ответственный</label>
           <select
             value={form.responsibleId}
             onChange={(e) => update('responsibleId', e.target.value)}
@@ -753,7 +753,7 @@ export function NewProductForm({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">Заметки</label>
+          <label className="mb-1.5 block text-sm font-medium text-foreground">Заметки</label>
           <textarea
             value={form.notes}
             onChange={(e) => update('notes', e.target.value)}
@@ -768,7 +768,7 @@ export function NewProductForm({
           <button
             type="button"
             onClick={onCancel}
-            className="inline-flex items-center gap-2 rounded-full px-2 py-1.5 text-[15px] font-medium text-brand-700 transition-colors hover:bg-brand-950/8"
+            className="inline-flex items-center gap-2 rounded-full px-2 py-1.5 text-[15px] font-medium text-primary transition-colors hover:bg-accent"
           >
             <ArrowLeft className="w-4 h-4" />
             Назад
@@ -776,7 +776,7 @@ export function NewProductForm({
         ) : (
           <Link
             href={returnTo}
-            className="inline-flex items-center gap-2 rounded-full px-2 py-1.5 text-[15px] font-medium text-brand-700 transition-colors hover:bg-brand-950/8"
+            className="inline-flex items-center gap-2 rounded-full px-2 py-1.5 text-[15px] font-medium text-primary transition-colors hover:bg-accent"
           >
             <ArrowLeft className="w-4 h-4" />
             Назад

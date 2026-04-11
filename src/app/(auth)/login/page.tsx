@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Package, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { ThemeToggle } from '@/components/theme/ThemeToggle'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -54,23 +55,26 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-brand-950 flex items-center justify-center p-4">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4 py-10">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_hsl(var(--primary)/0.18),_transparent_34%),radial-gradient(circle_at_85%_12%,_hsl(var(--chart-5)/0.18),_transparent_28%)]" />
+      <div className="absolute right-5 top-5 z-10">
+        <ThemeToggle compact />
+      </div>
       <div className="w-full max-w-md animate-slide-up">
-        {/* Logo */}
-        <div className="flex items-center gap-3 mb-8 justify-center">
-          <div className="w-10 h-10 bg-brand-600 rounded-xl flex items-center justify-center shadow-lg">
+        <div className="mb-8 flex items-center justify-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-card">
             <Package className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h1 className="text-white font-semibold text-xl leading-tight">Product Admin</h1>
-            <p className="text-slate-400 text-xs">Система управления продуктами</p>
+            <h1 className="text-balance text-xl font-semibold leading-tight text-foreground">Product Admin</h1>
+            <p className="text-xs text-muted-foreground">Система управления продуктами</p>
           </div>
         </div>
 
-        {/* Card */}
-        <div className="bg-white rounded-2xl shadow-modal p-8">
-          <h2 className="text-slate-900 font-semibold text-xl mb-1">Вход в систему</h2>
-          <p className="text-slate-500 text-sm mb-6">Введите ваши учётные данные</p>
+        <div className="surface-panel relative overflow-hidden rounded-[32px] p-8">
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
+          <h2 className="mb-1 text-xl font-semibold text-foreground">Вход в систему</h2>
+          <p className="mb-6 text-sm text-muted-foreground">Введите ваши учётные данные</p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -100,7 +104,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -108,7 +112,7 @@ export default function LoginPage() {
             </div>
 
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-red-600 text-sm animate-fade-in">
+              <div className="animate-fade-in rounded-[18px] border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-red-600 dark:text-red-300">
                 {error}
               </div>
             )}

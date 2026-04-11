@@ -81,6 +81,8 @@ export function DatePicker({
 
     const rect = element.getBoundingClientRect()
     const panelHeight = panelRef.current?.offsetHeight ?? 340
+    const viewportWidth = window.innerWidth
+    const width = Math.min(Math.max(rect.width, 308), viewportWidth - 24)
     const spaceBelow = window.innerHeight - rect.bottom - 12
     const spaceAbove = rect.top - 12
     const shouldOpenUp = spaceBelow < panelHeight && spaceAbove > spaceBelow
@@ -90,8 +92,8 @@ export function DatePicker({
 
     setPosition({
       top,
-      left: Math.max(12, Math.min(rect.left, window.innerWidth - 316)),
-      width: Math.max(rect.width, 240),
+      left: Math.max(12, Math.min(rect.left, viewportWidth - width - 12)),
+      width,
     })
   }, [])
 
@@ -179,16 +181,16 @@ export function DatePicker({
       ref={panelRef}
       onPointerDown={(event) => event.stopPropagation()}
       className={cn(
-        'fixed z-[180] rounded-xl border border-slate-200 bg-white p-3 shadow-[0_20px_60px_-30px_rgba(15,23,42,0.45)]',
+        'fixed z-[180] rounded-xl border border-border/80 bg-popover p-3 text-popover-foreground shadow-modal',
         panelClassName
       )}
-      style={{ top: position.top, left: position.left, width: Math.max(position.width, 308) }}
+      style={{ top: position.top, left: position.left, width: position.width }}
     >
       <div className="mb-3 flex items-center justify-between gap-2">
         <button
           type="button"
           onClick={() => setViewDate((current) => addMonths(current, -1))}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         >
           <ChevronLeft className="h-4 w-4" />
         </button>
@@ -197,7 +199,7 @@ export function DatePicker({
           <select
             value={viewDate.getMonth()}
             onChange={(event) => setViewDate((current) => setMonth(current, Number(event.target.value)))}
-            className="h-9 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-medium text-slate-700 outline-none transition focus:border-brand-400 focus:bg-white"
+            className="h-9 flex-1 rounded-lg border border-border bg-muted px-3 text-sm font-medium text-foreground outline-none transition focus:border-ring focus:bg-card"
           >
             {MONTH_OPTIONS.map((month) => (
               <option key={month.value} value={month.value}>
@@ -208,7 +210,7 @@ export function DatePicker({
           <select
             value={viewDate.getFullYear()}
             onChange={(event) => setViewDate((current) => setYear(current, Number(event.target.value)))}
-            className="h-9 w-24 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-medium text-slate-700 outline-none transition focus:border-brand-400 focus:bg-white"
+            className="h-9 w-24 rounded-lg border border-border bg-muted px-3 text-sm font-medium text-foreground outline-none transition focus:border-ring focus:bg-card"
           >
             {yearOptions.map((year) => (
               <option key={year} value={year}>
@@ -221,7 +223,7 @@ export function DatePicker({
         <button
           type="button"
           onClick={() => setViewDate((current) => addMonths(current, 1))}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         >
           <ChevronRight className="h-4 w-4" />
         </button>
@@ -229,7 +231,7 @@ export function DatePicker({
 
       <div className="mb-1 grid grid-cols-7 gap-1">
         {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((weekday) => (
-          <div key={weekday} className="py-1.5 text-center text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+          <div key={weekday} className="py-1.5 text-center text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             {weekday}
           </div>
         ))}
@@ -250,9 +252,9 @@ export function DatePicker({
               className={cn(
                 'h-9 rounded-lg text-sm font-semibold transition-colors',
                 isSelected && 'bg-brand-600 text-white shadow-sm',
-                !isSelected && isToday && 'border border-brand-200 bg-brand-50 text-brand-700',
-                !isSelected && isCurrentMonth && 'text-slate-700 hover:bg-brand-50 hover:text-brand-700',
-                !isCurrentMonth && 'text-slate-300 hover:bg-slate-50'
+                !isSelected && isToday && 'border border-brand-200 bg-brand-50 text-brand-700 dark:text-blue-300',
+                !isSelected && isCurrentMonth && 'text-foreground hover:bg-brand-50 hover:text-brand-700 dark:hover:text-blue-300',
+                !isCurrentMonth && 'text-muted-foreground hover:bg-accent'
               )}
             >
               {format(day, 'd')}
@@ -261,11 +263,11 @@ export function DatePicker({
         })}
       </div>
 
-      <div className="mt-3 flex items-center justify-between gap-2 border-t border-slate-100 pt-3">
+      <div className="mt-3 flex items-center justify-between gap-2 border-t border-border/80 pt-3">
         <button
           type="button"
           onClick={() => applyDate(new Date(), true)}
-          className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
+          className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-medium text-muted-foreground transition hover:bg-accent hover:text-foreground"
         >
           <CalendarDays className="h-3.5 w-3.5" />
           Сегодня
@@ -273,7 +275,7 @@ export function DatePicker({
         <button
           type="button"
           onClick={() => applyDate(null, true)}
-          className="inline-flex items-center gap-2 rounded-lg border border-red-100 px-3 py-2 text-xs font-medium text-red-600 transition hover:bg-red-50"
+          className="inline-flex items-center gap-2 rounded-lg border border-red-100 px-3 py-2 text-xs font-medium text-red-600 transition hover:bg-red-50 dark:text-red-300"
         >
           <X className="h-3.5 w-3.5" />
           Очистить
@@ -320,7 +322,7 @@ export function DatePicker({
               }
             }}
             className={cn(
-              'h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100',
+              'h-10 w-full rounded-lg border border-border bg-input px-3 text-sm font-medium text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/20',
               inputClassName
             )}
           />
@@ -328,7 +330,7 @@ export function DatePicker({
             <button
               type="button"
               onClick={() => (isOpen ? commitInput() : openCalendar())}
-              className="inline-flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700"
+              className="inline-flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground transition hover:bg-accent hover:text-foreground"
             >
               <CalendarDays className="h-4 w-4" />
             </button>

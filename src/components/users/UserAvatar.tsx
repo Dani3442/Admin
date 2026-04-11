@@ -29,7 +29,7 @@ export function UserAvatar({ user, size = 'md', className }: UserAvatarProps) {
 
   if (user.avatar && !hasImageError) {
     return (
-      <div className={cn('overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200', sizeClasses[size], className)}>
+      <div className={cn('overflow-hidden rounded-full bg-muted ring-1 ring-border', sizeClasses[size], className)}>
         <img
           src={user.avatar}
           alt="Аватар пользователя"
@@ -43,7 +43,7 @@ export function UserAvatar({ user, size = 'md', className }: UserAvatarProps) {
   return (
     <div
       className={cn(
-        'flex items-center justify-center rounded-full bg-brand-600 font-semibold uppercase text-white ring-1 ring-brand-500/20',
+        'flex items-center justify-center rounded-full bg-primary font-semibold uppercase text-primary-foreground ring-1 ring-primary/20',
         sizeClasses[size],
         className
       )}

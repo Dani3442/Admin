@@ -87,8 +87,8 @@ export default async function NewProductPage({
     <div className="mx-auto max-w-5xl">
       <div className="surface-panel p-6 sm:p-8">
         <div className="mb-6">
-          <h1 className="text-[32px] font-semibold tracking-[-0.03em] text-slate-950">Новый продукт</h1>
-          <p className="mt-2 text-sm text-slate-500">Создай продукт и сразу задай шаблон этапов, ответственного и базовые параметры.</p>
+          <h1 className="text-[32px] font-semibold tracking-[-0.03em] text-foreground">Новый продукт</h1>
+          <p className="mt-2 text-sm text-muted-foreground">Создай продукт и сразу задай шаблон этапов, ответственного и базовые параметры.</p>
         </div>
 
         <NewProductForm

@@ -102,7 +102,7 @@ function LayoutSwitcher({
   onChange: (nextLayout: ProductsLayoutMode) => void
 }) {
   return (
-    <div className="inline-flex items-center gap-1 rounded-full bg-slate-100/90 p-1.5">
+    <div className="inline-flex w-full flex-wrap items-center gap-1 rounded-[24px] border border-border/70 bg-muted/85 p-1.5 sm:w-auto sm:flex-nowrap sm:rounded-full">
       {layoutOptions.map((option) => {
         const Icon = option.icon
         const active = layout === option.value
@@ -113,14 +113,14 @@ function LayoutSwitcher({
             type="button"
             onClick={() => onChange(option.value)}
             className={cn(
-              'relative inline-flex min-w-[128px] items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium transition-colors',
-              active ? 'text-white' : 'text-slate-600 hover:text-slate-900'
+              'relative inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-[18px] px-4 py-2.5 text-sm font-medium transition-colors sm:min-w-[128px] sm:flex-none sm:rounded-full',
+              active ? 'text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
             )}
           >
             {active && (
               <motion.span
                 layoutId="products-layout-pill"
-                className="absolute inset-0 rounded-full bg-brand-950 shadow-[0_14px_28px_-18px_rgba(23,37,84,0.62)]"
+                className="absolute inset-0 rounded-full bg-primary shadow-card"
                 transition={{ type: 'spring', stiffness: 420, damping: 38, mass: 0.9 }}
               />
             )}
@@ -246,8 +246,8 @@ export function ProductsWorkspace({
 
   return (
     <div className="page-section">
-      <div className="surface-panel space-y-5 p-5">
-        <div className="flex items-start justify-between gap-4">
+      <div className="surface-panel space-y-5 p-4 sm:p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
           <div>
             <h1 className="page-heading">{archiveMode ? 'Архив продуктов' : 'Продукты'}</h1>
             <p className="subtle-copy mt-1">
@@ -259,9 +259,9 @@ export function ProductsWorkspace({
         </div>
 
         <div className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative min-w-[260px] flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+            <div className="relative min-w-0 flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
@@ -275,7 +275,7 @@ export function ProductsWorkspace({
               onChange={(nextValue) => setSortField(nextValue as ProductListSortField)}
               options={SORT_OPTIONS}
               placeholder="Сортировка"
-              className="w-[210px]"
+              className="w-full sm:w-[210px]"
             />
 
             {sortField !== 'manual' && (
@@ -284,27 +284,27 @@ export function ProductsWorkspace({
                 onChange={(nextValue) => setSortDirection(nextValue as ProductListSortDirection)}
                 options={SORT_DIRECTION_OPTIONS}
                 placeholder="Направление"
-                className="w-[170px]"
+                className="w-full sm:w-[170px]"
               />
             )}
 
             <button
               onClick={() => setShowAdvancedFilters((current) => !current)}
-              className={cn('btn-secondary', showAdvancedFilters && 'bg-brand-950 text-white border-brand-950 hover:bg-brand-900 hover:text-white')}
+              className={cn('btn-secondary w-full justify-center sm:w-auto', showAdvancedFilters && 'border-primary bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground')}
             >
               <Filter className="h-4 w-4" />
               Фильтры
             </button>
 
             {hasActiveFilters && (
-              <button onClick={resetFilters} className="btn-secondary">
+              <button onClick={resetFilters} className="btn-secondary w-full justify-center sm:w-auto">
                 <X className="h-4 w-4" />
                 Сбросить
               </button>
             )}
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
             {QUICK_VIEW_OPTIONS.map((option) => {
               const active = quickView === option.value
 
@@ -313,14 +313,14 @@ export function ProductsWorkspace({
                   key={option.value}
                   onClick={() => setQuickView(option.value)}
                   className={cn(
-                    'relative rounded-full px-3.5 py-2 text-sm font-medium transition-colors',
-                    active ? 'text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-800'
+                    'relative flex-shrink-0 rounded-full px-3.5 py-2 text-sm font-medium transition-colors',
+                    active ? 'text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground'
                   )}
                 >
                   {active && (
                     <motion.span
                       layoutId="products-quick-view-pill"
-                      className="absolute inset-0 rounded-full bg-brand-950"
+                      className="absolute inset-0 rounded-full bg-primary"
                       transition={{ type: 'spring', stiffness: 390, damping: 34 }}
                     />
                   )}
@@ -373,12 +373,12 @@ export function ProductsWorkspace({
                     />
                   </label>
 
-                  <label className="inline-flex items-center gap-2 pt-1 text-sm text-slate-600">
+                  <label className="inline-flex items-center gap-2 pt-1 text-sm text-muted-foreground">
                     <input
                       type="checkbox"
                       checked={onlyWithOverlaps}
                       onChange={(event) => setOnlyWithOverlaps(event.target.checked)}
-                      className="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                      className="rounded border-border bg-input text-primary focus:ring-ring"
                     />
                     Только с пересечениями дат
                   </label>
@@ -387,10 +387,10 @@ export function ProductsWorkspace({
             )}
           </AnimatePresence>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-            <div>{layoutSwitcher}</div>
+          <div className="flex flex-col gap-3 pt-1 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+            <div className="w-full sm:w-auto">{layoutSwitcher}</div>
             {!archiveMode && (
-              <Link href={createProductHref} scroll={false} className="btn-primary self-start">
+              <Link href={createProductHref} scroll={false} className="btn-primary w-full justify-center self-start sm:w-auto">
                 <Plus className="h-4 w-4" /> Новый продукт
               </Link>
             )}

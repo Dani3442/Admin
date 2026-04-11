@@ -26,15 +26,15 @@ export function DashboardMetricsCards({ metrics }: MetricsCardsProps) {
       label: 'Всего продуктов',
       value: metrics.total,
       icon: Package,
-      color: 'text-slate-600',
-      bg: 'bg-slate-50',
+      color: 'text-muted-foreground',
+      bg: 'bg-muted',
       href: '/products',
     },
     {
       label: 'В работе',
       value: metrics.inProgress,
       icon: Clock,
-      color: 'text-blue-600',
+      color: 'text-blue-600 dark:text-blue-300',
       bg: 'bg-blue-50',
       href: '/products?status=IN_PROGRESS',
     },
@@ -42,7 +42,7 @@ export function DashboardMetricsCards({ metrics }: MetricsCardsProps) {
       label: 'Завершено',
       value: metrics.completed,
       icon: CheckCircle2,
-      color: 'text-emerald-600',
+      color: 'text-emerald-600 dark:text-emerald-300',
       bg: 'bg-emerald-50',
       sub: `${metrics.completionRate}% выполнено`,
       href: '/products?status=COMPLETED',
@@ -51,7 +51,7 @@ export function DashboardMetricsCards({ metrics }: MetricsCardsProps) {
       label: 'Под риском',
       value: metrics.atRisk,
       icon: AlertTriangle,
-      color: 'text-amber-600',
+      color: 'text-amber-600 dark:text-amber-300',
       bg: 'bg-amber-50',
       href: '/products?view=atRisk',
     },
@@ -59,7 +59,7 @@ export function DashboardMetricsCards({ metrics }: MetricsCardsProps) {
       label: 'Просрочено',
       value: metrics.delayed,
       icon: XCircle,
-      color: 'text-red-600',
+      color: 'text-red-600 dark:text-red-300',
       bg: 'bg-red-50',
       href: '/products?status=DELAYED',
     },
@@ -67,8 +67,8 @@ export function DashboardMetricsCards({ metrics }: MetricsCardsProps) {
       label: 'Отклонение',
       value: `${metrics.avgDaysDeviation}д`,
       icon: TrendingUp,
-      color: metrics.avgDaysDeviation > 5 ? 'text-red-600' : 'text-slate-600',
-      bg: metrics.avgDaysDeviation > 5 ? 'bg-red-50' : 'bg-slate-50',
+      color: metrics.avgDaysDeviation > 5 ? 'text-red-600 dark:text-red-300' : 'text-muted-foreground',
+      bg: metrics.avgDaysDeviation > 5 ? 'bg-red-50' : 'bg-muted',
       sub: 'Среднее по датам',
       href: '/products?sort=riskScore&dir=desc',
     },
@@ -76,8 +76,8 @@ export function DashboardMetricsCards({ metrics }: MetricsCardsProps) {
       label: 'Срок через 7 дней',
       value: metrics.dueSoon7,
       icon: CalendarClock,
-      color: metrics.dueSoon7 > 0 ? 'text-orange-600' : 'text-slate-500',
-      bg: metrics.dueSoon7 > 0 ? 'bg-orange-50' : 'bg-slate-50',
+      color: metrics.dueSoon7 > 0 ? 'text-orange-600 dark:text-amber-300' : 'text-muted-foreground',
+      bg: metrics.dueSoon7 > 0 ? 'bg-orange-50' : 'bg-muted',
       sub: `${metrics.dueSoon30} за 30 дней`,
       href: '/products?sort=finalDate&dir=asc',
     },
@@ -97,8 +97,8 @@ export function DashboardMetricsCards({ metrics }: MetricsCardsProps) {
               <Icon className={cn('h-4 w-4', card.color)} />
             </div>
             <div className={cn('text-[26px] font-semibold tracking-[-0.03em]', card.color)}>{card.value}</div>
-            <div className="mt-1 text-xs font-medium uppercase tracking-[0.06em] text-slate-500">{card.label}</div>
-            {card.sub && <div className="mt-1 text-xs text-slate-400">{card.sub}</div>}
+            <div className="mt-1 text-xs font-medium uppercase tracking-[0.06em] text-muted-foreground">{card.label}</div>
+            {card.sub && <div className="mt-1 text-xs text-muted-foreground">{card.sub}</div>}
           </Link>
         )
       })}

@@ -52,8 +52,8 @@ export function InfoPopover({
         title={label}
         onClick={() => setOpen((current) => !current)}
         className={cn(
-          'inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 shadow-sm transition',
-          'hover:border-slate-300 hover:text-slate-600 hover:bg-slate-50'
+          'inline-flex h-8 w-8 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-sm transition',
+          'hover:border-border hover:bg-accent hover:text-foreground'
         )}
       >
         <Info className="h-4 w-4" />
@@ -67,12 +67,12 @@ export function InfoPopover({
             exit={{ opacity: 0, y: 4, scale: 0.98 }}
             transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
             className={cn(
-              'absolute top-10 z-40 w-[320px] rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl',
+              'absolute top-10 z-40 w-[320px] rounded-2xl border border-border/80 bg-popover p-4 text-popover-foreground shadow-modal',
               align === 'right' ? 'right-0' : 'left-0'
             )}
           >
-            {title && <div className="mb-2 text-sm font-semibold text-slate-800">{title}</div>}
-            <div className="space-y-2 text-sm text-slate-600">{children}</div>
+            {title && <div className="mb-2 text-sm font-semibold text-foreground">{title}</div>}
+            <div className="space-y-2 text-sm text-muted-foreground">{children}</div>
           </motion.div>
         )}
       </AnimatePresence>

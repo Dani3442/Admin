@@ -69,13 +69,13 @@ export function TimelineClient({ products }: { products: Product[] }) {
     <div className="space-y-4 animate-fade-in">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold text-slate-900">Timeline</h1>
+          <h1 className="text-2xl font-bold text-foreground">Timeline</h1>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setViewStart(d => addDays(d, -30))} className="btn-secondary p-2">
             <ChevronLeft className="w-4 h-4" />
           </button>
-          <span className="text-sm text-slate-600 font-medium min-w-36 text-center">
+          <span className="min-w-36 text-center text-sm font-medium text-muted-foreground">
             {format(viewStart, 'MMM yyyy', { locale: ru })} – {format(viewEnd, 'MMM yyyy', { locale: ru })}
           </span>
           <button onClick={() => setViewStart(d => addDays(d, 30))} className="btn-secondary p-2">
@@ -94,7 +94,7 @@ export function TimelineClient({ products }: { products: Product[] }) {
         placeholder="Фильтр по продукту..."
       />
 
-      <div className="bg-white rounded-xl border border-slate-100 shadow-card overflow-hidden">
+      <div className="overflow-hidden rounded-xl border border-border/80 bg-card shadow-card">
         <div className="overflow-x-auto">
           <div style={{ minWidth: `${200 + totalWidth}px` }}>
             {/* Header: Months */}
@@ -146,14 +146,14 @@ export function TimelineClient({ products }: { products: Product[] }) {
               <div key={product.id} className="flex border-b border-slate-50 hover:bg-slate-50/60 group" style={{ height: 52 }}>
                 {/* Name */}
                 <div className="w-48 flex-shrink-0 px-3 py-2 border-r border-slate-100 flex flex-col justify-center">
-                  <Link href={buildProductHref(product.id, currentRoute)} className="text-xs font-medium text-slate-700 hover:text-brand-700 truncate">
+                  <Link href={buildProductHref(product.id, currentRoute)} className="truncate text-xs font-medium text-foreground hover:text-brand-700 dark:hover:text-blue-300">
                     {product.name.length > 28 ? product.name.slice(0, 28) + '…' : product.name}
                   </Link>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <div className="progress-bar flex-1">
                       <div className="progress-fill bg-brand-400" style={{ width: `${product.progressPercent}%` }} />
                     </div>
-                    <span className="text-[9px] text-slate-400">{product.progressPercent}%</span>
+                    <span className="text-[9px] text-muted-foreground">{product.progressPercent}%</span>
                     {product.riskScore >= 40 && <AlertTriangle className="w-2.5 h-2.5 text-amber-500" />}
                     {productOverlaps.length > 0 && (
                       <span className="text-[9px] text-orange-600 font-medium" title={productOverlaps.map((overlap) => formatStageOverlap(overlap)).join(', ')}>

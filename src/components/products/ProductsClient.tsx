@@ -618,7 +618,7 @@ export function ProductsClient({
   return (
     <div className="space-y-6 animate-fade-in">
       {!embedded && (
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
           <div>
             <h1 className="page-heading">Продукты</h1>
             <p className="subtle-copy mt-1">
@@ -626,7 +626,7 @@ export function ProductsClient({
             </p>
           </div>
           {!archiveMode && (
-            <Link href={createProductHref} className="btn-primary">
+            <Link href={createProductHref} className="btn-primary w-full justify-center sm:w-auto">
               <Plus className="w-4 h-4" /> Новый продукт
             </Link>
           )}
@@ -634,11 +634,11 @@ export function ProductsClient({
       )}
 
       {!controlsHidden && (
-      <div className="surface-panel space-y-5 p-5">
+      <div className="surface-panel space-y-5 p-4 sm:p-5">
         <div className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative min-w-[260px] flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+            <div className="relative min-w-0 flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
@@ -652,7 +652,7 @@ export function ProductsClient({
               onChange={(nextValue) => setSortField(nextValue as ProductListSortField)}
               options={SORT_OPTIONS}
               placeholder="Сортировка"
-              className="w-[210px]"
+              className="w-full sm:w-[210px]"
             />
 
             {sortField !== 'manual' && (
@@ -661,36 +661,36 @@ export function ProductsClient({
                 onChange={(nextValue) => setSortDirection(nextValue as ProductListSortDirection)}
                 options={SORT_DIRECTION_OPTIONS}
                 placeholder="Направление"
-                className="w-[170px]"
+                className="w-full sm:w-[170px]"
               />
             )}
 
             <button
               onClick={() => setShowAdvancedFilters((current) => !current)}
-              className={cn('btn-secondary', showAdvancedFilters && 'bg-brand-950 text-white border-brand-950 hover:bg-brand-900 hover:text-white')}
+              className={cn('btn-secondary w-full justify-center sm:w-auto', showAdvancedFilters && 'border-primary bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground')}
             >
               <Filter className="w-4 h-4" />
               Фильтры
             </button>
 
             {(hasActiveFilters || sortField !== 'manual') && (
-              <button onClick={resetFilters} className="btn-secondary">
+              <button onClick={resetFilters} className="btn-secondary w-full justify-center sm:w-auto">
                 <X className="w-4 h-4" />
                 Сбросить
               </button>
             )}
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
             {QUICK_VIEW_OPTIONS.map((option) => (
               <button
                 key={option.value}
                 onClick={() => setQuickView(option.value)}
                 className={cn(
-                  'rounded-full px-3.5 py-2 text-sm font-medium transition-colors',
+                  'flex-shrink-0 rounded-full px-3.5 py-2 text-sm font-medium transition-colors',
                   quickView === option.value
-                    ? 'bg-brand-950 text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-800'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground'
                 )}
               >
                 {option.label}
@@ -751,12 +751,12 @@ export function ProductsClient({
                     />
                   </label>
 
-                  <label className="inline-flex items-center gap-2 pt-1 text-sm text-slate-600">
+                  <label className="inline-flex items-center gap-2 pt-1 text-sm text-muted-foreground">
                     <input
                       type="checkbox"
                       checked={onlyWithOverlaps}
                       onChange={(event) => setOnlyWithOverlaps(event.target.checked)}
-                      className="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                      className="rounded border-border text-primary focus:ring-ring"
                     />
                     Только с пересечениями дат
                   </label>
@@ -765,21 +765,21 @@ export function ProductsClient({
             )}
           </AnimatePresence>
 
-          {layoutSwitcher && <div className="pt-1">{layoutSwitcher}</div>}
+          {layoutSwitcher && <div className="w-full pt-1 sm:w-auto">{layoutSwitcher}</div>}
 
           {archiveMode && (
-            <div className="flex flex-wrap items-center gap-3 border-t border-slate-100 pt-3">
+            <div className="flex flex-col gap-3 border-t border-border/70 pt-3 sm:flex-row sm:flex-wrap sm:items-center">
               <button
                 type="button"
                 onClick={() => setSelectionMode(true)}
-                className="btn-secondary"
+                className="btn-secondary w-full justify-center sm:w-auto"
               >
                 Выбрать
               </button>
               <button
                 type="button"
                 onClick={handleSelectAllVisible}
-                className="btn-secondary"
+                className="btn-secondary w-full justify-center sm:w-auto"
                 disabled={!visibleProducts.length}
               >
                 Выбрать все
@@ -787,13 +787,13 @@ export function ProductsClient({
 
               {(selectionMode || selectedProductIds.length > 0) && (
                 <>
-                  <div className="text-sm text-slate-500">
-                    Выбрано: <span className="font-medium text-slate-700">{selectedProductIds.length}</span>
+                  <div className="text-sm text-muted-foreground">
+                    Выбрано: <span className="font-medium text-foreground">{selectedProductIds.length}</span>
                   </div>
                   <button
                     type="button"
                     onClick={() => setBulkAction('restore')}
-                    className="btn-secondary"
+                    className="btn-secondary w-full justify-center sm:w-auto"
                     disabled={!selectedProductIds.length || bulkActionPending}
                   >
                     <RotateCcw className="h-4 w-4" />
@@ -802,7 +802,7 @@ export function ProductsClient({
                   <button
                     type="button"
                     onClick={() => setBulkAction('deleteArchived')}
-                    className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-100 dark:text-red-300 dark:hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                     disabled={!selectedProductIds.length || bulkActionPending}
                   >
                     <Trash2 className="h-4 w-4" />
@@ -811,7 +811,7 @@ export function ProductsClient({
                   <button
                     type="button"
                     onClick={handleClearSelection}
-                    className="btn-secondary"
+                    className="btn-secondary w-full justify-center sm:w-auto"
                     disabled={bulkActionPending}
                   >
                     Снять выбор
@@ -824,11 +824,192 @@ export function ProductsClient({
       </div>
       )}
 
-      <div className="surface-panel overflow-hidden">
+      <div className="space-y-4 lg:hidden">
+        {visibleProducts.map((product, index) => {
+          const isOverdue = Boolean(product.finalDate && new Date(product.finalDate) < now && product.status !== 'COMPLETED')
+          const { overlaps } = detectStageOverlaps(product.stages)
+          const selected = selectedProductIds.includes(product.id)
+
+          return (
+            <article
+              key={product.id}
+              className="surface-panel space-y-4 p-4"
+              onClick={() => handleOpenProduct(product.id)}
+            >
+              <div className="flex items-start gap-3">
+                {archiveMode && selectionMode && (
+                  <div className="pt-1" onClick={(event) => event.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selected}
+                      onChange={() => toggleSelectedProduct(product.id)}
+                      className="h-5 w-5 rounded border-border text-primary focus:ring-ring"
+                      aria-label={`Выбрать продукт ${product.name}`}
+                    />
+                  </div>
+                )}
+
+                <div className="min-w-0 flex-1">
+                  <div className="mb-2 flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-medium text-muted-foreground">#{index + 1}</span>
+                    <span className={cn('badge text-xs', getStatusColor(product.status))}>{getStatusLabel(product.status)}</span>
+                    <span className={cn('badge border text-xs', getPriorityColor(product.priority))}>{getPriorityLabel(product.priority)}</span>
+                    {product.country && <span className="badge bg-muted text-xs text-muted-foreground">{product.country}</span>}
+                  </div>
+
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h2 className="text-base font-semibold leading-6 text-foreground">{product.name}</h2>
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        <span>{product._count.stages} этапов</span>
+                        <span>•</span>
+                        <span>{product._count.comments} комм.</span>
+                        {product.responsible?.name && (
+                          <>
+                            <span>•</span>
+                            <span>{product.responsible.name}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 text-muted-foreground">
+                      <Pin className={cn('h-3.5 w-3.5', product.isPinned ? 'fill-muted text-foreground' : 'text-muted-foreground/60')} />
+                      <Star className={cn('h-3.5 w-3.5', product.isFavorite ? 'fill-amber-200 text-amber-600 dark:fill-amber-500/20 dark:text-amber-300' : 'text-muted-foreground/60')} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-3 rounded-[24px] bg-muted/45 p-3 sm:grid-cols-2">
+                <div>
+                  <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">Прогресс</p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <div className="progress-bar flex-1">
+                      <div
+                        className={cn(
+                          'progress-fill',
+                          product.progressPercent < 30 ? 'bg-red-400' : product.progressPercent < 70 ? 'bg-amber-400' : 'bg-emerald-500'
+                        )}
+                        style={{ width: `${product.progressPercent}%` }}
+                      />
+                    </div>
+                    <span className="text-sm font-medium text-foreground">{product.progressPercent}%</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-1">
+                  <div>
+                    <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">Финальная дата</p>
+                    <p className={cn('mt-1 text-sm font-medium', isOverdue ? 'text-red-600 dark:text-red-300' : 'text-foreground')}>
+                      {formatDate(product.finalDate)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">Риск</p>
+                    <p className="mt-1 text-sm font-medium text-foreground">{product.riskScore}/100</p>
+                  </div>
+                </div>
+              </div>
+
+              {overlaps.length > 0 && (
+                <div
+                  className="rounded-[20px] border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300"
+                  title={overlaps.map((overlap) => formatStageOverlap(overlap)).join(', ')}
+                >
+                  Обнаружено пересечений: {overlaps.length}
+                </div>
+              )}
+
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    handleOpenProduct(product.id)
+                  }}
+                  className="btn-primary w-full justify-center sm:w-auto"
+                >
+                  Открыть
+                </button>
+
+                {canManageProducts && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        handleToggleProductFlag(product, 'isPinned', !product.isPinned)
+                      }}
+                      className="btn-secondary w-full justify-center sm:w-auto"
+                      disabled={savingProductId === product.id}
+                    >
+                      {product.isPinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
+                      {product.isPinned ? 'Открепить' : 'Закрепить'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        handleToggleProductFlag(product, 'isFavorite', !product.isFavorite)
+                      }}
+                      className="btn-secondary w-full justify-center sm:w-auto"
+                      disabled={savingProductId === product.id}
+                    >
+                      <Star className="h-4 w-4" />
+                      {product.isFavorite ? 'Убрать из избранного' : 'В избранное'}
+                    </button>
+                  </>
+                )}
+
+                {canArchiveProducts && (
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      setPendingArchiveProduct({ id: product.id, name: product.name })
+                    }}
+                    className="btn-secondary w-full justify-center sm:w-auto"
+                    disabled={archivingProductId === product.id}
+                  >
+                    <Archive className="h-4 w-4" />
+                    Архивировать
+                  </button>
+                )}
+
+                {archiveMode && canDeleteProducts && (
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      setBulkAction(null)
+                      handleDeleteProduct(product.id, product.name)
+                    }}
+                    className="btn-danger w-full justify-center sm:w-auto"
+                    disabled={deletingProductId === product.id}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Удалить
+                  </button>
+                )}
+              </div>
+            </article>
+          )
+        })}
+
+        {visibleProducts.length === 0 && (
+          <div className="surface-panel py-14 text-center text-muted-foreground">
+            <Search className="mx-auto mb-3 h-8 w-8 opacity-40" />
+            <p className="text-sm">По текущим фильтрам продукты не найдены</p>
+          </div>
+        )}
+      </div>
+
+      <div className="surface-panel hidden overflow-hidden lg:block">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-slate-100">
+              <tr className="border-b border-border/70">
                 {archiveMode && selectionMode && (
                   <th className="table-header w-10 text-center">
                     <input
@@ -841,7 +1022,7 @@ export function ProductsClient({
                           setSelectedProductIds([])
                         }
                       }}
-                      className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                      className="h-4 w-4 rounded border-border text-primary focus:ring-ring"
                       aria-label="Выбрать все архивные продукты"
                     />
                   </th>
@@ -858,7 +1039,7 @@ export function ProductsClient({
                 <th className="table-header w-20">Риск</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-border/60">
               {visibleProducts.map((product, index) => {
                 const isOverdue = Boolean(product.finalDate && new Date(product.finalDate) < now && product.status !== 'COMPLETED')
                 const { overlaps } = detectStageOverlaps(product.stages)
@@ -878,10 +1059,10 @@ export function ProductsClient({
                     onClick={() => handleOpenProduct(product.id)}
                     onContextMenu={(event) => handleProductRowContextMenu(event, product.id)}
                     className={cn(
-                      'relative cursor-pointer transition-all duration-150 hover:bg-slate-50/70',
-                      isDragging && 'bg-white shadow-[0_22px_44px_-30px_rgba(15,23,42,0.45)]',
-                      showDropBefore && 'border-t-2 border-slate-300',
-                      showDropAfter && 'border-b-2 border-slate-300'
+                      'relative cursor-pointer transition-all duration-150 hover:bg-accent/35',
+                      isDragging && 'bg-card shadow-card-hover',
+                      showDropBefore && 'border-t-2 border-border',
+                      showDropAfter && 'border-b-2 border-border'
                     )}
                     style={isDragging && dragOffset ? {
                       transform: `translate3d(${dragOffset.x}px, ${dragOffset.y}px, 0)`,
@@ -890,24 +1071,24 @@ export function ProductsClient({
                   >
                     {archiveMode && selectionMode && (
                       <td
-                        className={cn('table-cell w-10 text-center', isDragging && 'bg-white')}
+                        className={cn('table-cell w-10 text-center', isDragging && 'bg-card')}
                         onClick={(event) => event.stopPropagation()}
                       >
                         <input
                           type="checkbox"
                           checked={selectedProductIds.includes(product.id)}
                           onChange={() => toggleSelectedProduct(product.id)}
-                          className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                          className="h-4 w-4 rounded border-border text-primary focus:ring-ring"
                           aria-label={`Выбрать продукт ${product.name}`}
                         />
                       </td>
                     )}
-                    <td className={cn('table-cell text-center text-slate-400 text-xs', isDragging && 'bg-white')}>
+                    <td className={cn('table-cell text-center text-xs text-muted-foreground', isDragging && 'bg-card')}>
                       <div className="flex items-center justify-center">
                         <span>{index + 1}</span>
                       </div>
                     </td>
-                    <td className={cn('table-cell text-center relative', isDragging && 'bg-white')} onClick={(event) => event.stopPropagation()}>
+                    <td className={cn('table-cell relative text-center', isDragging && 'bg-card')} onClick={(event) => event.stopPropagation()}>
                       <button
                         type="button"
                         onPointerDown={(event) => handlePointerDragStart(event, product.id)}
@@ -915,34 +1096,34 @@ export function ProductsClient({
                         className={cn(
                           'inline-flex h-8 w-8 items-center justify-center rounded-lg border transition-all duration-150',
                           canReorder
-                            ? 'border-slate-200 text-slate-400 hover:border-slate-300 hover:text-slate-600 cursor-grab active:cursor-grabbing'
-                            : 'border-slate-100 text-slate-300 cursor-not-allowed',
-                          isDragging && 'border-slate-300 bg-white text-slate-700 shadow-sm'
+                            ? 'cursor-grab border-border text-muted-foreground hover:border-foreground/20 hover:text-foreground active:cursor-grabbing'
+                            : 'cursor-not-allowed border-border/40 text-muted-foreground/50',
+                          isDragging && 'border-border bg-card text-foreground shadow-sm'
                         )}
                         title={canReorder ? 'Перетащить продукт' : 'Перетаскивание сейчас недоступно'}
                       >
                         <GripVertical className="w-4 h-4" />
                       </button>
                     </td>
-                    <td className={cn('table-cell', isDragging && 'bg-white')}>
+                    <td className={cn('table-cell', isDragging && 'bg-card')}>
                       <div className="flex items-start gap-3">
                           <div className="mt-0.5 flex items-center gap-1">
-                          <Pin className={cn('w-3.5 h-3.5', product.isPinned ? 'text-slate-700 fill-slate-200' : 'text-slate-300')} />
-                          <Star className={cn('w-3.5 h-3.5', product.isFavorite ? 'text-slate-700 fill-slate-200' : 'text-slate-300')} />
+                          <Pin className={cn('h-3.5 w-3.5', product.isPinned ? 'fill-muted text-foreground' : 'text-muted-foreground/60')} />
+                          <Star className={cn('h-3.5 w-3.5', product.isFavorite ? 'fill-amber-200 text-amber-600 dark:fill-amber-500/20 dark:text-amber-300' : 'text-muted-foreground/60')} />
                         </div>
                         <div className="min-w-0">
-                          <div className="text-[19px] font-medium leading-[1.25] tracking-normal text-slate-800 transition-colors">
+                          <div className="text-[19px] font-medium leading-[1.25] tracking-normal text-foreground transition-colors">
                             {product.name.length > 70 ? `${product.name.slice(0, 70)}…` : product.name}
                           </div>
-                          <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[15px] leading-6 text-slate-400">
+                          <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[15px] leading-6 text-muted-foreground">
                             <span>{product._count.stages} этапов</span>
                             <span>•</span>
                             <span>{product._count.comments} комм.</span>
-                            {product.isPinned && <span className="font-medium text-slate-600">• закреплён</span>}
-                            {product.isFavorite && <span className="font-medium text-slate-600">• избранное</span>}
+                            {product.isPinned && <span className="font-medium text-foreground">• закреплён</span>}
+                            {product.isFavorite && <span className="font-medium text-foreground">• избранное</span>}
                             {overlaps.length > 0 && (
                               <span
-                                className="text-orange-600 font-medium"
+                                className="font-medium text-amber-600 dark:text-amber-300"
                                 title={overlaps.map((overlap) => formatStageOverlap(overlap)).join(', ')}
                               >
                                 • ⚠ {overlaps.length} пересеч.
@@ -952,19 +1133,19 @@ export function ProductsClient({
                         </div>
                       </div>
                     </td>
-                    <td className={cn('table-cell', isDragging && 'bg-white')}>
-                      <span className="text-[15px] leading-6 text-slate-500">{product.country || '—'}</span>
+                    <td className={cn('table-cell', isDragging && 'bg-card')}>
+                      <span className="text-[15px] leading-6 text-muted-foreground">{product.country || '—'}</span>
                     </td>
-                    <td className={cn('table-cell', isDragging && 'bg-white')}>
+                    <td className={cn('table-cell', isDragging && 'bg-card')}>
                       <span className={cn('badge text-xs', getStatusColor(product.status))}>{getStatusLabel(product.status)}</span>
                     </td>
-                    <td className={cn('table-cell', isDragging && 'bg-white')}>
+                    <td className={cn('table-cell', isDragging && 'bg-card')}>
                       <span className={cn('badge text-xs border', getPriorityColor(product.priority))}>{getPriorityLabel(product.priority)}</span>
                     </td>
-                    <td className={cn('table-cell', isDragging && 'bg-white')}>
-                      <span className="text-[15px] leading-6 text-slate-600">{product.responsible?.name || '—'}</span>
+                    <td className={cn('table-cell', isDragging && 'bg-card')}>
+                      <span className="text-[15px] leading-6 text-foreground">{product.responsible?.name || '—'}</span>
                     </td>
-                    <td className={cn('table-cell', isDragging && 'bg-white')}>
+                    <td className={cn('table-cell', isDragging && 'bg-card')}>
                       <div className="flex items-center gap-2">
                         <div className="progress-bar flex-1">
                           <div
@@ -975,26 +1156,26 @@ export function ProductsClient({
                             style={{ width: `${product.progressPercent}%` }}
                           />
                         </div>
-                        <span className="w-8 text-right text-[15px] leading-6 text-slate-500">{product.progressPercent}%</span>
+                        <span className="w-8 text-right text-[15px] leading-6 text-muted-foreground">{product.progressPercent}%</span>
                       </div>
                     </td>
-                    <td className={cn('table-cell', isDragging && 'bg-white')}>
-                      <span className={cn('text-[15px] font-medium leading-6', isOverdue ? 'text-red-600' : 'text-slate-600')}>
+                    <td className={cn('table-cell', isDragging && 'bg-card')}>
+                      <span className={cn('text-[15px] font-medium leading-6', isOverdue ? 'text-red-600 dark:text-red-300' : 'text-foreground')}>
                         {formatDate(product.finalDate)}
                       </span>
-                      {isOverdue && <div className="mt-0.5 text-[15px] leading-6 text-red-500">просрочен</div>}
+                      {isOverdue && <div className="mt-0.5 text-[15px] leading-6 text-red-500 dark:text-red-300">просрочен</div>}
                     </td>
-                    <td className={cn('table-cell', isDragging && 'bg-white')}>
+                    <td className={cn('table-cell', isDragging && 'bg-card')}>
                       <div
                         className={cn(
                           'inline-flex h-8 w-8 items-center justify-center rounded-lg text-[15px] font-semibold leading-none',
                           product.riskScore >= 70
-                            ? 'bg-red-100 text-red-700'
+                            ? 'bg-red-100 text-red-700 dark:text-red-300'
                             : product.riskScore >= 40
-                              ? 'bg-amber-100 text-amber-700'
+                              ? 'bg-amber-100 text-amber-700 dark:text-amber-300'
                               : product.riskScore > 0
-                                ? 'bg-blue-100 text-blue-700'
-                                : 'bg-slate-100 text-slate-500'
+                                ? 'bg-blue-100 text-blue-700 dark:text-blue-300'
+                                : 'bg-muted text-muted-foreground'
                         )}
                       >
                         {product.riskScore}
@@ -1007,7 +1188,7 @@ export function ProductsClient({
           </table>
 
           {visibleProducts.length === 0 && (
-            <div className="py-16 text-center text-slate-400">
+            <div className="py-16 text-center text-muted-foreground">
               <Search className="w-8 h-8 mx-auto mb-3 opacity-40" />
               <p className="text-sm">По текущим фильтрам продукты не найдены</p>
             </div>
@@ -1021,11 +1202,11 @@ export function ProductsClient({
           x={contextMenu.x}
           y={contextMenu.y}
           menuRef={contextMenuRef}
-          className="fixed z-[90] w-60 rounded-xl border border-slate-200 bg-white p-2 shadow-2xl"
+          className="fixed z-[90] w-60 rounded-xl border border-border/80 bg-popover p-2 text-popover-foreground shadow-modal"
         >
-            <div className="border-b border-slate-100 px-2.5 py-2">
-              <div className="truncate text-sm font-semibold text-slate-800">{contextProduct.name}</div>
-              <div className="mt-0.5 text-xs text-slate-400">Быстрые действия по продукту</div>
+            <div className="border-b border-border/70 px-2.5 py-2">
+              <div className="truncate text-sm font-semibold text-popover-foreground">{contextProduct.name}</div>
+              <div className="mt-0.5 text-xs text-muted-foreground">Быстрые действия по продукту</div>
             </div>
 
             <div className="py-1">
@@ -1034,9 +1215,9 @@ export function ProductsClient({
                   closeContextMenu()
                   router.push(buildProductHref(contextProduct.id, currentRoute))
                 }}
-                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-popover-foreground hover:bg-accent"
               >
-                <Search className="h-4 w-4 text-slate-400" />
+                <Search className="h-4 w-4 text-muted-foreground" />
                 Открыть продукт
               </button>
 
@@ -1045,12 +1226,12 @@ export function ProductsClient({
                   <button
                     onClick={() => handleToggleProductFlag(contextProduct, 'isPinned', !contextProduct.isPinned)}
                     disabled={savingProductId === contextProduct.id}
-                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-popover-foreground hover:bg-accent disabled:opacity-60"
                   >
                     {contextProduct.isPinned ? (
-                      <PinOff className="h-4 w-4 text-slate-400" />
+                      <PinOff className="h-4 w-4 text-muted-foreground" />
                     ) : (
-                      <Pin className="h-4 w-4 text-slate-400" />
+                      <Pin className="h-4 w-4 text-muted-foreground" />
                     )}
                     {contextProduct.isPinned ? 'Открепить' : 'Закрепить наверху'}
                   </button>
@@ -1058,9 +1239,9 @@ export function ProductsClient({
                   <button
                     onClick={() => handleToggleProductFlag(contextProduct, 'isFavorite', !contextProduct.isFavorite)}
                     disabled={savingProductId === contextProduct.id}
-                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-popover-foreground hover:bg-accent disabled:opacity-60"
                   >
-                    <Star className={cn('h-4 w-4', contextProduct.isFavorite ? 'text-amber-500 fill-amber-100' : 'text-slate-400')} />
+                    <Star className={cn('h-4 w-4', contextProduct.isFavorite ? 'fill-amber-100 text-amber-500 dark:fill-amber-500/20 dark:text-amber-300' : 'text-muted-foreground')} />
                     {contextProduct.isFavorite ? 'Убрать из избранного' : 'Добавить в избранное'}
                   </button>
                 </>
@@ -1068,11 +1249,11 @@ export function ProductsClient({
 
               {canArchiveProducts && (
                 <>
-                  <div className="my-1 border-t border-slate-100" />
+                  <div className="my-1 border-t border-border/70" />
                   <button
                     onClick={() => setPendingArchiveProduct({ id: contextProduct.id, name: contextProduct.name })}
                     disabled={archivingProductId === contextProduct.id}
-                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-amber-700 hover:bg-amber-50 disabled:opacity-60"
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-amber-700 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-500/10 disabled:opacity-60"
                   >
                     <Archive className="h-4 w-4" />
                     {archivingProductId === contextProduct.id ? 'Архивация...' : 'Архивировать продукт'}
@@ -1082,11 +1263,11 @@ export function ProductsClient({
 
               {archiveMode && canDeleteProducts && (
                 <>
-                  <div className="my-1 border-t border-slate-100" />
+                  <div className="my-1 border-t border-border/70" />
                   <button
                     onClick={() => handleDeleteProduct(contextProduct.id, contextProduct.name)}
                     disabled={deletingProductId === contextProduct.id}
-                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-60"
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-500/10 disabled:opacity-60"
                   >
                     <Trash2 className="h-4 w-4" />
                     {deletingProductId === contextProduct.id ? 'Удаление...' : 'Удалить архивный продукт'}

@@ -36,14 +36,14 @@ export function ConfirmDialog({
     <AnimatePresence>
       {open && (
         <motion.div
-          className="modal-backdrop fixed inset-0 z-[120] flex items-center justify-center px-4"
+          className="modal-backdrop fixed inset-0 z-[120] flex items-end justify-center px-4 pb-4 pt-8 sm:items-center sm:pb-4"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onCancel}
         >
           <motion.div
-            className="surface-panel w-full max-w-md p-6"
+            className="surface-panel max-h-[min(88vh,40rem)] w-full max-w-md overflow-y-auto p-4 sm:p-6"
             initial={{ opacity: 0, y: 10, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.98 }}
@@ -55,14 +55,14 @@ export function ConfirmDialog({
                 <div
                   className={cn(
                     'flex h-10 w-10 shrink-0 items-center justify-center rounded-full',
-                    confirmTone === 'danger' ? 'bg-red-50 text-red-600' : 'bg-brand-50 text-brand-700'
+                    confirmTone === 'danger' ? 'bg-red-50 text-red-600 dark:text-red-300' : 'bg-brand-50 text-brand-700 dark:text-blue-300'
                   )}
                 >
                   {confirmTone === 'danger' ? <Trash2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
                 </div>
                 <div className="space-y-1">
-                  <h3 className="text-base font-semibold text-slate-900">{title}</h3>
-                  <p className="text-sm leading-6 text-slate-500">{description}</p>
+                  <h3 className="text-base font-semibold text-foreground">{title}</h3>
+                  <p className="text-sm leading-6 text-muted-foreground">{description}</p>
                 </div>
               </div>
 
@@ -71,7 +71,7 @@ export function ConfirmDialog({
               </button>
             </div>
 
-            <div className="mt-6 flex justify-end gap-3">
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <button type="button" onClick={onCancel} className="btn-secondary" disabled={loading}>
                 {cancelLabel}
               </button>
@@ -83,7 +83,7 @@ export function ConfirmDialog({
                   'relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-full px-5 py-2.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-70',
                   confirmTone === 'danger'
                     ? 'bg-red-600 text-white hover:bg-red-500'
-                    : 'bg-brand-950 text-white hover:bg-brand-900'
+                    : 'bg-primary text-primary-foreground hover:bg-primary/90'
                 )}
               >
                 {loading && (

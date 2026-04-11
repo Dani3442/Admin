@@ -105,14 +105,14 @@ export function shiftDate(date: Date, days: number): Date {
 
 export function getStatusColor(status: ProductStatus | string): string {
   const map: Record<string, string> = {
-    PLANNED: 'text-slate-500 bg-slate-100',
-    IN_PROGRESS: 'text-blue-600 bg-blue-50',
-    AT_RISK: 'text-amber-600 bg-amber-50',
-    DELAYED: 'text-red-600 bg-red-50',
-    COMPLETED: 'text-emerald-600 bg-emerald-50',
-    CANCELLED: 'text-slate-400 bg-slate-100',
+    PLANNED: 'text-muted-foreground bg-muted/75 border border-border/70',
+    IN_PROGRESS: 'text-blue-600 bg-blue-50 border border-blue-200 dark:text-blue-300',
+    AT_RISK: 'text-amber-600 bg-amber-50 border border-amber-200 dark:text-amber-300',
+    DELAYED: 'text-red-600 bg-red-50 border border-red-200 dark:text-red-300',
+    COMPLETED: 'text-emerald-600 bg-emerald-50 border border-emerald-200 dark:text-emerald-300',
+    CANCELLED: 'text-muted-foreground bg-muted/75 border border-border/70',
   }
-  return map[status] || 'text-slate-500 bg-slate-100'
+  return map[status] || 'text-muted-foreground bg-muted/75 border border-border/70'
 }
 
 export function getStatusLabel(status: ProductStatus | string): string {
@@ -129,12 +129,12 @@ export function getStatusLabel(status: ProductStatus | string): string {
 
 export function getPriorityColor(priority: Priority | string): string {
   const map: Record<string, string> = {
-    CRITICAL: 'text-red-600 bg-red-50 border-red-200',
-    HIGH: 'text-orange-600 bg-orange-50 border-orange-200',
-    MEDIUM: 'text-blue-600 bg-blue-50 border-blue-200',
-    LOW: 'text-slate-500 bg-slate-50 border-slate-200',
+    CRITICAL: 'text-red-700 bg-red-50 border border-red-200 dark:text-red-300',
+    HIGH: 'text-amber-700 bg-amber-50 border border-amber-200 dark:text-amber-300',
+    MEDIUM: 'text-blue-700 bg-blue-50 border border-blue-200 dark:text-blue-300',
+    LOW: 'text-muted-foreground bg-muted/75 border border-border/70',
   }
-  return map[priority] || 'text-slate-500 bg-slate-50'
+  return map[priority] || 'text-muted-foreground bg-muted/75 border border-border/70'
 }
 
 export function getPriorityLabel(priority: Priority | string): string {
@@ -178,11 +178,11 @@ export function getVerificationStatusLabel(status: VerificationStatus | string):
 
 export function getVerificationStatusColor(status: VerificationStatus | string): string {
   const map: Record<string, string> = {
-    VERIFIED: 'text-emerald-700 bg-emerald-50 border-emerald-200',
-    PENDING: 'text-amber-700 bg-amber-50 border-amber-200',
-    UNVERIFIED: 'text-slate-600 bg-slate-50 border-slate-200',
+    VERIFIED: 'text-emerald-700 bg-emerald-50 border-emerald-200 dark:text-emerald-300',
+    PENDING: 'text-amber-700 bg-amber-50 border-amber-200 dark:text-amber-300',
+    UNVERIFIED: 'text-muted-foreground bg-muted/75 border-border/70',
   }
-  return map[status] || 'text-slate-600 bg-slate-50 border-slate-200'
+  return map[status] || 'text-muted-foreground bg-muted/75 border-border/70'
 }
 
 export function getAccessLevelLabel(role: string): string {
