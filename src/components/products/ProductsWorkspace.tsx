@@ -1,15 +1,28 @@
 'use client'
 
+import dynamic from 'next/dynamic'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Filter, LayoutList, Plus, Search, Table2, X } from 'lucide-react'
-import { ProductsClient } from '@/components/products/ProductsClient'
-import { TableViewClient } from '@/components/table/TableViewClient'
 import { FilterSelect } from '@/components/ui/FilterSelect'
 import type { ProductListFilters, ProductListItem, ProductListSortDirection, ProductListSortField, ProductQuickView } from '@/lib/product-list'
 import { cn, getPriorityLabel, getStatusLabel } from '@/lib/utils'
 import { useEffect, useMemo, type ReactNode, useState } from 'react'
+
+const ProductsClient = dynamic(
+  () => import('@/components/products/ProductsClient').then((mod) => mod.ProductsClient),
+  {
+    loading: () => <div className="surface-panel min-h-[420px] animate-pulse bg-muted/30" />,
+  }
+)
+
+const TableViewClient = dynamic(
+  () => import('@/components/table/TableViewClient').then((mod) => mod.TableViewClient),
+  {
+    loading: () => <div className="surface-panel min-h-[520px] animate-pulse bg-muted/30" />,
+  }
+)
 
 type ProductsLayoutMode = 'list' | 'table'
 

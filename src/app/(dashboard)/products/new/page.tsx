@@ -1,52 +1,27 @@
+import dynamic from 'next/dynamic'
 import { redirect } from 'next/navigation'
 import { auth, hasPermission, Permission } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
-import { NewProductForm } from '@/components/products/NewProductForm'
+import { getCachedAssignableUsers, getCachedProductTemplates, getCachedStageSuggestions } from '@/lib/cached-reference-data'
 import { supportsProductTemplateStageDurationDaysColumn } from '@/lib/schema-compat'
+
+const NewProductForm = dynamic(
+  () => import('@/components/products/NewProductForm').then((mod) => mod.NewProductForm),
+  {
+    loading: () => <div className="min-h-[520px] animate-pulse rounded-[28px] bg-muted/35" />,
+  }
+)
 
 async function getCreateProductData() {
   const hasProductTemplateStageDurationDaysColumn = await supportsProductTemplateStageDurationDaysColumn()
 
   const [users, productTemplates, stageSuggestions] = await Promise.all([
-    prisma.user.findMany({
-      where: { isActive: true },
-      select: { id: true, name: true },
-      orderBy: { name: 'asc' },
-    }),
-    prisma.productTemplate.findMany({
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        createdAt: true,
-        updatedAt: true,
-        stages: {
-          orderBy: { stageOrder: 'asc' },
-          select: {
-            id: true,
-            stageTemplateId: true,
-            stageOrder: true,
-            stageName: true,
-            plannedDate: true,
-            ...(hasProductTemplateStageDurationDaysColumn ? { durationDays: true } : {}),
-            stageTemplate: {
-              select: {
-                durationDays: true,
-              },
-            },
-          },
-        },
-      },
-      orderBy: [{ createdAt: 'desc' }],
-    }),
-    prisma.stageTemplate.findMany({
-      select: { id: true, name: true },
-      orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
-    }),
+    getCachedAssignableUsers(),
+    getCachedProductTemplates(hasProductTemplateStageDurationDaysColumn),
+    getCachedStageSuggestions(),
   ])
 
   return {
-    users,
+    users: users.map((user) => ({ id: user.id, name: user.name })),
     productTemplates: productTemplates.map((template) => ({
       ...template,
       stages: template.stages.map((stage) => ({

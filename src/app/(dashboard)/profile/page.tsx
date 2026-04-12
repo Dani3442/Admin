@@ -1,8 +1,15 @@
+import dynamic from 'next/dynamic'
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { canEditOperationalProfileFields, userProfileSelect } from '@/lib/user-profile'
-import { UserProfileClient } from '@/components/users/UserProfileClient'
+
+const UserProfileClient = dynamic(
+  () => import('@/components/users/UserProfileClient').then((mod) => mod.UserProfileClient),
+  {
+    loading: () => <div className="surface-panel min-h-[620px] animate-pulse bg-muted/30" />,
+  }
+)
 
 export default async function ProfilePage() {
   const session = await auth()

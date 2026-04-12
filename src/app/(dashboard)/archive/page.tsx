@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { ProductsWorkspace } from '@/components/products/ProductsWorkspace'
+import { getCachedAssignableUsers, getCachedProductTemplates, getCachedStageSuggestions, getCachedStageTemplates } from '@/lib/cached-reference-data'
 import { supportsProductTemplateStageDurationDaysColumn } from '@/lib/schema-compat'
 import { canManageArchive, getVisibleProductWhere } from '@/lib/product-access'
 
@@ -55,58 +56,16 @@ async function getArchiveWorkspaceData(viewer: { id?: string | null; role?: stri
       select: productWorkspaceSelect,
       orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }],
     }),
-    prisma.user.findMany({
-      where: { isActive: true },
-      select: { id: true, name: true },
-      orderBy: { name: 'asc' },
-    }),
-    prisma.stageTemplate.findMany({
-      select: {
-        id: true,
-        name: true,
-        order: true,
-        durationText: true,
-        isCritical: true,
-        participatesInAutoshift: true,
-      },
-      orderBy: { order: 'asc' },
-    }),
-    prisma.productTemplate.findMany({
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        createdAt: true,
-        updatedAt: true,
-        stages: {
-          orderBy: { stageOrder: 'asc' },
-          select: {
-            id: true,
-            stageTemplateId: true,
-            stageOrder: true,
-            stageName: true,
-            plannedDate: true,
-            ...(hasTemplateStageDurationDaysColumn ? { durationDays: true } : {}),
-            stageTemplate: {
-              select: {
-                durationDays: true,
-              },
-            },
-          },
-        },
-      },
-      orderBy: [{ createdAt: 'desc' }],
-    }),
-    prisma.stageTemplate.findMany({
-      select: { id: true, name: true },
-      orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
-    }),
+    getCachedAssignableUsers(),
+    getCachedStageTemplates(),
+    getCachedProductTemplates(hasTemplateStageDurationDaysColumn),
+    getCachedStageSuggestions(),
   ])
 
   return {
     listProducts: products,
     tableProducts: products,
-    users,
+    users: users.map((user) => ({ id: user.id, name: user.name })),
     stages,
     productTemplates,
     stageSuggestions,

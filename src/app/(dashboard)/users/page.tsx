@@ -1,7 +1,14 @@
+import dynamic from 'next/dynamic'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
-import { UsersClient } from '@/components/UsersClient'
+
+const UsersClient = dynamic(
+  () => import('@/components/UsersClient').then((mod) => mod.UsersClient),
+  {
+    loading: () => <div className="surface-panel min-h-[540px] animate-pulse bg-muted/30" />,
+  }
+)
 
 export default async function UsersPage() {
   const session = await auth()
