@@ -11,6 +11,7 @@ interface ConfirmDialogProps {
   description: string
   confirmLabel?: string
   cancelLabel?: string
+  hideCancel?: boolean
   confirmTone?: 'danger' | 'primary'
   loading?: boolean
   onConfirm: () => void
@@ -23,6 +24,7 @@ export function ConfirmDialog({
   description,
   confirmLabel = 'Подтвердить',
   cancelLabel = 'Отмена',
+  hideCancel = false,
   confirmTone = 'danger',
   loading = false,
   onConfirm,
@@ -72,9 +74,11 @@ export function ConfirmDialog({
             </div>
 
             <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-              <button type="button" onClick={onCancel} className="btn-secondary" disabled={loading}>
-                {cancelLabel}
-              </button>
+              {!hideCancel && (
+                <button type="button" onClick={onCancel} className="btn-secondary" disabled={loading}>
+                  {cancelLabel}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={onConfirm}

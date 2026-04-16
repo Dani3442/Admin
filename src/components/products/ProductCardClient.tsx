@@ -70,6 +70,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
   const [deletingProduct, setDeletingProduct] = useState(false)
   const [lifecycleSaving, setLifecycleSaving] = useState(false)
   const [pendingDeleteStageId, setPendingDeleteStageId] = useState<string | null>(null)
+  const [deleteStageError, setDeleteStageError] = useState<string | null>(null)
   const [confirmArchiveProductOpen, setConfirmArchiveProductOpen] = useState(false)
   const [confirmRestoreProductOpen, setConfirmRestoreProductOpen] = useState(false)
   const commentInputRef = useRef<HTMLTextAreaElement>(null)
@@ -548,6 +549,8 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
   }
 
   const handleDeleteStage = async (stageId: string) => {
+    closeStageMenu()
+    setDeleteStageError(null)
     setPendingDeleteStageId(stageId)
   }
 
@@ -558,24 +561,33 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
       const res = await fetch(`/api/products/${product.id}/stages?stageId=${encodeURIComponent(pendingDeleteStageId)}`, {
         method: 'DELETE',
       })
-      const data = await res.json()
+      const responseText = await res.text()
+      let data: { error?: string; details?: string; stages?: any[]; finalDate?: Date | string | null; progressPercent?: number; riskScore?: number; status?: string } | null = null
+
+      try {
+        data = responseText ? JSON.parse(responseText) : null
+      } catch {
+        data = null
+      }
 
       if (!res.ok) {
-        throw new Error(data.error || 'Не удалось удалить этап')
+        throw new Error(data?.details || data?.error || responseText || 'Не удалось удалить этап')
       }
 
       setProduct((prev: any) => ({
         ...prev,
-        stages: data.stages,
-        finalDate: data.finalDate ?? prev.finalDate,
-        progressPercent: data.progressPercent,
-        riskScore: data.riskScore,
-        status: data.status,
+        stages: data?.stages || prev.stages,
+        finalDate: data?.finalDate ?? prev.finalDate,
+        progressPercent: data?.progressPercent ?? prev.progressPercent,
+        riskScore: data?.riskScore ?? prev.riskScore,
+        status: data?.status ?? prev.status,
       }))
       setPendingDeleteStageId(null)
       closeStageMenu()
     } catch (error: any) {
-      alert(error.message || 'Не удалось удалить этап')
+      setPendingDeleteStageId(null)
+      closeStageMenu()
+      setDeleteStageError(error.message || 'Не удалось удалить этап')
     } finally {
       setSaving(false)
     }
@@ -1449,8 +1461,22 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
         description="Этап будет удалён только из этого продукта. Это действие нельзя отменить."
         confirmLabel="Удалить этап"
         loading={saving && Boolean(pendingDeleteStageId)}
-        onCancel={() => setPendingDeleteStageId(null)}
+        onCancel={() => {
+          setPendingDeleteStageId(null)
+          closeStageMenu()
+        }}
         onConfirm={confirmDeleteStage}
+      />
+
+      <ConfirmDialog
+        open={Boolean(deleteStageError)}
+        title="Не удалось удалить этап"
+        description={deleteStageError || 'Не удалось удалить этап'}
+        confirmLabel="Закрыть"
+        confirmTone="primary"
+        hideCancel
+        onCancel={() => setDeleteStageError(null)}
+        onConfirm={() => setDeleteStageError(null)}
       />
 
       <ConfirmDialog

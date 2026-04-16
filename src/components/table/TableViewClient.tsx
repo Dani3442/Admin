@@ -174,6 +174,7 @@ export function TableViewClient({
   const [newStageAutoshift, setNewStageAutoshift] = useState(true)
   const canEditTable = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUserRole) && !archiveMode
   const [pendingDeleteStageId, setPendingDeleteStageId] = useState<string | null>(null)
+  const [deleteStageError, setDeleteStageError] = useState<string | null>(null)
   const {
     menu: stageMenu,
     menuRef,
@@ -349,6 +350,8 @@ export function TableViewClient({
   }
 
   const handleDeleteStage = async (stageId: string) => {
+    closeStageMenu()
+    setDeleteStageError(null)
     setPendingDeleteStageId(stageId)
   }
 
@@ -379,7 +382,8 @@ export function TableViewClient({
           data = null
         }
 
-        window.alert(
+        setPendingDeleteStageId(null)
+        setDeleteStageError(
           data?.details ||
             data?.error ||
             responseText ||
@@ -1108,8 +1112,22 @@ export function TableViewClient({
         title="Удалить этап?"
         description="Этап будет удалён из таблицы и у всех продуктов. Это действие нельзя отменить."
         confirmLabel="Удалить этап"
-        onCancel={() => setPendingDeleteStageId(null)}
+        onCancel={() => {
+          setPendingDeleteStageId(null)
+          closeStageMenu()
+        }}
         onConfirm={confirmDeleteStage}
+      />
+
+      <ConfirmDialog
+        open={Boolean(deleteStageError)}
+        title="Не удалось удалить этап"
+        description={deleteStageError || 'Не удалось удалить этап'}
+        confirmLabel="Закрыть"
+        confirmTone="primary"
+        hideCancel
+        onCancel={() => setDeleteStageError(null)}
+        onConfirm={() => setDeleteStageError(null)}
       />
 
       {/* New stage modal */}

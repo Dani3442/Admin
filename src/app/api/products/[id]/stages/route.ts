@@ -28,7 +28,7 @@ async function normalizeRemainingProductStages(
   for (const [index, remainingStage] of remainingStages.entries()) {
     await tx.productStage.update({
       where: { id: remainingStage.id },
-      data: { stageOrder: -(index + 1) },
+      data: { stageOrder: 1000000 + index },
     })
   }
 
@@ -354,6 +354,8 @@ export async function DELETE(
       })
 
       await normalizeRemainingProductStages(tx as any, productId)
+    }, {
+      timeout: 20000,
     })
 
     const derivedProduct = await recalculateProductDerivedFields(productId).catch(() => null)
@@ -372,6 +374,7 @@ export async function DELETE(
     })
   } catch (error) {
     console.error('[product-stages:delete] Failed to delete stage', error)
-    return NextResponse.json({ error: 'Не удалось удалить этап' }, { status: 500 })
+    const details = error instanceof Error ? error.message : String(error)
+    return NextResponse.json({ error: 'Не удалось удалить этап', details }, { status: 500 })
   }
 }
