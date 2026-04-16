@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { DatePicker } from '@/components/ui/DatePicker'
 import type { ProductTemplateData, ProductTemplateStageData } from '@/types'
 import { formatDate } from '@/lib/utils'
-import { buildSequentialStageSchedule } from '@/lib/stage-schedule'
+import { applySequentialStageDateOverride, buildSequentialStageSchedule } from '@/lib/stage-schedule'
 
 const PRIORITIES = [
   { value: 'CRITICAL', label: 'Критический' },
@@ -144,16 +144,23 @@ export function NewProductForm({
   const updateTemplateStage = (stageId: string, patch: Partial<TemplateDraftStage>) => {
     setTemplateStages((prev) =>
       {
-        const nextStages = prev.map((stage, index) => {
+        const targetIndex = prev.findIndex((stage) => stage.id === stageId)
+        const nextStages = prev.map((stage) => {
           if (stage.id !== stageId) return stage
 
-          const nextPatch: Partial<TemplateDraftStage> =
-            index === 0 || !('plannedDate' in patch)
-              ? patch
-              : { ...patch, plannedDate: stage.plannedDate }
-
-          return { ...stage, ...nextPatch }
+          return { ...stage, ...patch }
         })
+
+        if ('plannedDate' in patch && targetIndex >= 0) {
+          return applySequentialStageDateOverride(nextStages, targetIndex, patch.plannedDate ?? null).map((stage) => ({
+            id: stage.id,
+            stageName: stage.stageName,
+            plannedDate: stage.plannedDate,
+            durationDays: stage.durationDays ?? null,
+            effectiveDurationDays: stage.effectiveDurationDays,
+            participatesInAutoshift: stage.participatesInAutoshift,
+          }))
+        }
 
         if (nextStages[0]?.plannedDate === null) {
           return nextStages.map((stage) => ({ ...stage, plannedDate: null, effectiveDurationDays: null }))
@@ -170,16 +177,20 @@ export function NewProductForm({
   ) => {
     setSelectedTemplateStages((prev) =>
       {
-        const nextStages = prev.map((stage, index) => {
+        const targetIndex = prev.findIndex((stage) => stage.id === stageId)
+        const nextStages = prev.map((stage) => {
           if (stage.id !== stageId) return stage
 
-          const nextPatch: Partial<SelectedTemplateStageOverride> =
-            index === 0 || !('plannedDate' in patch)
-              ? patch
-              : { ...patch, plannedDate: stage.plannedDate }
-
-          return { ...stage, ...nextPatch }
+          return { ...stage, ...patch }
         })
+
+        if ('plannedDate' in patch && targetIndex >= 0) {
+          return applySequentialStageDateOverride(nextStages, targetIndex, patch.plannedDate ?? null).map((stage) => ({
+            ...stage,
+            durationDays: stage.durationDays ?? null,
+            effectiveDurationDays: stage.effectiveDurationDays,
+          }))
+        }
 
         if (nextStages[0]?.plannedDate === null) {
           return nextStages.map((stage) => ({ ...stage, plannedDate: null, effectiveDurationDays: null }))
@@ -470,21 +481,15 @@ export function NewProductForm({
                     </div>
                     <div>
                       <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                        {index === 0 ? 'Старт этапа' : 'Рассчитанная дата'}
+                        Дата этапа
                       </div>
-                      {index === 0 ? (
-                        <DatePicker
-                          value={stage.plannedDate}
-                          onChange={(date) => updateSelectedTemplateStage(stage.id, { plannedDate: date })}
-                          inputClassName="h-9 w-full text-xs"
-                          panelClassName="w-[320px]"
-                          placeholder="Без даты"
-                        />
-                      ) : (
-                        <div className="flex h-9 items-center rounded-lg border border-border/70 bg-muted/75 px-3 text-xs font-medium text-muted-foreground">
-                          {formatDate(stage.plannedDate)}
-                        </div>
-                      )}
+                      <DatePicker
+                        value={stage.plannedDate}
+                        onChange={(date) => updateSelectedTemplateStage(stage.id, { plannedDate: date })}
+                        inputClassName="h-9 w-full text-xs"
+                        panelClassName="w-[320px]"
+                        placeholder="Без даты"
+                      />
                     </div>
                     <div>
                       <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -583,21 +588,15 @@ export function NewProductForm({
                     </div>
                     <div>
                       <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        {index === 0 ? 'Дата старта' : 'Рассчитанная дата'}
+                        Дата этапа
                       </label>
-                      {index === 0 ? (
-                        <DatePicker
-                          value={stage.plannedDate}
-                          onChange={(date) => updateTemplateStage(stage.id, { plannedDate: date })}
-                          inputClassName="h-11 text-sm"
-                          panelClassName="w-[320px]"
-                          placeholder="Необязательно"
-                        />
-                      ) : (
-                        <div className="flex h-11 items-center rounded-[18px] border border-border/70 bg-card px-3 text-sm font-medium text-muted-foreground">
-                          {formatDate(stage.plannedDate)}
-                        </div>
-                      )}
+                      <DatePicker
+                        value={stage.plannedDate}
+                        onChange={(date) => updateTemplateStage(stage.id, { plannedDate: date })}
+                        inputClassName="h-11 text-sm"
+                        panelClassName="w-[320px]"
+                        placeholder="Необязательно"
+                      />
                     </div>
                     <div>
                       <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">

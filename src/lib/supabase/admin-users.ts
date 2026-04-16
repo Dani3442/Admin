@@ -3,6 +3,24 @@ import { prisma } from '@/lib/prisma'
 import { sanitizeEmailValue, sanitizeTextValue } from '@/lib/input-security'
 import { createAdminClient } from './admin'
 
+function isBcryptHash(value: string) {
+  return /^\$2[aby]\$\d{2}\$/.test(value)
+}
+
+async function verifyLocalPassword(storedPassword: string, candidatePassword: string) {
+  if (isBcryptHash(storedPassword)) {
+    return {
+      isValid: await bcrypt.compare(candidatePassword, storedPassword),
+      needsRehash: false,
+    }
+  }
+
+  return {
+    isValid: storedPassword === candidatePassword,
+    needsRehash: storedPassword === candidatePassword,
+  }
+}
+
 async function findSupabaseUserByEmail(email: string) {
   const supabase = createAdminClient()
   const normalizedEmail = sanitizeEmailValue(email)
@@ -94,6 +112,25 @@ export async function deleteSupabaseUserByEmail(email: string) {
   }
 }
 
+export async function syncExistingUserPassword(input: {
+  userId: string
+  email: string
+  password: string
+  name?: string | null
+  lastName?: string | null
+  emailConfirmed?: boolean
+}) {
+  await ensureSupabaseUserForLocalUser(input)
+
+  const hashedPassword = await bcrypt.hash(String(input.password), 12)
+  await prisma.user.update({
+    where: { id: input.userId },
+    data: { password: hashedPassword },
+  })
+
+  return hashedPassword
+}
+
 export async function migrateLegacyUserPassword(email: string, password: string) {
   const normalizedEmail = sanitizeEmailValue(email)
   const localUser = await prisma.user.findUnique({
@@ -112,17 +149,27 @@ export async function migrateLegacyUserPassword(email: string, password: string)
     return { migrated: false, reason: 'not_found' as const }
   }
 
-  const isValid = await bcrypt.compare(String(password), localUser.password)
+  const candidatePassword = String(password)
+  const { isValid, needsRehash } = await verifyLocalPassword(localUser.password, candidatePassword)
   if (!isValid) {
     return { migrated: false, reason: 'invalid_password' as const }
   }
 
   await ensureSupabaseUserForLocalUser({
     email: localUser.email,
-    password,
+    password: candidatePassword,
     name: localUser.name,
     lastName: localUser.lastName,
   })
+
+  if (needsRehash) {
+    await prisma.user.update({
+      where: { id: localUser.id },
+      data: {
+        password: await bcrypt.hash(candidatePassword, 12),
+      },
+    })
+  }
 
   return { migrated: true as const }
 }

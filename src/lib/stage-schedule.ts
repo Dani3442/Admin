@@ -107,3 +107,50 @@ export function buildSequentialStageSchedule<T extends SequentialStageInput>(
     }
   })
 }
+
+export function applySequentialStageDateOverride<T extends SequentialStageInput>(
+  stages: T[],
+  stageIndex: number,
+  plannedDate: Date | null
+): Array<SequentialStageScheduleItem<T>> {
+  const stagesWithDurations = deriveSequentialStageDurations(stages)
+
+  if (stagesWithDurations.length === 0) return []
+
+  let cursor = plannedDate ? startOfDay(plannedDate) : null
+
+  return stagesWithDurations.map((stage, index) => {
+    if (index < stageIndex) {
+      return {
+        ...(stages[index] as T),
+        plannedDate: stages[index].plannedDate ? startOfDay(stages[index].plannedDate as Date) : null,
+        effectiveDurationDays: stage.durationDays ?? 1,
+      }
+    }
+
+    if (index === stageIndex) {
+      return {
+        ...(stages[index] as T),
+        plannedDate: cursor,
+        effectiveDurationDays: stage.durationDays ?? 1,
+      }
+    }
+
+    if (!cursor) {
+      return {
+        ...(stages[index] as T),
+        plannedDate: null,
+        effectiveDurationDays: stage.durationDays ?? 1,
+      }
+    }
+
+    const previousDuration = stagesWithDurations[index - 1].durationDays ?? 1
+    cursor = addDays(cursor, previousDuration)
+
+    return {
+      ...(stages[index] as T),
+      plannedDate: cursor,
+      effectiveDurationDays: stage.durationDays ?? 1,
+    }
+  })
+}

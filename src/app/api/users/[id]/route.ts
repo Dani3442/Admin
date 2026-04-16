@@ -13,7 +13,7 @@ import {
   userProfileSelect,
 } from '@/lib/user-profile'
 import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
-import { deleteSupabaseUserByEmail } from '@/lib/supabase/admin-users'
+import { deleteSupabaseUserByEmail, syncExistingUserPassword } from '@/lib/supabase/admin-users'
 
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -51,7 +51,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const target = await prisma.user.findUnique({
     where: { id },
-    select: { id: true, role: true },
+    select: { id: true, role: true, email: true, name: true, lastName: true },
   })
 
   if (!target) {
@@ -104,6 +104,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (canEditSensitive) {
       updateData.role = (parsed.data as any).role
       updateData.isActive = (parsed.data as any).isActive
+    }
+
+    if (canEditSensitive && (parsed.data as any).password) {
+      await syncExistingUserPassword({
+        userId: target.id,
+        email: target.email,
+        password: (parsed.data as any).password,
+        name: parsed.data.name,
+        lastName: parsed.data.lastName,
+      })
+      updateData.password = undefined
     }
 
     const profile = await prisma.user.update({

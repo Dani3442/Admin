@@ -40,6 +40,7 @@ export const managerProfileSchema = selfProfileSchema.extend({
 export const adminProfileSchema = managerProfileSchema.extend({
   role: z.enum([...PROFILE_ROLE_OPTIONS] as [string, ...string[]]),
   isActive: z.boolean(),
+  password: z.string().min(8, 'Пароль должен содержать минимум 8 символов').optional(),
 })
 
 export function normalizeAvatarValue(value: unknown) {
