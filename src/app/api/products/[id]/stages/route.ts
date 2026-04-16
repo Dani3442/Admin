@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { recalculateProductRisk } from '@/lib/risk'
@@ -364,6 +365,13 @@ export async function DELETE(
     const derivedProduct = await recalculateProductDerivedFields(productId).catch(() => null)
     await recalculateProductRisk(productId).catch(() => null)
     const snapshot = await getProductStageSnapshot(productId).catch(() => null)
+
+    revalidatePath('/products')
+    revalidatePath('/table')
+    revalidatePath('/dashboard')
+    revalidatePath('/timeline')
+    revalidatePath('/archive')
+    revalidatePath(`/products/${productId}`)
 
     return NextResponse.json({
       stages: (snapshot?.stages || []).map((stage) => ({

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { auth, hasPermission, Permission } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { recalculateProductRisk } from '@/lib/risk'
@@ -510,6 +511,16 @@ export async function DELETE(req: NextRequest) {
         await recalculateProductRisk(productId)
       })
     )
+
+    revalidatePath('/products')
+    revalidatePath('/table')
+    revalidatePath('/dashboard')
+    revalidatePath('/timeline')
+    revalidatePath('/archive')
+    revalidatePath('/products/new')
+    for (const productId of affectedProductIds) {
+      revalidatePath(`/products/${productId}`)
+    }
 
     const all = await prisma.stageTemplate.findMany({
       select: {

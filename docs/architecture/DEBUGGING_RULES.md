@@ -57,3 +57,9 @@ cd /Users/eugrph/Documents/Playground/product-admin-5-beta && npm run dev
 - Do not push to `main` until local verification is approved.
 - If DB schema changed, call that out explicitly before push.
 
+## Project memory policy
+- Before substantial work, read the project Obsidian hub:
+  - `/Users/eugrph/Documents/ObsidianVault/Work Vault/Product Admin/PROJECT_HUB.md`
+- After important fixes, update the relevant Obsidian notes.
+- In the user-facing summary, explicitly state:
+  - `Записал в Obsidian`

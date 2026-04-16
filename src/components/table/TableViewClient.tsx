@@ -357,17 +357,24 @@ export function TableViewClient({
 
   const confirmDeleteStage = async () => {
     if (!pendingDeleteStageId) return
+    const deletingStageId = pendingDeleteStageId
     try {
-      const res = await fetch(`/api/stage-templates?id=${encodeURIComponent(pendingDeleteStageId)}`, {
+      const res = await fetch(`/api/stage-templates?id=${encodeURIComponent(deletingStageId)}`, {
         method: 'DELETE',
       })
 
       if (res.ok) {
         const allStages = await res.json()
         setStages(allStages)
+        setProducts((prev) =>
+          prev.map((product) => ({
+            ...product,
+            stages: product.stages.filter((stage) => stage.stageTemplateId !== deletingStageId),
+          }))
+        )
         setColumnWidths((prev) => {
           const next = { ...prev }
-          delete next[pendingDeleteStageId]
+          delete next[deletingStageId]
           return next
         })
         setPendingDeleteStageId(null)
@@ -847,7 +854,7 @@ export function TableViewClient({
             <thead className="sticky top-0 z-10">
               <tr>
                 <th
-                  className="sticky left-0 z-20 border-b border-r border-border/70 bg-muted/80 px-4 py-3 text-left text-[15px] font-medium leading-6 text-muted-foreground relative"
+                  className="sticky left-0 z-20 border-b border-r border-border/70 bg-muted px-4 py-3 text-left text-[15px] font-medium leading-6 text-muted-foreground relative"
                   style={{ width: columnWidths.__product, minWidth: 120 }}
                 >
                   Продукт
@@ -857,7 +864,7 @@ export function TableViewClient({
                   />
                 </th>
                 <th
-                  className="border-b border-r border-border/70 bg-muted/80 px-2 py-3 text-center text-[15px] font-medium leading-6 text-muted-foreground relative"
+                  className="border-b border-r border-border/70 bg-muted px-2 py-3 text-center text-[15px] font-medium leading-6 text-muted-foreground relative"
                   style={{ width: columnWidths.__progress, minWidth: 60 }}
                 >
                   Прогресс
@@ -869,7 +876,7 @@ export function TableViewClient({
                 {stages.map((stage, idx) => (
                   <th
                     key={stage.id}
-                    className="group relative border-b border-r border-border/70 bg-muted/80 px-2 py-3 text-center text-muted-foreground"
+                    className="group relative border-b border-r border-border/70 bg-muted px-2 py-3 text-center text-muted-foreground"
                     style={{ width: columnWidths[stage.id], minWidth: 60 }}
                     title={`ПКМ: управление этапом\n${stage.name}`}
                     onContextMenu={(e) => handleStageHeaderClick(e, stage)}
@@ -906,7 +913,7 @@ export function TableViewClient({
 
                 {/* Add new stage column */}
                 <th
-                  className="border-b border-r border-border/70 bg-muted/80 text-center align-middle"
+                  className="border-b border-r border-border/70 bg-muted text-center align-middle"
                   style={{ width: addColumnWidth, minWidth: addColumnWidth }}
                 >
                   {canEditTable && (
@@ -925,20 +932,22 @@ export function TableViewClient({
               {filteredProducts.map((product, rowIdx) => {
                 const { overlappingIds } = detectStageOverlaps(product.stages)
                 const resolvedStageMap = resolveStageMapForProduct(product.stages, stages)
+                const rowBackgroundClass = rowIdx % 2 === 0 ? 'bg-card' : 'bg-muted/35'
+                const stickyProductCellBackgroundClass = rowIdx % 2 === 0 ? 'bg-card' : 'bg-muted'
 
                 return (
                   <tr
                     key={product.id}
                     className={cn(
                       'cursor-pointer border-b border-border/60 transition-colors',
-                      rowIdx % 2 === 0 ? 'bg-card' : 'bg-muted/35',
+                      rowBackgroundClass,
                       'hover:bg-accent/40'
                     )}
                     onClick={() => router.push(buildProductHref(product.id, currentRoute))}
                   >
                     {/* Product Name */}
                     <td
-                      className={cn('sticky left-0 z-10 border-r border-border/60 px-3 py-2', rowIdx % 2 === 0 ? 'bg-card' : 'bg-muted/60')}
+                      className={cn('sticky left-0 z-10 border-r border-border/60 px-3 py-2', stickyProductCellBackgroundClass)}
                       style={{ width: columnWidths.__product, minWidth: 120, maxWidth: columnWidths.__product }}
                     >
                       <Link href={buildProductHref(product.id, currentRoute)} className="block">
