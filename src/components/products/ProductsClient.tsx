@@ -153,8 +153,8 @@ export function ProductsClient({
   })
 
   const canManageProducts = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUserRole) && !archiveMode
-  const canArchiveProducts = ['ADMIN', 'DIRECTOR'].includes(currentUserRole) && !archiveMode
-  const canDeleteProducts = ['ADMIN', 'DIRECTOR'].includes(currentUserRole)
+  const canArchiveProducts = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUserRole) && !archiveMode
+  const canDeleteProducts = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUserRole)
   const currentRoute = typeof window === 'undefined'
     ? getRouteWithSearch(pathname, searchParams.toString())
     : `${window.location.pathname}${window.location.search}`

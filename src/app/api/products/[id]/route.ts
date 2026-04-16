@@ -224,7 +224,7 @@ export async function PATCH(
     if (!hasProductLifecycleColumns) {
       return NextResponse.json({ error: 'Для архивации продукта нужно применить обновление схемы базы данных' }, { status: 409 })
     }
-    if (!['ADMIN', 'DIRECTOR'].includes(role)) {
+    if (!['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
@@ -264,7 +264,7 @@ export async function PATCH(
     if (!hasProductLifecycleColumns) {
       return NextResponse.json({ error: 'Для восстановления продукта нужно применить обновление схемы базы данных' }, { status: 409 })
     }
-    if (!['ADMIN', 'DIRECTOR'].includes(role)) {
+    if (!['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
@@ -367,7 +367,7 @@ export async function DELETE(
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const user = session.user as any
   const role = user.role
-  if (!['ADMIN', 'DIRECTOR'].includes(role)) {
+  if (!['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
   const rateLimit = consumeRateLimit({

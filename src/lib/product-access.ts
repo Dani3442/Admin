@@ -23,7 +23,7 @@ export function canViewAnalytics(viewer: ProductAccessViewer | null | undefined)
 }
 
 export function canManageArchive(viewer: ProductAccessViewer | null | undefined) {
-  return ['ADMIN', 'DIRECTOR'].includes(getViewerRole(viewer))
+  return ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(getViewerRole(viewer))
 }
 
 export function getVisibleProductWhere(
@@ -44,4 +44,3 @@ export function getVisibleProductWhere(
     AND: [baseWhere, { id: '__no-access__' }],
   }
 }
-

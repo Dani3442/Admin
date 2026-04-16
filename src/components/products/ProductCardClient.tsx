@@ -87,7 +87,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
 
   const canEdit = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUser?.role) && !product.isArchived
   const canComment = Boolean(currentUser?.id) && !product.isArchived
-  const canArchiveProduct = ['ADMIN', 'DIRECTOR'].includes(currentUser?.role)
+  const canArchiveProduct = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUser?.role)
   const backNavigation = resolveBackNavigation(searchParams.get('returnTo'))
   const mentionableUsers = useMemo(
     () =>
