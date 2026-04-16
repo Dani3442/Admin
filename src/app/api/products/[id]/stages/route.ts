@@ -29,6 +29,7 @@ async function normalizeRemainingProductStages(
     await tx.productStage.update({
       where: { id: remainingStage.id },
       data: { stageOrder: 1000000 + index },
+      select: { id: true },
     })
   }
 
@@ -36,6 +37,7 @@ async function normalizeRemainingProductStages(
     await tx.productStage.update({
       where: { id: remainingStage.id },
       data: { stageOrder: index },
+      select: { id: true },
     })
   }
 }
@@ -351,6 +353,7 @@ export async function DELETE(
 
       await tx.productStage.delete({
         where: { id: stageId },
+        select: { id: true },
       })
 
       await normalizeRemainingProductStages(tx as any, productId)
