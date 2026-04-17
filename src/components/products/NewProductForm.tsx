@@ -740,7 +740,7 @@ export function NewProductForm({
                 </div>
               </div>
 
-              <div className="space-y-3">
+              <div className="max-h-[min(52vh,34rem)] space-y-3 overflow-y-auto pr-2">
                 {templateStages.map((stage, index) => (
                   <div key={stage.id} className="grid gap-3 rounded-xl border border-border/70 bg-muted/55 p-3 md:grid-cols-[minmax(0,1fr)_220px_140px_180px_44px]">
                     <div>
