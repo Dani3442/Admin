@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Layers3, Plus, Save, Trash2 } from 'lucide-react'
+import { ArrowLeft, Check, ChevronDown, Layers3, Plus, Save, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import { DatePicker } from '@/components/ui/DatePicker'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import type { ProductTemplateData, ProductTemplateStageData } from '@/types'
 import { formatDate } from '@/lib/utils'
 import { applySequentialStageDateOverride, buildSequentialStageSchedule } from '@/lib/stage-schedule'
@@ -102,13 +103,18 @@ export function NewProductForm({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [templates, setTemplates] = useState(productTemplates)
+  const [templateSelectOpen, setTemplateSelectOpen] = useState(false)
   const [showTemplateBuilder, setShowTemplateBuilder] = useState(false)
   const [templateSaving, setTemplateSaving] = useState(false)
+  const [templateDeleting, setTemplateDeleting] = useState(false)
   const [templateError, setTemplateError] = useState('')
+  const [templateDeleteError, setTemplateDeleteError] = useState('')
+  const [templateToDelete, setTemplateToDelete] = useState<ProductTemplateData | null>(null)
   const [templateDraftName, setTemplateDraftName] = useState('')
   const [templateDraftDescription, setTemplateDraftDescription] = useState('')
   const [templateStages, setTemplateStages] = useState<TemplateDraftStage[]>([createDraftStage(0)])
   const [selectedTemplateStages, setSelectedTemplateStages] = useState<SelectedTemplateStageOverride[]>([])
+  const templateSelectRef = useRef<HTMLDivElement | null>(null)
 
   const [form, setForm] = useState({
     name: '',
@@ -126,6 +132,10 @@ export function NewProductForm({
     [form.productTemplateId, templates]
   )
 
+  const selectedTemplateLabel = selectedTemplate
+    ? `${selectedTemplate.name} (${selectedTemplate.stages.length} этапов)`
+    : 'Стандартный набор этапов'
+
   useEffect(() => {
     if (!selectedTemplate) {
       setSelectedTemplateStages([])
@@ -136,6 +146,30 @@ export function NewProductForm({
       hydrateSelectedTemplateStages(selectedTemplate.stages)
     )
   }, [selectedTemplate])
+
+  useEffect(() => {
+    if (!templateSelectOpen) return
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!templateSelectRef.current?.contains(event.target as Node)) {
+        setTemplateSelectOpen(false)
+      }
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setTemplateSelectOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('keydown', handleEscape)
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [templateSelectOpen])
 
   const update = (field: string, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }))
@@ -294,6 +328,44 @@ export function NewProductForm({
     await persistTemplateDraft()
   }
 
+  const handleSelectTemplate = (templateId: string) => {
+    update('productTemplateId', templateId)
+    setTemplateSelectOpen(false)
+    setTemplateDeleteError('')
+  }
+
+  const handleDeleteTemplate = async () => {
+    if (!templateToDelete) return
+
+    setTemplateDeleting(true)
+    setTemplateDeleteError('')
+
+    try {
+      const response = await fetch(`/api/product-templates/${encodeURIComponent(templateToDelete.id)}`, {
+        method: 'DELETE',
+      })
+
+      const data = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'Не удалось удалить шаблон этапов')
+      }
+
+      setTemplates((prev) => prev.filter((template) => template.id !== templateToDelete.id))
+      if (form.productTemplateId === templateToDelete.id) {
+        setForm((prev) => ({ ...prev, productTemplateId: '' }))
+        setSelectedTemplateStages([])
+      }
+      setTemplateSelectOpen(false)
+      setTemplateToDelete(null)
+      router.refresh()
+    } catch (err: any) {
+      setTemplateDeleteError(err.message || 'Не удалось удалить шаблон этапов')
+    } finally {
+      setTemplateDeleting(false)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.name.trim()) {
@@ -440,21 +512,105 @@ export function NewProductForm({
 
           <div>
             <label className="mb-1.5 block text-sm font-medium text-foreground">Использовать шаблон</label>
-            <select
-              value={form.productTemplateId}
-              onChange={(e) => update('productTemplateId', e.target.value)}
-              className="input w-full"
-            >
-              <option value="">Стандартный набор этапов</option>
-              {templates.map((template) => (
-                <option key={template.id} value={template.id}>
-                  {template.name} ({template.stages.length} этапов)
-                </option>
-              ))}
-            </select>
+            <div ref={templateSelectRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setTemplateSelectOpen((prev) => !prev)}
+                className="flex min-h-12 w-full items-center justify-between gap-3 rounded-2xl border border-border/70 bg-card px-4 py-3 text-left shadow-sm transition hover:border-primary/40 hover:bg-card/95"
+              >
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium text-foreground">{selectedTemplateLabel}</div>
+                  <div className="mt-0.5 text-xs text-muted-foreground">
+                    {selectedTemplate
+                      ? 'Готовый шаблон этапов для быстрого старта'
+                      : 'Создать продукт со стандартным набором этапов'}
+                  </div>
+                </div>
+                <ChevronDown
+                  className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${
+                    templateSelectOpen ? 'rotate-180' : ''
+                  }`}
+                />
+              </button>
+
+              {templateSelectOpen && (
+                <div className="absolute left-0 right-0 z-30 mt-2 overflow-hidden rounded-2xl border border-border/70 bg-popover shadow-2xl shadow-black/20">
+                  <div className="max-h-72 overflow-y-auto p-2">
+                    <button
+                      type="button"
+                      onClick={() => handleSelectTemplate('')}
+                      className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm transition ${
+                        !form.productTemplateId
+                          ? 'bg-primary text-primary-foreground'
+                          : 'text-foreground hover:bg-accent'
+                      }`}
+                    >
+                      <Check className={`h-4 w-4 ${!form.productTemplateId ? 'opacity-100' : 'opacity-0'}`} />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-medium">Стандартный набор этапов</div>
+                        <div className={`${!form.productTemplateId ? 'text-primary-foreground/80' : 'text-muted-foreground'} mt-0.5 text-xs`}>
+                          Создать продукт без отдельного шаблона
+                        </div>
+                      </div>
+                    </button>
+
+                    {templates.length > 0 && <div className="my-2 border-t border-border/60" />}
+
+                    {templates.map((template) => {
+                      const isSelected = template.id === form.productTemplateId
+
+                      return (
+                        <div
+                          key={template.id}
+                          className={`flex items-center gap-2 rounded-xl px-2 py-1 ${
+                            isSelected ? 'bg-primary text-primary-foreground' : 'text-foreground hover:bg-accent'
+                          }`}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => handleSelectTemplate(template.id)}
+                            className="flex min-w-0 flex-1 items-center gap-3 rounded-lg px-1 py-2 text-left"
+                          >
+                            <Check className={`h-4 w-4 shrink-0 ${isSelected ? 'opacity-100' : 'opacity-0'}`} />
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate text-sm font-medium">{template.name}</div>
+                              <div className={`${isSelected ? 'text-primary-foreground/80' : 'text-muted-foreground'} mt-0.5 text-xs`}>
+                                {template.stages.length} этапов
+                              </div>
+                            </div>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              setTemplateSelectOpen(false)
+                              setTemplateToDelete(template)
+                            }}
+                            className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition ${
+                              isSelected
+                                ? 'border-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/10'
+                                : 'border-border/60 text-red-500 hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-500/10'
+                            }`}
+                            title={`Удалить шаблон ${template.name}`}
+                            aria-label={`Удалить шаблон ${template.name}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
             <p className="mt-1.5 text-xs text-muted-foreground">
               Если шаблон не выбран, продукт создастся со всеми текущими глобальными этапами.
             </p>
+            {templateDeleteError && (
+              <div className="mt-2 rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-red-700 dark:text-red-300">
+                {templateDeleteError}
+              </div>
+            )}
           </div>
 
           {selectedTemplate && (
@@ -466,7 +622,21 @@ export function NewProductForm({
                     <div className="mt-0.5 text-xs text-muted-foreground">{selectedTemplate.description}</div>
                   )}
                 </div>
-                <div className="text-xs text-muted-foreground">{selectedTemplate.stages.length} этапов</div>
+                <div className="flex items-center gap-2">
+                  <div className="text-xs text-muted-foreground">{selectedTemplate.stages.length} этапов</div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTemplateSelectOpen(false)
+                      setTemplateToDelete(selectedTemplate)
+                    }}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-red-100 text-red-500 transition hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-500/10"
+                    title={`Удалить шаблон ${selectedTemplate.name}`}
+                    aria-label={`Удалить шаблон ${selectedTemplate.name}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
               <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
                 {selectedTemplateStages.map((stage, index) => (
@@ -786,6 +956,23 @@ export function NewProductForm({
           {saving ? 'Создание...' : 'Создать продукт'}
         </button>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(templateToDelete)}
+        title="Удалить шаблон?"
+        description={
+          templateToDelete
+            ? `Шаблон «${templateToDelete.name}» будет удалён из системы. У уже созданных продуктов данные останутся, но шаблон больше нельзя будет выбрать.`
+            : ''
+        }
+        confirmLabel="Удалить шаблон"
+        loading={templateDeleting}
+        onConfirm={handleDeleteTemplate}
+        onCancel={() => {
+          if (templateDeleting) return
+          setTemplateToDelete(null)
+        }}
+      />
     </form>
   )
 }

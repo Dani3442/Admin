@@ -59,6 +59,8 @@ Before changing business logic, routes, or UI flows, start here and verify the o
 - Product creation UI owner: `src/components/products/NewProductForm.tsx`
 - Product creation business logic owner: `src/lib/product-create.ts`
 - Avoid splitting creation flow across unrelated modal/page owners.
+- Template selection in product creation must use the system-styled custom selector, not a native browser `<select>`.
+- Product-template deletion from the creation flow must go through `src/app/api/product-templates/[id]/route.ts`.
 
 ### Stage scheduling
 - Scheduling math owner: `src/lib/stage-schedule.ts`

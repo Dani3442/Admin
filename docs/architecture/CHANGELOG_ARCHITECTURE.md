@@ -19,3 +19,13 @@
 
 ### Rollout note
 - Schema-dependent features must document whether local/prod DB changes are required.
+
+## 2026-04-17
+
+### Product template selector and deletion rule
+- Product creation template choice now belongs to the custom selector in `src/components/products/NewProductForm.tsx`, not a native browser `<select>`.
+- Product-template deletion from the creation flow belongs to `src/app/api/product-templates/[id]/route.ts`.
+- After template deletion succeeds, the form must immediately:
+  - remove the template from local `templates` state
+  - clear `productTemplateId` if the deleted template was selected
+  - reset the selected template stage override state

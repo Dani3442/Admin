@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { auth, hasPermission, Permission } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { buildSequentialStageSchedule } from '@/lib/stage-schedule'
@@ -224,5 +225,58 @@ export async function PATCH(
       { error: message },
       { status: message === 'Шаблон этапов не найден' ? 404 : 500 }
     )
+  }
+}
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth()
+  if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasPermission((session.user as any).role, Permission.EDIT_STAGES)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const userId = (session.user as any).id
+  const rateLimit = consumeRateLimit({
+    key: `api:product-templates:delete:${userId}:${getClientIpFromHeaders(req.headers)}`,
+    limit: 20,
+    windowMs: 60 * 1000,
+  })
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: 'Too many requests' },
+      { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } }
+    )
+  }
+
+  try {
+    const { id } = await params
+
+    const existingTemplate = await prisma.productTemplate.findUnique({
+      where: { id },
+      select: { id: true },
+    })
+
+    if (!existingTemplate) {
+      return NextResponse.json({ error: 'Шаблон этапов не найден' }, { status: 404 })
+    }
+
+    await prisma.productTemplate.delete({
+      where: { id },
+      select: { id: true },
+    })
+
+    revalidatePath('/products')
+    revalidatePath('/products/new')
+    revalidatePath('/table')
+
+    return NextResponse.json({ success: true, id })
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Не удалось удалить шаблон этапов'
+
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
