@@ -47,9 +47,13 @@ Before changing business logic, routes, or UI flows, start here and verify the o
 ## Source-of-truth rules
 
 ### Product list interactions
-- List mode context menu belongs only to `ProductsClient.tsx`.
-- Table mode must not own product context-menu behavior.
-- Table mode may own stage context menus only.
+- List mode product context menu owner: `src/components/products/ProductsClient.tsx`.
+- Table mode product context menu owner: `src/components/table/TableViewClient.tsx`.
+- Product rename uses one shared server contract: `PATCH /api/products/[id]` with `name`.
+- Table mode owns two separate context-menu flows:
+  - product row actions
+  - stage actions
+- Product and stage context menus in table mode must stay isolated and close each other before opening.
 
 ### Product creation
 - Product creation UI owner: `src/components/products/NewProductForm.tsx`

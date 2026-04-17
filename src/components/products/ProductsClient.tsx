@@ -11,6 +11,7 @@ import {
   Pin,
   PinOff,
   Plus,
+  Pencil,
   RotateCcw,
   Search,
   Star,
@@ -22,6 +23,7 @@ import { buildProductHref, getRouteWithSearch } from '@/lib/navigation'
 import { FilterSelect } from '@/components/ui/FilterSelect'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { FloatingContextMenu } from '@/components/ui/FloatingContextMenu'
+import { ProductRenameDialog } from '@/components/products/ProductRenameDialog'
 import { useContextMenu } from '@/hooks/useContextMenu'
 import {
   filterProducts,
@@ -136,6 +138,7 @@ export function ProductsClient({
   const [bulkAction, setBulkAction] = useState<'restore' | 'deleteArchived' | null>(null)
   const [bulkActionPending, setBulkActionPending] = useState(false)
   const [savingProductId, setSavingProductId] = useState<string | null>(null)
+  const [renamingProduct, setRenamingProduct] = useState<{ id: string; name: string } | null>(null)
   const [draggingProductId, setDraggingProductId] = useState<string | null>(null)
   const [dragOverState, setDragOverState] = useState<{ productId: string; position: 'before' | 'after' } | null>(null)
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number } | null>(null)
@@ -310,6 +313,38 @@ export function ProductsClient({
     } catch (error: any) {
       setProducts(previousProducts)
       window.alert(error.message || 'Не удалось обновить продукт')
+    } finally {
+      setSavingProductId(null)
+    }
+  }
+
+  const confirmRenameProduct = async (nextName: string) => {
+    if (!renamingProduct || !canManageProducts) return
+
+    const previousProducts = products
+    const productId = renamingProduct.id
+    const trimmedName = nextName.trim()
+
+    setSavingProductId(productId)
+    updateProduct(productId, (currentProduct) => ({ ...currentProduct, name: trimmedName }))
+
+    try {
+      const response = await fetch(`/api/products/${productId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: trimmedName }),
+      })
+      const data = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'Не удалось переименовать продукт')
+      }
+
+      setRenamingProduct(null)
+      router.refresh()
+    } catch (error: any) {
+      setProducts(previousProducts)
+      window.alert(error.message || 'Не удалось переименовать продукт')
     } finally {
       setSavingProductId(null)
     }
@@ -1224,6 +1259,18 @@ export function ProductsClient({
               {canManageProducts && (
                 <>
                   <button
+                    onClick={() => {
+                      closeContextMenu()
+                      setRenamingProduct({ id: contextProduct.id, name: contextProduct.name })
+                    }}
+                    disabled={savingProductId === contextProduct.id}
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-popover-foreground hover:bg-accent disabled:opacity-60"
+                  >
+                    <Pencil className="h-4 w-4 text-muted-foreground" />
+                    Переименовать продукт
+                  </button>
+
+                  <button
                     onClick={() => handleToggleProductFlag(contextProduct, 'isPinned', !contextProduct.isPinned)}
                     disabled={savingProductId === contextProduct.id}
                     className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-popover-foreground hover:bg-accent disabled:opacity-60"
@@ -1325,6 +1372,14 @@ export function ProductsClient({
           setBulkAction(null)
         }}
         onConfirm={confirmBulkArchiveAction}
+      />
+
+      <ProductRenameDialog
+        open={Boolean(renamingProduct)}
+        initialName={renamingProduct?.name || ''}
+        loading={Boolean(renamingProduct && savingProductId === renamingProduct.id)}
+        onCancel={() => setRenamingProduct(null)}
+        onConfirm={confirmRenameProduct}
       />
     </div>
   )

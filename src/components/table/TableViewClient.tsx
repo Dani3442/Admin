@@ -4,12 +4,13 @@ import { useState, useRef, useCallback, useEffect, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { Search, CheckCircle2, AlertTriangle, Plus, ChevronLeft, ChevronRight, Pencil, X, Trash2, Filter } from 'lucide-react'
+import { Search, CheckCircle2, AlertTriangle, Plus, ChevronLeft, ChevronRight, Pencil, X, Trash2, Filter, Archive, Pin, PinOff, Star } from 'lucide-react'
 import { cn, formatDate, detectStageOverlaps, getPriorityLabel, getStatusLabel } from '@/lib/utils'
 import { DatePicker } from '@/components/ui/DatePicker'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { FilterSelect } from '@/components/ui/FilterSelect'
 import { FloatingContextMenu } from '@/components/ui/FloatingContextMenu'
+import { ProductRenameDialog } from '@/components/products/ProductRenameDialog'
 import { buildProductHref, getRouteWithSearch } from '@/lib/navigation'
 import { useContextMenu } from '@/hooks/useContextMenu'
 import { filterProducts, sortProducts, type ProductListFilters, type ProductListSortDirection, type ProductListSortField, type ProductQuickView } from '@/lib/product-list'
@@ -62,6 +63,10 @@ interface EditingCellState {
 type StageMenuState =
   | { kind: 'header'; stageId: string }
   | { kind: 'cell'; stageId: string; productId: string }
+
+interface ProductMenuState {
+  productId: string
+}
 
 const ALL_STATUSES = ['PLANNED', 'IN_PROGRESS', 'AT_RISK', 'DELAYED', 'COMPLETED', 'CANCELLED'] as const
 const ALL_PRIORITIES = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] as const
@@ -175,6 +180,9 @@ export function TableViewClient({
   const canEditTable = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUserRole) && !archiveMode
   const [pendingDeleteStageId, setPendingDeleteStageId] = useState<string | null>(null)
   const [deleteStageError, setDeleteStageError] = useState<string | null>(null)
+  const [savingProductId, setSavingProductId] = useState<string | null>(null)
+  const [pendingArchiveProduct, setPendingArchiveProduct] = useState<{ id: string; name: string } | null>(null)
+  const [renamingProduct, setRenamingProduct] = useState<{ id: string; name: string } | null>(null)
   const {
     menu: stageMenu,
     menuRef,
@@ -183,6 +191,15 @@ export function TableViewClient({
   } = useContextMenu<StageMenuState>({
     width: 220,
     height: 260,
+  })
+  const {
+    menu: productMenu,
+    menuRef: productMenuRef,
+    closeMenu: closeProductMenu,
+    openMenuFromEvent: openProductMenu,
+  } = useContextMenu<ProductMenuState>({
+    width: 240,
+    height: 320,
   })
   const userOptions = Array.from(
     new Map(
@@ -195,6 +212,8 @@ export function TableViewClient({
   useEffect(() => {
     setProducts(initial)
   }, [initial])
+
+  const contextProduct = productMenu ? products.find((product) => product.id === productMenu.productId) || null : null
 
   useEffect(() => {
     setStages(initialStages)
@@ -355,6 +374,108 @@ export function TableViewClient({
     setPendingDeleteStageId(stageId)
   }
 
+  const updateProduct = (productId: string, updater: (product: Product) => Product) => {
+    setProducts((currentProducts) =>
+      currentProducts.map((product) => (product.id === productId ? updater(product) : product))
+    )
+  }
+
+  const handleToggleProductFlag = async (
+    product: Product,
+    field: 'isPinned' | 'isFavorite',
+    nextValue: boolean
+  ) => {
+    if (!canEditTable) return
+
+    const previousProducts = products
+    setSavingProductId(product.id)
+    updateProduct(product.id, (currentProduct) => ({ ...currentProduct, [field]: nextValue }))
+    closeProductMenu()
+
+    try {
+      const response = await fetch(`/api/products/${product.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [field]: nextValue }),
+      })
+      const data = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'Не удалось обновить продукт')
+      }
+
+      router.refresh()
+    } catch (error: any) {
+      setProducts(previousProducts)
+      window.alert(error.message || 'Не удалось обновить продукт')
+    } finally {
+      setSavingProductId(null)
+    }
+  }
+
+  const confirmRenameProduct = async (nextName: string) => {
+    if (!renamingProduct || !canEditTable) return
+
+    const previousProducts = products
+    const productId = renamingProduct.id
+    const trimmedName = nextName.trim()
+
+    setSavingProductId(productId)
+    updateProduct(productId, (currentProduct) => ({ ...currentProduct, name: trimmedName }))
+
+    try {
+      const response = await fetch(`/api/products/${productId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: trimmedName }),
+      })
+      const data = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'Не удалось переименовать продукт')
+      }
+
+      setRenamingProduct(null)
+      router.refresh()
+    } catch (error: any) {
+      setProducts(previousProducts)
+      window.alert(error.message || 'Не удалось переименовать продукт')
+    } finally {
+      setSavingProductId(null)
+    }
+  }
+
+  const confirmArchiveProduct = async () => {
+    if (!pendingArchiveProduct) return
+
+    const previousProducts = products
+    const productId = pendingArchiveProduct.id
+    setSavingProductId(productId)
+    closeProductMenu()
+    setProducts((currentProducts) => currentProducts.filter((product) => product.id !== productId))
+
+    try {
+      const response = await fetch(`/api/products/${productId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'archive' }),
+      })
+      const data = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'Не удалось архивировать продукт')
+      }
+
+      setPendingArchiveProduct(null)
+      router.refresh()
+    } catch (error: any) {
+      setProducts(previousProducts)
+      window.alert(error.message || 'Не удалось архивировать продукт')
+    } finally {
+      setSavingProductId(null)
+    }
+  }
+
   const confirmDeleteStage = async () => {
     if (!pendingDeleteStageId) return
     const deletingStageId = pendingDeleteStageId
@@ -404,11 +525,13 @@ export function TableViewClient({
 
   const handleStageHeaderClick = (e: React.MouseEvent, stage: Stage) => {
     if (!canEditTable) return
+    closeProductMenu()
     openStageMenu(e, { kind: 'header', stageId: stage.id }, { width: 220, height: 260 })
   }
 
   const handleStageCellContextMenu = (e: React.MouseEvent, productId: string, stage: ProductStage | undefined) => {
     if (!canEditTable || !stage) return
+    closeProductMenu()
     openStageMenu(
       e,
       {
@@ -418,6 +541,12 @@ export function TableViewClient({
       },
       { width: 220, height: 120 }
     )
+  }
+
+  const handleProductRowContextMenu = (event: React.MouseEvent, productId: string) => {
+    if (!canEditTable) return
+    closeStageMenu()
+    openProductMenu(event, { productId }, { width: 240, height: 320 })
   }
 
   const startRename = (stage: Stage) => {
@@ -944,6 +1073,7 @@ export function TableViewClient({
                       'hover:bg-accent/40'
                     )}
                     onClick={() => router.push(buildProductHref(product.id, currentRoute))}
+                    onContextMenu={(event) => handleProductRowContextMenu(event, product.id)}
                   >
                     {/* Product Name */}
                     <td
@@ -1116,6 +1246,78 @@ export function TableViewClient({
         </FloatingContextMenu>
       )}
 
+      {canEditTable && productMenu && contextProduct && (
+        <FloatingContextMenu
+          open
+          x={productMenu.x}
+          y={productMenu.y}
+          menuRef={productMenuRef}
+          className="fixed z-[90] w-60 rounded-xl border border-border/80 bg-popover p-2 text-popover-foreground shadow-modal"
+        >
+          <div className="border-b border-border/70 px-2.5 py-2">
+            <div className="truncate text-sm font-semibold text-popover-foreground">{contextProduct.name}</div>
+            <div className="mt-0.5 text-xs text-muted-foreground">Быстрые действия по продукту</div>
+          </div>
+
+          <div className="py-1">
+            <button
+              onClick={() => {
+                closeProductMenu()
+                router.push(buildProductHref(contextProduct.id, currentRoute))
+              }}
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-popover-foreground hover:bg-accent"
+            >
+              <Search className="h-4 w-4 text-muted-foreground" />
+              Открыть продукт
+            </button>
+
+            <button
+              onClick={() => {
+                closeProductMenu()
+                setRenamingProduct({ id: contextProduct.id, name: contextProduct.name })
+              }}
+              disabled={savingProductId === contextProduct.id}
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-popover-foreground hover:bg-accent disabled:opacity-60"
+            >
+              <Pencil className="h-4 w-4 text-muted-foreground" />
+              Переименовать продукт
+            </button>
+
+            <button
+              onClick={() => handleToggleProductFlag(contextProduct, 'isPinned', !contextProduct.isPinned)}
+              disabled={savingProductId === contextProduct.id}
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-popover-foreground hover:bg-accent disabled:opacity-60"
+            >
+              {contextProduct.isPinned ? (
+                <PinOff className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <Pin className="h-4 w-4 text-muted-foreground" />
+              )}
+              {contextProduct.isPinned ? 'Открепить' : 'Закрепить наверху'}
+            </button>
+
+            <button
+              onClick={() => handleToggleProductFlag(contextProduct, 'isFavorite', !contextProduct.isFavorite)}
+              disabled={savingProductId === contextProduct.id}
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-popover-foreground hover:bg-accent disabled:opacity-60"
+            >
+              <Star className={cn('h-4 w-4', contextProduct.isFavorite ? 'fill-amber-100 text-amber-500 dark:fill-amber-500/20 dark:text-amber-300' : 'text-muted-foreground')} />
+              {contextProduct.isFavorite ? 'Убрать из избранного' : 'Добавить в избранное'}
+            </button>
+
+            <div className="my-1 border-t border-border/70" />
+            <button
+              onClick={() => setPendingArchiveProduct({ id: contextProduct.id, name: contextProduct.name })}
+              disabled={savingProductId === contextProduct.id}
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-amber-700 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-500/10 disabled:opacity-60"
+            >
+              <Archive className="h-4 w-4" />
+              {savingProductId === contextProduct.id ? 'Архивация...' : 'Архивировать продукт'}
+            </button>
+          </div>
+        </FloatingContextMenu>
+      )}
+
       <ConfirmDialog
         open={Boolean(pendingDeleteStageId)}
         title="Удалить этап?"
@@ -1137,6 +1339,29 @@ export function TableViewClient({
         hideCancel
         onCancel={() => setDeleteStageError(null)}
         onConfirm={() => setDeleteStageError(null)}
+      />
+
+      <ConfirmDialog
+        open={Boolean(pendingArchiveProduct)}
+        title="Архивировать продукт?"
+        description={
+          pendingArchiveProduct
+            ? `Продукт «${pendingArchiveProduct.name}» исчезнет из активных списков, но этапы, комментарии и история сохранятся.`
+            : ''
+        }
+        confirmLabel="Архивировать"
+        confirmTone="primary"
+        loading={Boolean(pendingArchiveProduct && savingProductId === pendingArchiveProduct.id)}
+        onCancel={() => setPendingArchiveProduct(null)}
+        onConfirm={confirmArchiveProduct}
+      />
+
+      <ProductRenameDialog
+        open={Boolean(renamingProduct)}
+        initialName={renamingProduct?.name || ''}
+        loading={Boolean(renamingProduct && savingProductId === renamingProduct.id)}
+        onCancel={() => setRenamingProduct(null)}
+        onConfirm={confirmRenameProduct}
       />
 
       {/* New stage modal */}

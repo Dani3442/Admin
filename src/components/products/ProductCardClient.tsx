@@ -8,6 +8,7 @@ import { createPortal } from 'react-dom'
 import { ArrowLeft, CalendarDays, CheckCircle2, Circle, AlertTriangle, MessageCircle, Clock, History, Zap, ExternalLink, Edit2, Save, Pencil, ChevronUp, ChevronDown, X, Plus, Trash2, SendHorizontal, Archive, ArchiveRestore } from 'lucide-react'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { FloatingContextMenu } from '@/components/ui/FloatingContextMenu'
+import { ProductRenameDialog } from '@/components/products/ProductRenameDialog'
 import { cn, getStatusColor, getStatusLabel, getPriorityColor, getPriorityLabel, formatDate, formatDurationDays, detectStageOverlaps, formatStageOverlap } from '@/lib/utils'
 import { DatePicker } from '@/components/ui/DatePicker'
 import { resolveBackNavigation } from '@/lib/navigation'
@@ -73,6 +74,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
   const [deleteStageError, setDeleteStageError] = useState<string | null>(null)
   const [confirmArchiveProductOpen, setConfirmArchiveProductOpen] = useState(false)
   const [confirmRestoreProductOpen, setConfirmRestoreProductOpen] = useState(false)
+  const [renameProductOpen, setRenameProductOpen] = useState(false)
   const commentInputRef = useRef<HTMLTextAreaElement>(null)
   const commentsScrollRef = useRef<HTMLDivElement>(null)
   const markedSeenProductRef = useRef<string | null>(null)
@@ -309,6 +311,32 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
       alert(error.message || 'Не удалось добавить комментарий')
     } finally {
       setSavingComment(false)
+    }
+  }
+
+  const confirmRenameProduct = async (nextName: string) => {
+    if (!canEdit) return
+
+    setLifecycleSaving(true)
+    try {
+      const res = await fetch(`/api/products/${product.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: nextName.trim() }),
+      })
+      const data = await res.json().catch(() => null)
+
+      if (!res.ok) {
+        throw new Error(data?.error || 'Не удалось переименовать продукт')
+      }
+
+      setProduct((prev: any) => ({ ...prev, name: data.name ?? nextName.trim() }))
+      setRenameProductOpen(false)
+      router.refresh()
+    } catch (error: any) {
+      alert(error.message || 'Не удалось переименовать продукт')
+    } finally {
+      setLifecycleSaving(false)
     }
   }
 
@@ -771,7 +799,20 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
               <span className={cn('badge', getStatusColor(product.status))}>{getStatusLabel(product.status)}</span>
               {product.country && <span className="badge bg-muted text-muted-foreground">{product.country}</span>}
             </div>
-            <h1 className="mb-2 text-xl font-bold leading-tight text-foreground">{product.name}</h1>
+            <div className="mb-2 flex items-start gap-2">
+              <h1 className="min-w-0 flex-1 text-xl font-bold leading-tight text-foreground">{product.name}</h1>
+              {canEdit && (
+                <button
+                  type="button"
+                  onClick={() => setRenameProductOpen(true)}
+                  disabled={lifecycleSaving}
+                  className="inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-border/70 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-60"
+                  title="Переименовать продукт"
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+              )}
+            </div>
             <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
               <span>Ответственный: <span className="font-medium text-foreground">{product.responsible?.name || '—'}</span></span>
               <span>Финальная дата: <span className={cn('font-medium', product.finalDate && new Date(product.finalDate) < now ? 'text-red-600 dark:text-red-300' : 'text-foreground')}>{formatDate(product.finalDate)}</span></span>
@@ -1477,6 +1518,14 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
         hideCancel
         onCancel={() => setDeleteStageError(null)}
         onConfirm={() => setDeleteStageError(null)}
+      />
+
+      <ProductRenameDialog
+        open={renameProductOpen}
+        initialName={product.name}
+        loading={lifecycleSaving}
+        onCancel={() => setRenameProductOpen(false)}
+        onConfirm={confirmRenameProduct}
       />
 
       <ConfirmDialog

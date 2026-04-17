@@ -58,10 +58,15 @@
 
 ## Known mode ownership
 - Right-click product actions:
-  - list mode only
-  - not table mode
+  - list mode (`src/components/products/ProductsClient.tsx`)
+  - table mode (`src/components/table/TableViewClient.tsx`)
 - Right-click stage actions:
-  - table mode
+  - table mode (`src/components/table/TableViewClient.tsx`)
+- Product rename entry points:
+  - list mode product context menu
+  - table mode product context menu
+  - product details card header
+  - shared dialog: `src/components/products/ProductRenameDialog.tsx`
 - Archive actions:
   - product API owner
 - Notifications badge:
