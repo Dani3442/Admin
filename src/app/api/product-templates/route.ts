@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth, hasPermission, Permission } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { parseDateOnly } from '@/lib/date-only'
 import { buildSequentialStageSchedule } from '@/lib/stage-schedule'
 import { supportsProductTemplateStageDurationDaysColumn } from '@/lib/schema-compat'
 import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
@@ -96,7 +97,7 @@ export async function POST(req: NextRequest) {
       .map((stage: any, index: number) => ({
         stageOrder: index,
         stageName: normalizeStageName(String(stage?.stageName || '')),
-        plannedDate: stage?.plannedDate ? new Date(stage.plannedDate) : null,
+        plannedDate: parseDateOnly(stage?.plannedDate),
         durationDays:
           typeof stage?.durationDays === 'number' && Number.isFinite(stage.durationDays)
             ? Math.max(1, Math.floor(stage.durationDays))

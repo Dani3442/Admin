@@ -9,6 +9,7 @@ import { ArrowLeft, CalendarDays, CheckCircle2, Circle, AlertTriangle, MessageCi
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { FloatingContextMenu } from '@/components/ui/FloatingContextMenu'
 import { ProductRenameDialog } from '@/components/products/ProductRenameDialog'
+import { serializeDateOnly } from '@/lib/date-only'
 import { cn, getStatusColor, getStatusLabel, getPriorityColor, getPriorityLabel, formatDate, formatDurationDays, detectStageOverlaps, formatStageOverlap } from '@/lib/utils'
 import { DatePicker } from '@/components/ui/DatePicker'
 import { resolveBackNavigation } from '@/lib/navigation'
@@ -348,7 +349,16 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
       const res = await fetch('/api/stages', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stageId, updates: vals, applyAutomations: true }),
+        body: JSON.stringify({
+          stageId,
+          updates: {
+            ...vals,
+            ...(Object.prototype.hasOwnProperty.call(vals, 'dateValue')
+              ? { dateValue: serializeDateOnly(vals.dateValue ?? null) }
+              : {}),
+          },
+          applyAutomations: true,
+        }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -516,7 +526,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           stageName,
-          dateValue: newStageDate || null,
+          dateValue: serializeDateOnly(newStageDate),
           participatesInAutoshift: newStageAutoshift,
         }),
       })

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { createProductStageCompat } from '@/lib/product-stage-compat'
+import { parseDateOnly } from '@/lib/date-only'
 import { getFinalDateFromStages } from '@/lib/product-derived-fields'
 import {
   supportsProductTemplateReferenceColumn,
@@ -112,7 +113,7 @@ export async function createProduct(input: CreateProductInput) {
             stageTemplateId: String(stage?.stageTemplateId || ''),
             stageOrder: typeof stage?.stageOrder === 'number' ? stage.stageOrder : index,
             stageName: sanitizeTextValue(stage?.stageName, { maxLength: 160 }),
-            dateValue: stage?.plannedDate ? new Date(stage.plannedDate) : null,
+            dateValue: parseDateOnly(stage?.plannedDate),
             durationDays:
               typeof stage?.durationDays === 'number' && Number.isFinite(stage.durationDays)
                 ? Math.max(1, Math.floor(stage.durationDays))

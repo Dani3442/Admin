@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { Search, CheckCircle2, AlertTriangle, Plus, ChevronLeft, ChevronRight, Pencil, X, Trash2, Filter, Archive, Pin, PinOff, Star } from 'lucide-react'
 import { cn, formatDate, detectStageOverlaps, getPriorityLabel, getStatusLabel } from '@/lib/utils'
 import { DatePicker } from '@/components/ui/DatePicker'
+import { serializeDateOnly } from '@/lib/date-only'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { FilterSelect } from '@/components/ui/FilterSelect'
 import { FloatingContextMenu } from '@/components/ui/FloatingContextMenu'
@@ -719,7 +720,7 @@ export function TableViewClient({
           stageTemplateId: activeCell.stageTemplateId,
           stageOrder: activeCell.stageOrder,
           stageName: activeCell.stageName,
-          updates: { dateValue: nextDate },
+          updates: { dateValue: serializeDateOnly(nextDate) },
           applyAutomations: true,
         }),
       })

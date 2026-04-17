@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { parseDateOnly } from '@/lib/date-only'
 import { recalculateProductRisk } from '@/lib/risk'
 import { recalculateProductDerivedFields } from '@/lib/product-derived-fields'
 import { createProductStageCompat } from '@/lib/product-stage-compat'
@@ -171,7 +172,7 @@ export async function POST(
   try {
     const body = await req.json()
     const stageName = sanitizeTextValue(body?.stageName, { maxLength: 160 })
-    const dateValue = body.dateValue ? new Date(body.dateValue) : null
+    const dateValue = parseDateOnly(body.dateValue)
     const participatesInAutoshift = body.participatesInAutoshift !== false
     const hasStageTemplateAffectsFinalDateColumn = await supportsStageTemplateAffectsFinalDateColumn()
 

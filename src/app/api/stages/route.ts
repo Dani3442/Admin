@@ -3,6 +3,7 @@ import { revalidatePath } from 'next/cache'
 import { auth, hasPermission, Permission } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { applyAutomation, ensureDefaultShiftFollowingAutomation } from '@/lib/automation'
+import { parseDateOnly } from '@/lib/date-only'
 import { recalculateProductRisk } from '@/lib/risk'
 import {
   supportsProductStageAutoshiftColumn,
@@ -395,7 +396,7 @@ export async function PATCH(req: NextRequest) {
           _max: { stageOrder: true },
         })
         const tempStageOrder = (orderAggregate._max.stageOrder ?? -1) + 1
-        const initialDateValue = updates?.dateValue ? new Date(updates.dateValue) : null
+        const initialDateValue = parseDateOnly(updates?.dateValue)
 
         const createdStage = await createProductStageCompat(tx as any, {
           productId,
@@ -461,7 +462,7 @@ export async function PATCH(req: NextRequest) {
 
   const oldDate = createdMissingStage ? null : targetStage.dateValue
   const hasExplicitDateUpdate = Object.prototype.hasOwnProperty.call(updates || {}, 'dateValue')
-  const newDate = hasExplicitDateUpdate && updates.dateValue ? new Date(updates.dateValue) : null
+  const newDate = hasExplicitDateUpdate ? parseDateOnly(updates?.dateValue) : null
 
   // Log change
   if (hasExplicitDateUpdate && !areSameDate(oldDate, newDate)) {

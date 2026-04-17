@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { DatePicker } from '@/components/ui/DatePicker'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import type { ProductTemplateData, ProductTemplateStageData } from '@/types'
+import { serializeDateOnly } from '@/lib/date-only'
 import { formatDate } from '@/lib/utils'
 import { applySequentialStageDateOverride, buildSequentialStageSchedule } from '@/lib/stage-schedule'
 
@@ -308,7 +309,7 @@ export function NewProductForm({
           description: templateDraftDescription.trim() || null,
           stages: normalizedStages.map((stage) => ({
             stageName: stage.stageName,
-            plannedDate: stage.plannedDate ? stage.plannedDate.toISOString() : null,
+            plannedDate: serializeDateOnly(stage.plannedDate),
             durationDays: stage.durationDays ?? null,
             participatesInAutoshift: stage.participatesInAutoshift,
           })),
@@ -413,7 +414,7 @@ export function NewProductForm({
           stages: normalizedStages.map((stage) => ({
             id: stage.id,
             stageName: stage.stageName,
-            plannedDate: stage.plannedDate ? stage.plannedDate.toISOString() : null,
+            plannedDate: serializeDateOnly(stage.plannedDate),
             durationDays: stage.durationDays ?? null,
             participatesInAutoshift: stage.participatesInAutoshift,
           })),
@@ -482,7 +483,7 @@ export function NewProductForm({
             stageTemplateId: stage.stageTemplateId,
             stageOrder: stage.stageOrder,
             stageName: stage.stageName,
-            plannedDate: stage.plannedDate ? stage.plannedDate.toISOString() : null,
+            plannedDate: serializeDateOnly(stage.plannedDate),
             durationDays: stage.durationDays ?? null,
             participatesInAutoshift: stage.participatesInAutoshift,
           })),
@@ -536,7 +537,7 @@ export function NewProductForm({
           stageTemplateId: stage.stageTemplateId,
           stageOrder: stage.stageOrder,
           stageName: stage.stageName,
-          plannedDate: stage.plannedDate ? stage.plannedDate.toISOString() : null,
+          plannedDate: serializeDateOnly(stage.plannedDate),
           durationDays: stage.durationDays ?? null,
           participatesInAutoshift: stage.participatesInAutoshift,
         }))
