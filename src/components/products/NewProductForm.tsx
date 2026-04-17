@@ -106,14 +106,18 @@ export function NewProductForm({
   const [templateSelectOpen, setTemplateSelectOpen] = useState(false)
   const [showTemplateBuilder, setShowTemplateBuilder] = useState(false)
   const [templateSaving, setTemplateSaving] = useState(false)
+  const [selectedTemplateSaving, setSelectedTemplateSaving] = useState(false)
   const [templateDeleting, setTemplateDeleting] = useState(false)
   const [templateError, setTemplateError] = useState('')
   const [templateDeleteError, setTemplateDeleteError] = useState('')
+  const [selectedTemplateError, setSelectedTemplateError] = useState('')
   const [templateToDelete, setTemplateToDelete] = useState<ProductTemplateData | null>(null)
   const [templateDraftName, setTemplateDraftName] = useState('')
   const [templateDraftDescription, setTemplateDraftDescription] = useState('')
   const [templateStages, setTemplateStages] = useState<TemplateDraftStage[]>([createDraftStage(0)])
   const [selectedTemplateStages, setSelectedTemplateStages] = useState<SelectedTemplateStageOverride[]>([])
+  const [selectedTemplateName, setSelectedTemplateName] = useState('')
+  const [selectedTemplateDescription, setSelectedTemplateDescription] = useState('')
   const templateSelectRef = useRef<HTMLDivElement | null>(null)
 
   const [form, setForm] = useState({
@@ -139,9 +143,15 @@ export function NewProductForm({
   useEffect(() => {
     if (!selectedTemplate) {
       setSelectedTemplateStages([])
+      setSelectedTemplateName('')
+      setSelectedTemplateDescription('')
+      setSelectedTemplateError('')
       return
     }
 
+    setSelectedTemplateName(selectedTemplate.name)
+    setSelectedTemplateDescription(selectedTemplate.description ?? '')
+    setSelectedTemplateError('')
     setSelectedTemplateStages(
       hydrateSelectedTemplateStages(selectedTemplate.stages)
     )
@@ -363,6 +373,72 @@ export function NewProductForm({
       setTemplateDeleteError(err.message || 'Не удалось удалить шаблон этапов')
     } finally {
       setTemplateDeleting(false)
+    }
+  }
+
+  const handleUpdateSelectedTemplate = async () => {
+    if (!selectedTemplate) return
+
+    const normalizedName = selectedTemplateName.trim()
+    const normalizedStages = selectedTemplateStages
+      .map((stage) => ({
+        id: stage.id,
+        stageName: stage.stageName.trim(),
+        plannedDate: stage.plannedDate,
+        durationDays: stage.durationDays ?? null,
+        participatesInAutoshift: stage.participatesInAutoshift,
+      }))
+      .filter((stage) => stage.stageName)
+
+    if (!normalizedName) {
+      setSelectedTemplateError('Укажите название шаблона')
+      return
+    }
+
+    if (normalizedStages.length === 0) {
+      setSelectedTemplateError('Добавьте хотя бы один этап в шаблон')
+      return
+    }
+
+    setSelectedTemplateSaving(true)
+    setSelectedTemplateError('')
+
+    try {
+      const response = await fetch(`/api/product-templates/${encodeURIComponent(selectedTemplate.id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: normalizedName,
+          description: selectedTemplateDescription.trim() || null,
+          stages: normalizedStages.map((stage) => ({
+            id: stage.id,
+            stageName: stage.stageName,
+            plannedDate: stage.plannedDate ? stage.plannedDate.toISOString() : null,
+            durationDays: stage.durationDays ?? null,
+            participatesInAutoshift: stage.participatesInAutoshift,
+          })),
+        }),
+      })
+
+      const data = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'Не удалось обновить шаблон этапов')
+      }
+
+      setTemplates((prev) =>
+        prev.map((template) => (template.id === data.id ? (data as ProductTemplateData) : template))
+      )
+      setSelectedTemplateName(data.name)
+      setSelectedTemplateDescription(data.description ?? '')
+      setSelectedTemplateStages(
+        hydrateSelectedTemplateStages(Array.isArray(data?.stages) ? data.stages : [])
+      )
+      router.refresh()
+    } catch (err: any) {
+      setSelectedTemplateError(err.message || 'Не удалось обновить шаблон этапов')
+    } finally {
+      setSelectedTemplateSaving(false)
     }
   }
 
@@ -616,14 +692,43 @@ export function NewProductForm({
           {selectedTemplate && (
             <div className="rounded-xl border border-border/70 bg-card p-4">
               <div className="flex items-center justify-between gap-3 mb-3">
-                <div>
-                  <div className="text-sm font-semibold text-foreground">{selectedTemplate.name}</div>
-                  {selectedTemplate.description && (
-                    <div className="mt-0.5 text-xs text-muted-foreground">{selectedTemplate.description}</div>
-                  )}
+                <div className="min-w-0 flex-1 space-y-3">
+                  <div>
+                    <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Название шаблона
+                    </label>
+                    <input
+                      type="text"
+                      value={selectedTemplateName}
+                      onChange={(e) => setSelectedTemplateName(e.target.value)}
+                      className="input h-10 w-full text-sm"
+                      placeholder="Название шаблона"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Описание
+                    </label>
+                    <input
+                      type="text"
+                      value={selectedTemplateDescription}
+                      onChange={(e) => setSelectedTemplateDescription(e.target.value)}
+                      className="input h-10 w-full text-sm"
+                      placeholder="Описание шаблона"
+                    />
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="text-xs text-muted-foreground">{selectedTemplate.stages.length} этапов</div>
+                <div className="flex items-start gap-2">
+                  <div className="pt-2 text-xs text-muted-foreground">{selectedTemplateStages.length} этапов</div>
+                  <button
+                    type="button"
+                    onClick={handleUpdateSelectedTemplate}
+                    disabled={selectedTemplateSaving}
+                    className="btn-secondary h-9 px-3 text-sm"
+                  >
+                    <Save className="h-4 w-4" />
+                    {selectedTemplateSaving ? 'Сохраняем...' : 'Сохранить'}
+                  </button>
                   <button
                     type="button"
                     onClick={() => {
@@ -638,6 +743,11 @@ export function NewProductForm({
                   </button>
                 </div>
               </div>
+              {selectedTemplateError && (
+                <div className="mb-3 rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-red-700 dark:text-red-300">
+                  {selectedTemplateError}
+                </div>
+              )}
               <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
                 {selectedTemplateStages.map((stage, index) => (
                   <div
@@ -645,9 +755,21 @@ export function NewProductForm({
                     className="grid gap-3 rounded-lg border border-border/60 px-3 py-3 md:grid-cols-[minmax(0,1fr)_220px_150px_120px]"
                   >
                     <div className="min-w-0">
-                      <div className="text-sm font-medium text-foreground">
-                        {index + 1}. {stage.stageName}
+                      <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        Этап {index + 1}
                       </div>
+                      <input
+                        type="text"
+                        value={stage.stageName}
+                        onChange={(e) =>
+                          updateSelectedTemplateStage(stage.id, {
+                            stageName: e.target.value,
+                          })
+                        }
+                        className="input h-9 w-full text-sm"
+                        list="stage-suggestions"
+                        placeholder="Название этапа"
+                      />
                     </div>
                     <div>
                       <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">

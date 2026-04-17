@@ -799,19 +799,27 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
               <span className={cn('badge', getStatusColor(product.status))}>{getStatusLabel(product.status)}</span>
               {product.country && <span className="badge bg-muted text-muted-foreground">{product.country}</span>}
             </div>
-            <div className="mb-2 flex items-start gap-2">
-              <h1 className="min-w-0 flex-1 text-xl font-bold leading-tight text-foreground">{product.name}</h1>
+            <div className="mb-2 flex items-start gap-3">
               {canEdit && (
                 <button
                   type="button"
                   onClick={() => setRenameProductOpen(true)}
                   disabled={lifecycleSaving}
-                  className="inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-border/70 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-60"
+                  className="mt-0.5 inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-border/70 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-60"
                   title="Переименовать продукт"
+                  aria-label="Переименовать продукт"
                 >
                   <Pencil className="h-4 w-4" />
                 </button>
               )}
+              <div className="min-w-0 flex-1">
+                <h1 className="text-xl font-bold leading-tight text-foreground">{product.name}</h1>
+                {canEdit && (
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    Нажми на иконку слева, чтобы переименовать продукт
+                  </div>
+                )}
+              </div>
             </div>
             <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
               <span>Ответственный: <span className="font-medium text-foreground">{product.responsible?.name || '—'}</span></span>

@@ -204,6 +204,10 @@ export async function PATCH(
       })
     })
 
+    revalidatePath('/products')
+    revalidatePath('/products/new')
+    revalidatePath('/table')
+
     return NextResponse.json({
       ...template,
       stages: template.stages.map((stage) => ({

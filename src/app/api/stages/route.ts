@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { auth, hasPermission, Permission } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { applyAutomation, ensureDefaultShiftFollowingAutomation } from '@/lib/automation'
 import { recalculateProductRisk } from '@/lib/risk'
 import {
   supportsProductStageAutoshiftColumn,
+  supportsProductStageDurationDaysColumn,
   supportsProductStageOverlapAcceptedColumn,
   supportsStageTemplateAffectsFinalDateColumn,
 } from '@/lib/schema-compat'
@@ -13,6 +15,13 @@ import { createProductStageCompat } from '@/lib/product-stage-compat'
 import { getOverlapAcceptedMap, persistOverlapAccepted } from '@/lib/overlap-acceptance'
 import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
 import { sanitizeDeepStrings, sanitizeTextValue } from '@/lib/input-security'
+import { applySequentialStageDateOverride } from '@/lib/stage-schedule'
+
+function areSameDate(left: Date | null, right: Date | null) {
+  if (!left && !right) return true
+  if (!left || !right) return false
+  return left.getTime() === right.getTime()
+}
 
 async function normalizeProductStageOrders(
   tx: {
@@ -136,12 +145,13 @@ export async function PATCH(req: NextRequest) {
 
   const body = sanitizeDeepStrings(await req.json(), { preserveNewlines: true }) as any
   const { stageId, stageIds, updates, applyAutomations = true, swapWithStageId, productId, stageTemplateId, stageOrder, stageName } = body
-  const [hasAutoshiftColumn, hasOverlapAcceptedColumn, hasStageTemplateAffectsFinalDateColumn] = await Promise.all([
+  const [hasAutoshiftColumn, hasDurationDaysColumn, hasOverlapAcceptedColumn, hasStageTemplateAffectsFinalDateColumn] = await Promise.all([
     supportsProductStageAutoshiftColumn(),
+    supportsProductStageDurationDaysColumn(),
     supportsProductStageOverlapAcceptedColumn(),
     supportsStageTemplateAffectsFinalDateColumn(),
   ])
-  const stageResponseSelect: Record<string, boolean> = {
+  const stageResponseSelect: Record<string, any> = {
     id: true,
     stageTemplateId: true,
     stageOrder: true,
@@ -161,10 +171,34 @@ export async function PATCH(req: NextRequest) {
     daysDeviation: true,
     createdAt: true,
     updatedAt: true,
+    stageTemplate: {
+      select: hasStageTemplateAffectsFinalDateColumn
+        ? {
+            id: true,
+            name: true,
+            order: true,
+            durationText: true,
+            durationDays: true,
+            isCritical: true,
+            affectsFinalDate: true,
+          }
+        : {
+            id: true,
+            name: true,
+            order: true,
+            durationText: true,
+            durationDays: true,
+            isCritical: true,
+          },
+    },
   }
 
   if (hasAutoshiftColumn) {
     stageResponseSelect.participatesInAutoshift = true
+  }
+
+  if (hasDurationDaysColumn) {
+    stageResponseSelect.durationDays = true
   }
 
   if (hasOverlapAcceptedColumn) {
@@ -391,6 +425,7 @@ export async function PATCH(req: NextRequest) {
   }
 
   if (!existingStage) return NextResponse.json({ error: 'Stage not found' }, { status: 404 })
+  const targetStage = existingStage
 
   // Handle order swap (move up/down)
   if (swapWithStageId) {
@@ -400,29 +435,42 @@ export async function PATCH(req: NextRequest) {
     // Use a temporary order to avoid unique constraint violation
     const tempOrder = -1
     await prisma.$transaction([
-      prisma.productStage.update({ where: { id: existingStage.id }, data: { stageOrder: tempOrder } }),
-      prisma.productStage.update({ where: { id: otherStage.id }, data: { stageOrder: existingStage.stageOrder } }),
-      prisma.productStage.update({ where: { id: existingStage.id }, data: { stageOrder: otherStage.stageOrder } }),
+      prisma.productStage.update({ where: { id: targetStage.id }, data: { stageOrder: tempOrder } }),
+      prisma.productStage.update({ where: { id: otherStage.id }, data: { stageOrder: targetStage.stageOrder } }),
+      prisma.productStage.update({ where: { id: targetStage.id }, data: { stageOrder: otherStage.stageOrder } }),
     ])
 
     const updatedStages = await prisma.productStage.findMany({
-      where: { productId: existingStage.productId },
+      where: { productId: targetStage.productId },
       orderBy: { stageOrder: 'asc' },
+      select: stageResponseSelect,
     })
-    return NextResponse.json({ stages: updatedStages })
+    const overlapAcceptedMap = await getOverlapAcceptedMap(targetStage.productId)
+    const overlapAcceptedByStageId = overlapAcceptedMap as Map<string, boolean>
+
+    return NextResponse.json({
+      stages: updatedStages.map((stage) => ({
+        ...stage,
+        participatesInAutoshift: hasAutoshiftColumn ? (stage as any).participatesInAutoshift ?? true : true,
+        overlapAccepted: hasOverlapAcceptedColumn
+          ? (stage as any).overlapAccepted ?? false
+          : overlapAcceptedByStageId.get((stage as any).id) ?? false,
+      })),
+    })
   }
 
-  const oldDate = createdMissingStage ? null : existingStage.dateValue
-  const newDate = updates.dateValue ? new Date(updates.dateValue) : null
+  const oldDate = createdMissingStage ? null : targetStage.dateValue
+  const hasExplicitDateUpdate = Object.prototype.hasOwnProperty.call(updates || {}, 'dateValue')
+  const newDate = hasExplicitDateUpdate && updates.dateValue ? new Date(updates.dateValue) : null
 
   // Log change
-  if (oldDate && newDate && oldDate.getTime() !== newDate.getTime()) {
+  if (hasExplicitDateUpdate && !areSameDate(oldDate, newDate)) {
     await prisma.changeHistory.create({
       data: {
-        productId: existingStage.productId,
-        productStageId: existingStage.id,
+        productId: targetStage.productId,
+        productStageId: targetStage.id,
         field: 'dateValue',
-        oldValue: oldDate.toISOString(),
+        oldValue: oldDate?.toISOString() ?? null,
         newValue: newDate?.toISOString() || null,
         changedById: userId,
         reason: updates.reason || null,
@@ -435,13 +483,7 @@ export async function PATCH(req: NextRequest) {
     delete safeUpdates.overlapAccepted
   }
 
-  if (
-    hasOverlapAcceptedColumn &&
-    Object.prototype.hasOwnProperty.call(safeUpdates, 'dateValue') &&
-    oldDate &&
-    newDate &&
-    oldDate.getTime() !== newDate.getTime()
-  ) {
+  if (hasOverlapAcceptedColumn && hasExplicitDateUpdate && !areSameDate(oldDate, newDate)) {
     safeUpdates.overlapAccepted = false
   }
 
@@ -449,52 +491,117 @@ export async function PATCH(req: NextRequest) {
     ...safeUpdates,
   }
 
-  const updatedStage = createdMissingStage
-    ? await prisma.productStage.findUniqueOrThrow({
-        where: { id: existingStage.id },
-        select: {
-          productId: true,
-          ...stageResponseSelect,
-        },
-      })
-    : await prisma.productStage.update({
-        where: { id: existingStage.id },
-        data: normalizedUpdates,
-        select: {
-          productId: true,
-          ...stageResponseSelect,
-        },
-      })
-
-  // Apply automation if date changed
   let automationResult = null
-  if (applyAutomations && oldDate && newDate && oldDate.getTime() !== newDate.getTime()) {
-    automationResult = await applyAutomation(
-      existingStage.productId,
-      existingStage.stageOrder,
-      oldDate,
-      newDate,
-      userId
+
+  if (hasExplicitDateUpdate) {
+    const scheduleStages = await prisma.productStage.findMany({
+      where: { productId: targetStage.productId },
+      orderBy: { stageOrder: 'asc' },
+      select: {
+        id: true,
+        stageOrder: true,
+        dateValue: true,
+        plannedDate: true,
+        ...(hasDurationDaysColumn ? { durationDays: true } : {}),
+        stageTemplate: {
+          select: {
+            durationDays: true,
+          },
+        },
+      },
+    })
+
+    const changedStageIndex = scheduleStages.findIndex((stage) => stage.id === targetStage.id)
+    if (changedStageIndex < 0) {
+      return NextResponse.json({ error: 'Stage not found' }, { status: 404 })
+    }
+
+    const recalculatedStages = applySequentialStageDateOverride(
+      scheduleStages.map((stage) => ({
+        plannedDate: stage.id === targetStage.id
+          ? newDate
+          : stage.dateValue ?? stage.plannedDate ?? null,
+        durationDays: hasDurationDaysColumn ? (stage as { durationDays?: number | null }).durationDays ?? null : null,
+        stageTemplateDurationDays: stage.stageTemplate?.durationDays ?? null,
+      })),
+      changedStageIndex,
+      newDate
     )
+
+    await prisma.$transaction(async (tx) => {
+      for (const [index, stage] of scheduleStages.entries()) {
+        if (index < changedStageIndex) continue
+
+        const nextPlannedDate = recalculatedStages[index]?.plannedDate ?? null
+        const previousPlannedDate = stage.dateValue ?? stage.plannedDate ?? null
+        const isChangedStage = stage.id === targetStage.id
+        const nextStageData = isChangedStage
+          ? {
+              ...normalizedUpdates,
+              dateValue: nextPlannedDate,
+              plannedDate: nextPlannedDate,
+            }
+          : {
+              dateValue: nextPlannedDate,
+              plannedDate: nextPlannedDate,
+            }
+
+        await tx.productStage.update({
+          where: { id: stage.id },
+          data: nextStageData,
+          select: { id: true },
+        })
+
+        if (!isChangedStage && !areSameDate(previousPlannedDate, nextPlannedDate)) {
+          await tx.changeHistory.create({
+            data: {
+              productId: targetStage.productId,
+              productStageId: stage.id,
+              field: 'dateValue',
+              oldValue: previousPlannedDate?.toISOString() ?? null,
+              newValue: nextPlannedDate?.toISOString() ?? null,
+              changedById: userId,
+              reason: `Автопересчёт после изменения даты этапа`,
+            },
+          })
+        }
+      }
+    })
+  } else {
+    if (!createdMissingStage) {
+      await prisma.productStage.update({
+        where: { id: targetStage.id },
+        data: normalizedUpdates,
+        select: { id: true },
+      })
+    }
+
+    if (applyAutomations && oldDate && newDate && !areSameDate(oldDate, newDate)) {
+      automationResult = await applyAutomation(
+        targetStage.productId,
+        targetStage.stageOrder,
+        oldDate,
+        newDate,
+        userId
+      )
+    }
   }
 
   if (
     !hasOverlapAcceptedColumn &&
-    Object.prototype.hasOwnProperty.call(updates || {}, 'dateValue') &&
-    oldDate &&
-    newDate &&
-    oldDate.getTime() !== newDate.getTime()
+    hasExplicitDateUpdate &&
+    !areSameDate(oldDate, newDate)
   ) {
-    await persistOverlapAccepted(existingStage.productId, [existingStage.id], false, userId)
+    await persistOverlapAccepted(targetStage.productId, [targetStage.id], false, userId)
   }
 
-  await recalculateProductDerivedFields(existingStage.productId)
+  await recalculateProductDerivedFields(targetStage.productId)
 
   // Recalculate risk after any stage change
-  await recalculateProductRisk(existingStage.productId)
+  await recalculateProductRisk(targetStage.productId)
 
   const updatedProduct = await prisma.product.findUnique({
-    where: { id: existingStage.productId },
+    where: { id: targetStage.productId },
     select: {
       id: true,
       finalDate: true,
@@ -505,21 +612,29 @@ export async function PATCH(req: NextRequest) {
   })
 
   const stages = await prisma.productStage.findMany({
-    where: { productId: existingStage.productId },
+    where: { productId: targetStage.productId },
     orderBy: { stageOrder: 'asc' },
     select: stageResponseSelect,
   })
-  const overlapAcceptedMap = await getOverlapAcceptedMap(existingStage.productId)
+  const updatedStage = stages.find((stage) => (stage as any).id === targetStage.id)
+  const overlapAcceptedMap = await getOverlapAcceptedMap(targetStage.productId)
   const overlapAcceptedByStageId = overlapAcceptedMap as Map<string, boolean>
 
+  revalidatePath('/products')
+  revalidatePath('/table')
+  revalidatePath('/dashboard')
+  revalidatePath('/timeline')
+  revalidatePath('/archive')
+  revalidatePath(`/products/${targetStage.productId}`)
+
   return NextResponse.json({
-    stage: {
+    stage: updatedStage ? {
       ...updatedStage,
       participatesInAutoshift: hasAutoshiftColumn ? (updatedStage as any).participatesInAutoshift ?? true : true,
       overlapAccepted: hasOverlapAcceptedColumn
         ? (updatedStage as any).overlapAccepted ?? false
         : overlapAcceptedByStageId.get((updatedStage as any).id) ?? false,
-    },
+    } : null,
     stages: stages.map((stage) => ({
       ...stage,
       participatesInAutoshift: hasAutoshiftColumn ? (stage as any).participatesInAutoshift ?? true : true,
