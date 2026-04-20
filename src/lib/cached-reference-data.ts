@@ -42,7 +42,7 @@ const getCachedStageSuggestionsInternal = unstable_cache(
 )
 
 const getCachedProductTemplatesInternal = unstable_cache(
-  async (hasDurationDaysColumn: boolean) =>
+  async (hasDurationDaysColumn: boolean, hasAutoshiftColumn: boolean) =>
     prisma.productTemplate.findMany({
       select: {
         id: true,
@@ -59,6 +59,7 @@ const getCachedProductTemplatesInternal = unstable_cache(
             stageName: true,
             plannedDate: true,
             ...(hasDurationDaysColumn ? { durationDays: true } : {}),
+            ...(hasAutoshiftColumn ? { participatesInAutoshift: true } : {}),
             stageTemplate: {
               select: {
                 durationDays: true,
@@ -85,6 +86,6 @@ export async function getCachedStageSuggestions() {
   return getCachedStageSuggestionsInternal()
 }
 
-export async function getCachedProductTemplates(hasDurationDaysColumn: boolean) {
-  return getCachedProductTemplatesInternal(hasDurationDaysColumn)
+export async function getCachedProductTemplates(hasDurationDaysColumn: boolean, hasAutoshiftColumn: boolean) {
+  return getCachedProductTemplatesInternal(hasDurationDaysColumn, hasAutoshiftColumn)
 }

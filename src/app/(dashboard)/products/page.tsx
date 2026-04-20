@@ -4,12 +4,18 @@ import { auth } from '@/lib/auth'
 import { ProductsWorkspace } from '@/components/products/ProductsWorkspace'
 import { recalculateAllRisksIfNeeded } from '@/lib/risk'
 import { getCachedAssignableUsers, getCachedProductTemplates, getCachedStageSuggestions, getCachedStageTemplates } from '@/lib/cached-reference-data'
-import { supportsProductTemplateStageDurationDaysColumn } from '@/lib/schema-compat'
+import {
+  supportsProductTemplateStageAutoshiftColumn,
+  supportsProductTemplateStageDurationDaysColumn,
+} from '@/lib/schema-compat'
 import { getVisibleProductWhere } from '@/lib/product-access'
 
 async function getProductsWorkspaceData(viewer: { id?: string | null; role?: string | null }, archived = false) {
   await recalculateAllRisksIfNeeded()
-  const hasTemplateStageDurationDaysColumn = await supportsProductTemplateStageDurationDaysColumn()
+  const [hasTemplateStageDurationDaysColumn, hasTemplateStageAutoshiftColumn] = await Promise.all([
+    supportsProductTemplateStageDurationDaysColumn(),
+    supportsProductTemplateStageAutoshiftColumn(),
+  ])
   const visibleProductsWhere = getVisibleProductWhere(viewer, { isArchived: archived })
 
   const productWorkspaceSelect = {
@@ -60,7 +66,7 @@ async function getProductsWorkspaceData(viewer: { id?: string | null; role?: str
     }),
     getCachedAssignableUsers(),
     getCachedStageTemplates(),
-    getCachedProductTemplates(hasTemplateStageDurationDaysColumn),
+    getCachedProductTemplates(hasTemplateStageDurationDaysColumn, hasTemplateStageAutoshiftColumn),
     getCachedStageSuggestions(),
   ])
 
@@ -72,6 +78,7 @@ async function getProductsWorkspaceData(viewer: { id?: string | null; role?: str
     productTemplates,
     stageSuggestions,
     hasTemplateStageDurationDaysColumn,
+    hasTemplateStageAutoshiftColumn,
   }
 }
 
@@ -118,7 +125,7 @@ export default async function ProductsPage({
           plannedDate: stage.plannedDate,
           durationDays: data.hasTemplateStageDurationDaysColumn ? (stage as any).durationDays ?? null : null,
           stageTemplateDurationDays: stage.stageTemplate.durationDays ?? null,
-          participatesInAutoshift: true,
+          participatesInAutoshift: data.hasTemplateStageAutoshiftColumn ? (stage as any).participatesInAutoshift ?? true : true,
         })),
       })) as any}
       stageSuggestions={data.stageSuggestions}

@@ -4,7 +4,10 @@ import { auth, hasPermission, Permission } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { parseDateOnly } from '@/lib/date-only'
 import { buildSequentialStageSchedule } from '@/lib/stage-schedule'
-import { supportsProductTemplateStageDurationDaysColumn } from '@/lib/schema-compat'
+import {
+  supportsProductTemplateStageAutoshiftColumn,
+  supportsProductTemplateStageDurationDaysColumn,
+} from '@/lib/schema-compat'
 import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
 import { sanitizeDeepStrings, sanitizeTextValue } from '@/lib/input-security'
 
@@ -17,6 +20,7 @@ type TemplateStagePayload = {
   stageName: string
   plannedDate: Date | null
   durationDays: number | null
+  participatesInAutoshift: boolean
   stageTemplateDurationDays: number | null
 }
 
@@ -43,7 +47,10 @@ export async function PATCH(
   try {
     const { id } = await params
     const body = sanitizeDeepStrings(await req.json(), { preserveNewlines: true }) as any
-    const hasDurationDaysColumn = await supportsProductTemplateStageDurationDaysColumn()
+    const [hasDurationDaysColumn, hasAutoshiftColumn] = await Promise.all([
+      supportsProductTemplateStageDurationDaysColumn(),
+      supportsProductTemplateStageAutoshiftColumn(),
+    ])
     const templateName = sanitizeTextValue(body?.name, { maxLength: 160 })
     const description = sanitizeTextValue(body?.description, { preserveNewlines: true, maxLength: 1000 })
     const rawStages = Array.isArray(body?.stages) ? body.stages : []
@@ -62,6 +69,7 @@ export async function PATCH(
             typeof stage?.durationDays === 'number' && Number.isFinite(stage.durationDays)
               ? Math.max(1, Math.floor(stage.durationDays))
               : null,
+          participatesInAutoshift: stage?.participatesInAutoshift !== false,
           stageTemplateDurationDays: null,
           }))
         .filter((stage: { stageName: string }) => stage.stageName)
@@ -114,6 +122,7 @@ export async function PATCH(
         stageName: string
         plannedDate: Date | null
         durationDays: number | null
+        participatesInAutoshift: boolean
       }> = []
 
       for (const stage of stages) {
@@ -149,6 +158,7 @@ export async function PATCH(
           stageName: stage.stageName,
           plannedDate: stage.plannedDate,
           durationDays: stage.durationDays ?? null,
+          participatesInAutoshift: stage.participatesInAutoshift,
         })
       }
 
@@ -173,6 +183,7 @@ export async function PATCH(
             stageName: stage.stageName,
             plannedDate: stage.plannedDate,
             ...(hasDurationDaysColumn ? { durationDays: stage.durationDays } : {}),
+            ...(hasAutoshiftColumn ? { participatesInAutoshift: stage.participatesInAutoshift } : {}),
           },
         })
       }
@@ -194,6 +205,7 @@ export async function PATCH(
               stageName: true,
               plannedDate: true,
               ...(hasDurationDaysColumn ? { durationDays: true } : {}),
+              ...(hasAutoshiftColumn ? { participatesInAutoshift: true } : {}),
               stageTemplate: {
                 select: {
                   durationDays: true,
@@ -219,7 +231,7 @@ export async function PATCH(
         plannedDate: stage.plannedDate,
         durationDays: hasDurationDaysColumn ? (stage as any).durationDays ?? null : null,
         stageTemplateDurationDays: stage.stageTemplate.durationDays ?? null,
-        participatesInAutoshift: true,
+        participatesInAutoshift: hasAutoshiftColumn ? (stage as any).participatesInAutoshift ?? true : true,
       })),
     })
   } catch (error) {

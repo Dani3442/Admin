@@ -3,6 +3,7 @@ import { createProductStageCompat } from '@/lib/product-stage-compat'
 import { parseDateOnly } from '@/lib/date-only'
 import { getFinalDateFromStages } from '@/lib/product-derived-fields'
 import {
+  supportsProductTemplateStageAutoshiftColumn,
   supportsProductTemplateReferenceColumn,
   supportsProductTemplateStageDurationDaysColumn,
 } from '@/lib/schema-compat'
@@ -50,6 +51,7 @@ export async function createProduct(input: CreateProductInput) {
       sortOrderAggregate,
       hasProductTemplateReferenceColumn,
       hasProductTemplateStageDurationDaysColumn,
+      hasProductTemplateStageAutoshiftColumn,
     ] = await Promise.all([
       tx.stageTemplate.findMany({
         select: {
@@ -69,6 +71,7 @@ export async function createProduct(input: CreateProductInput) {
       }),
       supportsProductTemplateReferenceColumn(),
       supportsProductTemplateStageDurationDaysColumn(),
+      supportsProductTemplateStageAutoshiftColumn(),
     ])
 
     const selectedTemplate = input.productTemplateId
@@ -85,6 +88,7 @@ export async function createProduct(input: CreateProductInput) {
                 stageName: true,
                 plannedDate: true,
                 ...(hasProductTemplateStageDurationDaysColumn ? { durationDays: true } : {}),
+                ...(hasProductTemplateStageAutoshiftColumn ? { participatesInAutoshift: true } : {}),
                 stageTemplate: {
                   select: {
                     id: true,
@@ -140,7 +144,9 @@ export async function createProduct(input: CreateProductInput) {
             stageTemplateDurationDays: stage.stageTemplate.durationDays ?? null,
             isCritical: stage.stageTemplate.isCritical,
             affectsFinalDate: true,
-            participatesInAutoshift: override?.participatesInAutoshift ?? true,
+            participatesInAutoshift:
+              override?.participatesInAutoshift ??
+              (hasProductTemplateStageAutoshiftColumn ? (stage as any).participatesInAutoshift ?? true : true),
           }
         })
       : normalizedStageTemplates.map((template) => ({

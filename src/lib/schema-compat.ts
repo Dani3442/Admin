@@ -54,6 +54,10 @@ export async function supportsProductTemplateStageDurationDaysColumn() {
   return hasDbColumn('product_template_stages', 'durationDays')
 }
 
+export async function supportsProductTemplateStageAutoshiftColumn() {
+  return hasDbColumn('product_template_stages', 'participatesInAutoshift')
+}
+
 export async function supportsProductTemplateReferenceColumn() {
   return hasDbColumn('products', 'productTemplateId')
 }

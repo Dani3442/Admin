@@ -3,7 +3,10 @@ import { auth, hasPermission, Permission } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { parseDateOnly } from '@/lib/date-only'
 import { buildSequentialStageSchedule } from '@/lib/stage-schedule'
-import { supportsProductTemplateStageDurationDaysColumn } from '@/lib/schema-compat'
+import {
+  supportsProductTemplateStageAutoshiftColumn,
+  supportsProductTemplateStageDurationDaysColumn,
+} from '@/lib/schema-compat'
 import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
 import { sanitizeDeepStrings, sanitizeTextValue } from '@/lib/input-security'
 
@@ -23,7 +26,10 @@ type TemplateStagePayload = {
 export async function GET() {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const hasDurationDaysColumn = await supportsProductTemplateStageDurationDaysColumn()
+  const [hasDurationDaysColumn, hasAutoshiftColumn] = await Promise.all([
+    supportsProductTemplateStageDurationDaysColumn(),
+    supportsProductTemplateStageAutoshiftColumn(),
+  ])
 
   const templates = await prisma.productTemplate.findMany({
     select: {
@@ -41,6 +47,7 @@ export async function GET() {
           stageName: true,
           plannedDate: true,
           ...(hasDurationDaysColumn ? { durationDays: true } : {}),
+          ...(hasAutoshiftColumn ? { participatesInAutoshift: true } : {}),
           stageTemplate: {
             select: {
               durationDays: true,
@@ -63,7 +70,7 @@ export async function GET() {
         plannedDate: stage.plannedDate,
         durationDays: hasDurationDaysColumn ? stage.durationDays ?? null : null,
         stageTemplateDurationDays: stage.stageTemplate.durationDays ?? null,
-        participatesInAutoshift: true,
+        participatesInAutoshift: hasAutoshiftColumn ? (stage as any).participatesInAutoshift ?? true : true,
       })),
     }))
   )
@@ -88,7 +95,10 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = sanitizeDeepStrings(await req.json(), { preserveNewlines: true }) as any
-    const hasDurationDaysColumn = await supportsProductTemplateStageDurationDaysColumn()
+    const [hasDurationDaysColumn, hasAutoshiftColumn] = await Promise.all([
+      supportsProductTemplateStageDurationDaysColumn(),
+      supportsProductTemplateStageAutoshiftColumn(),
+    ])
     const templateName = sanitizeTextValue(body?.name, { maxLength: 160 })
     const description = sanitizeTextValue(body?.description, { preserveNewlines: true, maxLength: 1000 })
     const rawStages = Array.isArray(body?.stages) ? body.stages : []
@@ -155,12 +165,14 @@ export async function POST(req: NextRequest) {
         stageName: string
         plannedDate: Date | null
         durationDays: number | null
+        participatesInAutoshift: boolean
       }> = scheduledStages.map((stage) => ({
         stageTemplateId: '',
         stageOrder: stage.stageOrder,
         stageName: stage.stageName,
         plannedDate: stage.plannedDate,
         durationDays: stage.durationDays ?? null,
+        participatesInAutoshift: stage.participatesInAutoshift !== false,
       }))
 
       for (const stage of resolvedStages) {
@@ -207,6 +219,7 @@ export async function POST(req: NextRequest) {
               stageName: stage.stageName,
               plannedDate: stage.plannedDate,
               ...(hasDurationDaysColumn ? { durationDays: stage.durationDays ?? null } : {}),
+              ...(hasAutoshiftColumn ? { participatesInAutoshift: stage.participatesInAutoshift } : {}),
             })),
           },
         },
@@ -224,6 +237,7 @@ export async function POST(req: NextRequest) {
               stageName: true,
               plannedDate: true,
               ...(hasDurationDaysColumn ? { durationDays: true } : {}),
+              ...(hasAutoshiftColumn ? { participatesInAutoshift: true } : {}),
               stageTemplate: {
                 select: {
                   durationDays: true,
@@ -245,7 +259,7 @@ export async function POST(req: NextRequest) {
         plannedDate: stage.plannedDate,
         durationDays: hasDurationDaysColumn ? stage.durationDays ?? null : null,
         stageTemplateDurationDays: stage.stageTemplate.durationDays ?? null,
-        participatesInAutoshift: true,
+        participatesInAutoshift: hasAutoshiftColumn ? (stage as any).participatesInAutoshift ?? true : true,
       })),
     }, { status: 201 })
   } catch (error) {

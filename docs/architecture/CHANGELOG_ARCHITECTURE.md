@@ -1,5 +1,17 @@
 # Architecture Changelog
 
+## 2026-04-20
+
+### Parallel template stages
+- Fixed the product-template scheduling contract so adjacent stages can remain on the same date without being force-shifted on save.
+- Root cause was split across three layers:
+  - `product_template_stages` did not persist `participatesInAutoshift`
+  - `src/lib/stage-schedule.ts` always treated the chain as strictly sequential
+  - `src/lib/product-create.ts` recalculated template stages again when creating a product
+- Added `product_template_stages.participatesInAutoshift`
+- Updated template create/update/read flows to persist and return the flag with compatibility guards
+- Updated schedule math so a same-day adjacent pair is treated as a parallel block and only the last stage in that block shifts following stages
+
 ## 2026-04-10
 
 ### Established architectural docs

@@ -3,11 +3,17 @@ import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { ProductsWorkspace } from '@/components/products/ProductsWorkspace'
 import { getCachedAssignableUsers, getCachedProductTemplates, getCachedStageSuggestions, getCachedStageTemplates } from '@/lib/cached-reference-data'
-import { supportsProductTemplateStageDurationDaysColumn } from '@/lib/schema-compat'
+import {
+  supportsProductTemplateStageAutoshiftColumn,
+  supportsProductTemplateStageDurationDaysColumn,
+} from '@/lib/schema-compat'
 import { canManageArchive, getVisibleProductWhere } from '@/lib/product-access'
 
 async function getArchiveWorkspaceData(viewer: { id?: string | null; role?: string | null }) {
-  const hasTemplateStageDurationDaysColumn = await supportsProductTemplateStageDurationDaysColumn()
+  const [hasTemplateStageDurationDaysColumn, hasTemplateStageAutoshiftColumn] = await Promise.all([
+    supportsProductTemplateStageDurationDaysColumn(),
+    supportsProductTemplateStageAutoshiftColumn(),
+  ])
   const visibleProductsWhere = getVisibleProductWhere(viewer, { isArchived: true })
 
   const productWorkspaceSelect = {
@@ -58,7 +64,7 @@ async function getArchiveWorkspaceData(viewer: { id?: string | null; role?: stri
     }),
     getCachedAssignableUsers(),
     getCachedStageTemplates(),
-    getCachedProductTemplates(hasTemplateStageDurationDaysColumn),
+    getCachedProductTemplates(hasTemplateStageDurationDaysColumn, hasTemplateStageAutoshiftColumn),
     getCachedStageSuggestions(),
   ])
 
@@ -70,6 +76,7 @@ async function getArchiveWorkspaceData(viewer: { id?: string | null; role?: stri
     productTemplates,
     stageSuggestions,
     hasTemplateStageDurationDaysColumn,
+    hasTemplateStageAutoshiftColumn,
   }
 }
 
@@ -99,7 +106,7 @@ export default async function ArchivePage() {
           plannedDate: stage.plannedDate,
           durationDays: data.hasTemplateStageDurationDaysColumn ? (stage as any).durationDays ?? null : null,
           stageTemplateDurationDays: stage.stageTemplate.durationDays ?? null,
-          participatesInAutoshift: true,
+          participatesInAutoshift: data.hasTemplateStageAutoshiftColumn ? (stage as any).participatesInAutoshift ?? true : true,
         })),
       })) as any}
       stageSuggestions={data.stageSuggestions}

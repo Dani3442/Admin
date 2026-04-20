@@ -4,6 +4,7 @@ export type SequentialStageInput = {
   plannedDate: Date | null
   durationDays?: number | null
   stageTemplateDurationDays?: number | null
+  participatesInAutoshift?: boolean | null
 }
 
 export type SequentialStageScheduleItem<T extends SequentialStageInput> = T & {
@@ -14,6 +15,11 @@ export function normalizeDurationDays(value: unknown): number | null {
   if (typeof value !== 'number' || !Number.isFinite(value)) return null
   const normalized = Math.max(1, Math.floor(value))
   return normalized > 0 ? normalized : null
+}
+
+function hasParallelAnchor(currentDate: Date | null | undefined, previousDate: Date | null | undefined) {
+  if (!currentDate || !previousDate) return false
+  return differenceInCalendarDays(startOfDay(currentDate), startOfDay(previousDate)) === 0
 }
 
 export function deriveSequentialStageDurations<T extends SequentialStageInput>(stages: T[]) {
@@ -67,7 +73,10 @@ export function recalculateSequentialStageDates<T extends SequentialStageInput>(
     }
 
     const previousDuration = stagesWithDurations[index - 1].durationDays ?? 1
-    cursor = addDays(cursor, previousDuration)
+    const preserveParallelDate = hasParallelAnchor(stages[index].plannedDate, stages[index - 1].plannedDate)
+    if (!preserveParallelDate && stagesWithDurations[index - 1].participatesInAutoshift !== false) {
+      cursor = addDays(cursor, previousDuration)
+    }
 
     return {
       ...stage,
@@ -97,7 +106,10 @@ export function buildSequentialStageSchedule<T extends SequentialStageInput>(
   return stagesWithDurations.map((stage, index) => {
     if (index > 0) {
       const previousDuration = stagesWithDurations[index - 1].durationDays ?? 1
-      cursor = addDays(cursor, previousDuration)
+      const preserveParallelDate = hasParallelAnchor(stages[index].plannedDate, stages[index - 1].plannedDate)
+      if (!preserveParallelDate && stagesWithDurations[index - 1].participatesInAutoshift !== false) {
+        cursor = addDays(cursor, previousDuration)
+      }
     }
 
     return {
@@ -145,7 +157,10 @@ export function applySequentialStageDateOverride<T extends SequentialStageInput>
     }
 
     const previousDuration = stagesWithDurations[index - 1].durationDays ?? 1
-    cursor = addDays(cursor, previousDuration)
+    const preserveParallelDate = hasParallelAnchor(stages[index].plannedDate, stages[index - 1].plannedDate)
+    if (!preserveParallelDate && stagesWithDurations[index - 1].participatesInAutoshift !== false) {
+      cursor = addDays(cursor, previousDuration)
+    }
 
     return {
       ...(stages[index] as T),

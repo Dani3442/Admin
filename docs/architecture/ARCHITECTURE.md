@@ -66,6 +66,8 @@ Before changing business logic, routes, or UI flows, start here and verify the o
 - Scheduling math owner: `src/lib/stage-schedule.ts`
 - UI must not implement its own independent date chain logic.
 - APIs and forms must both use the same schedule helper.
+- Parallel adjacent stages are allowed when the next stage is explicitly set to the same calendar day or when the previous stage has `participatesInAutoshift = false`.
+- Template-stage autoshift is stored on `product_template_stages.participatesInAutoshift`, not only in form-local state.
 
 ### Archive behavior
 - Archive is represented by product fields like `isArchived`, `archivedAt`, `archivedById`.

@@ -118,6 +118,7 @@ model ProductTemplateStage {
   stageName         String
   plannedDate       DateTime?
   durationDays      Int?
+  participatesInAutoshift Boolean   @default(true)
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 

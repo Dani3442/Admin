@@ -2,7 +2,10 @@ import dynamic from 'next/dynamic'
 import { redirect } from 'next/navigation'
 import { auth, hasPermission, Permission } from '@/lib/auth'
 import { getCachedAssignableUsers, getCachedProductTemplates, getCachedStageSuggestions } from '@/lib/cached-reference-data'
-import { supportsProductTemplateStageDurationDaysColumn } from '@/lib/schema-compat'
+import {
+  supportsProductTemplateStageAutoshiftColumn,
+  supportsProductTemplateStageDurationDaysColumn,
+} from '@/lib/schema-compat'
 
 const NewProductForm = dynamic(
   () => import('@/components/products/NewProductForm').then((mod) => mod.NewProductForm),
@@ -12,11 +15,14 @@ const NewProductForm = dynamic(
 )
 
 async function getCreateProductData() {
-  const hasProductTemplateStageDurationDaysColumn = await supportsProductTemplateStageDurationDaysColumn()
+  const [hasProductTemplateStageDurationDaysColumn, hasProductTemplateStageAutoshiftColumn] = await Promise.all([
+    supportsProductTemplateStageDurationDaysColumn(),
+    supportsProductTemplateStageAutoshiftColumn(),
+  ])
 
   const [users, productTemplates, stageSuggestions] = await Promise.all([
     getCachedAssignableUsers(),
-    getCachedProductTemplates(hasProductTemplateStageDurationDaysColumn),
+    getCachedProductTemplates(hasProductTemplateStageDurationDaysColumn, hasProductTemplateStageAutoshiftColumn),
     getCachedStageSuggestions(),
   ])
 
@@ -32,7 +38,7 @@ async function getCreateProductData() {
         plannedDate: stage.plannedDate,
         durationDays: hasProductTemplateStageDurationDaysColumn ? (stage as any).durationDays ?? null : null,
         stageTemplateDurationDays: stage.stageTemplate.durationDays ?? null,
-        participatesInAutoshift: true,
+        participatesInAutoshift: hasProductTemplateStageAutoshiftColumn ? (stage as any).participatesInAutoshift ?? true : true,
       })),
     })),
     stageSuggestions,
