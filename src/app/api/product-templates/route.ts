@@ -3,6 +3,7 @@ import { auth, hasPermission, Permission } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { parseDateOnly } from '@/lib/date-only'
 import { buildSequentialStageSchedule } from '@/lib/stage-schedule'
+import { createProductTemplateStageCompat } from '@/lib/product-template-stage-compat'
 import {
   supportsProductTemplateStageAutoshiftColumn,
   supportsProductTemplateStageDurationDaysColumn,
@@ -212,18 +213,21 @@ export async function POST(req: NextRequest) {
         data: {
           name: templateName,
           description: description || null,
-          stages: {
-            create: resolvedStages.map((stage: any) => ({
-              stageTemplateId: stage.stageTemplateId,
-              stageOrder: stage.stageOrder,
-              stageName: stage.stageName,
-              plannedDate: stage.plannedDate,
-              ...(hasDurationDaysColumn ? { durationDays: stage.durationDays ?? null } : {}),
-              ...(hasAutoshiftColumn ? { participatesInAutoshift: stage.participatesInAutoshift } : {}),
-            })),
-          },
         },
+        select: { id: true },
       })
+
+      for (const stage of resolvedStages) {
+        await createProductTemplateStageCompat(tx as any, {
+          productTemplateId: createdTemplate.id,
+          stageTemplateId: stage.stageTemplateId,
+          stageOrder: stage.stageOrder,
+          stageName: stage.stageName,
+          plannedDate: stage.plannedDate,
+          durationDays: stage.durationDays ?? null,
+          participatesInAutoshift: stage.participatesInAutoshift,
+        })
+      }
 
       return tx.productTemplate.findUniqueOrThrow({
         where: { id: createdTemplate.id },

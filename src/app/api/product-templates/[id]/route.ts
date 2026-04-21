@@ -4,6 +4,7 @@ import { auth, hasPermission, Permission } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { parseDateOnly } from '@/lib/date-only'
 import { buildSequentialStageSchedule } from '@/lib/stage-schedule'
+import { createProductTemplateStageCompat } from '@/lib/product-template-stage-compat'
 import {
   supportsProductTemplateStageAutoshiftColumn,
   supportsProductTemplateStageDurationDaysColumn,
@@ -175,16 +176,14 @@ export async function PATCH(
       })
 
       for (const stage of resolvedStages) {
-        await tx.productTemplateStage.create({
-          data: {
-            productTemplateId: id,
-            stageTemplateId: stage.stageTemplateId,
-            stageOrder: stage.stageOrder,
-            stageName: stage.stageName,
-            plannedDate: stage.plannedDate,
-            ...(hasDurationDaysColumn ? { durationDays: stage.durationDays } : {}),
-            ...(hasAutoshiftColumn ? { participatesInAutoshift: stage.participatesInAutoshift } : {}),
-          },
+        await createProductTemplateStageCompat(tx as any, {
+          productTemplateId: id,
+          stageTemplateId: stage.stageTemplateId,
+          stageOrder: stage.stageOrder,
+          stageName: stage.stageName,
+          plannedDate: stage.plannedDate,
+          durationDays: stage.durationDays,
+          participatesInAutoshift: stage.participatesInAutoshift,
         })
       }
 

@@ -12,6 +12,11 @@
 - Updated template create/update/read flows to persist and return the flag with compatibility guards
 - Updated schedule math so a same-day adjacent pair is treated as a parallel block and only the last stage in that block shifts following stages
 
+### Product template stage create compatibility
+- Fixed template save/create on databases that do not yet have `product_template_stages.participatesInAutoshift`.
+- Root cause: Prisma `productTemplateStage.create()` still targeted the new column even when the route used compatibility checks.
+- Introduced a compat insert owner in `src/lib/product-template-stage-compat.ts` and routed template stage inserts through it.
+
 ## 2026-04-10
 
 ### Established architectural docs
