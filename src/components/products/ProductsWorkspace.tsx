@@ -393,7 +393,7 @@ export function ProductsWorkspace({
                       onChange={(event) => setOnlyWithOverlaps(event.target.checked)}
                       className="rounded border-border bg-input text-primary focus:ring-ring"
                     />
-                    Только с пересечениями дат
+                    Только с проблемами дат
                   </label>
                 </div>
               </motion.div>

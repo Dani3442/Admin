@@ -10,7 +10,20 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { FloatingContextMenu } from '@/components/ui/FloatingContextMenu'
 import { ProductRenameDialog } from '@/components/products/ProductRenameDialog'
 import { serializeDateOnly } from '@/lib/date-only'
-import { cn, getStatusColor, getStatusLabel, getPriorityColor, getPriorityLabel, formatDate, formatDurationDays, detectStageOverlaps, formatStageOverlap } from '@/lib/utils'
+import {
+  cn,
+  getStatusColor,
+  getStatusLabel,
+  getPriorityColor,
+  getPriorityLabel,
+  formatDate,
+  formatDurationDays,
+  detectStageOverlaps,
+  formatStageOverlap,
+  getStageIssueBadgeLabel,
+  getStageIssueKindForStage,
+  getStageIssuesSummaryLabel,
+} from '@/lib/utils'
 import { DatePicker } from '@/components/ui/DatePicker'
 import { resolveBackNavigation } from '@/lib/navigation'
 import { UserAvatar } from '@/components/users/UserAvatar'
@@ -980,7 +993,9 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                       <div className="mb-3 flex items-start gap-2 rounded-[24px] border border-amber-500/20 bg-amber-500/10 p-3">
                         <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-500 dark:text-amber-300" />
                         <div className="flex-1">
-                          <p className="text-sm font-medium text-amber-800 dark:text-amber-200">Обнаружены пересечения дат</p>
+                          <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                            {getStageIssuesSummaryLabel(overlaps) || 'Обнаружены проблемы с датами'}
+                          </p>
                           <ul className="mt-2 space-y-2">
                             {overlaps.map((o, i) => (
                               <li key={i} className="flex items-start justify-between gap-3 rounded-[16px] border border-amber-500/10 bg-card/70 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
@@ -1003,6 +1018,8 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                     )}
                     {product.stages.map((stage: any, idx: number) => {
                       const hasOverlap = overlappingIds.has(stage.id)
+                      const stageIssueKind = hasOverlap ? getStageIssueKindForStage(stage.id, overlaps) : null
+                      const stageIssueLabel = getStageIssueBadgeLabel(stageIssueKind)
                       const isEditing = editingStageId === stage.id
                       const cellStyle = getStageCellStyle(stage)
 
@@ -1056,7 +1073,11 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                                 {stage.participatesInAutoshift === false && (
                                   <span className="ml-1.5 text-xs font-semibold text-muted-foreground">АВТОСДВИГ ВЫКЛ.</span>
                                 )}
-                                {hasOverlap && <span className="ml-1.5 text-xs font-semibold text-amber-600 dark:text-amber-300">⚠ ПЕРЕСЕЧЕНИЕ</span>}
+                                {stageIssueLabel && (
+                                  <span className="ml-1.5 text-xs font-semibold text-amber-600 dark:text-amber-300">
+                                    {stageIssueLabel}
+                                  </span>
+                                )}
                               </p>
                             )}
                             {stage.comment && !isEditing && renamingStageId !== stage.id && (

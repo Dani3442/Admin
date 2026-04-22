@@ -228,7 +228,40 @@ export function formatStageOverlap(overlap: StageOverlapIssue) {
     return `Одинаковая дата у этапов: ${overlap.names.map((name) => `«${name}»`).join(', ')}`
   }
 
-  return `Пересечение: «${overlap.fromName || 'Этап'}» → «${overlap.toName || 'Этап'}»`
+  return `Нарушен порядок дат: «${overlap.fromName || 'Этап'}» позже «${overlap.toName || 'Этап'}»`
+}
+
+export function getStageIssueKindForStage(stageId: string, overlaps: StageOverlapIssue[]) {
+  for (const overlap of overlaps) {
+    if (overlap.stageIds.includes(stageId)) {
+      return overlap.kind
+    }
+  }
+
+  return null
+}
+
+export function getStageIssueBadgeLabel(kind: StageOverlapIssue['kind'] | null) {
+  if (kind === 'same_day_cluster') return '⚠ ОДНА ДАТА'
+  if (kind === 'out_of_order') return '⚠ НАРУШЕН ПОРЯДОК'
+  return null
+}
+
+export function getStageIssuesSummaryLabel(overlaps: StageOverlapIssue[]) {
+  if (overlaps.length === 0) return null
+
+  const hasSameDayCluster = overlaps.some((overlap) => overlap.kind === 'same_day_cluster')
+  const hasOutOfOrder = overlaps.some((overlap) => overlap.kind === 'out_of_order')
+
+  if (hasSameDayCluster && hasOutOfOrder) {
+    return `Обнаружены проблемы с датами: ${overlaps.length}`
+  }
+
+  if (hasSameDayCluster) {
+    return `Обнаружены совпадения дат: ${overlaps.length}`
+  }
+
+  return `Обнаружены нарушения порядка дат: ${overlaps.length}`
 }
 
 export function detectStageOverlaps(

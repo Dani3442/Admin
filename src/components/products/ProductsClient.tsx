@@ -18,7 +18,17 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-import { cn, detectStageOverlaps, formatDate, formatStageOverlap, getPriorityColor, getPriorityLabel, getStatusColor, getStatusLabel } from '@/lib/utils'
+import {
+  cn,
+  detectStageOverlaps,
+  formatDate,
+  formatStageOverlap,
+  getPriorityColor,
+  getPriorityLabel,
+  getStageIssuesSummaryLabel,
+  getStatusColor,
+  getStatusLabel,
+} from '@/lib/utils'
 import { buildProductHref, getRouteWithSearch } from '@/lib/navigation'
 import { FilterSelect } from '@/components/ui/FilterSelect'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -793,7 +803,7 @@ export function ProductsClient({
                       onChange={(event) => setOnlyWithOverlaps(event.target.checked)}
                       className="rounded border-border text-primary focus:ring-ring"
                     />
-                    Только с пересечениями дат
+                    Только с проблемами дат
                   </label>
                 </div>
               </motion.div>
@@ -952,7 +962,7 @@ export function ProductsClient({
                   className="rounded-[20px] border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300"
                   title={overlaps.map((overlap) => formatStageOverlap(overlap)).join(', ')}
                 >
-                  Обнаружено пересечений: {overlaps.length}
+                  {getStageIssuesSummaryLabel(overlaps) || `Обнаружены проблемы с датами: ${overlaps.length}`}
                 </div>
               )}
 
@@ -1161,7 +1171,7 @@ export function ProductsClient({
                                 className="font-medium text-amber-600 dark:text-amber-300"
                                 title={overlaps.map((overlap) => formatStageOverlap(overlap)).join(', ')}
                               >
-                                • ⚠ {overlaps.length} пересеч.
+                                • ⚠ {overlaps.length} проблем с датами
                               </span>
                             )}
                           </div>

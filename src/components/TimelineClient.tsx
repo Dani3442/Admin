@@ -201,7 +201,7 @@ export function TimelineClient({ products }: { products: Product[] }) {
                           'w-2.5 h-2.5 bg-blue-400 border-blue-500'
                         )}
                         style={{ left: left - 5, zIndex: hasOverlap ? 8 : 5 }}
-                        title={`${stage.stageName}\n${formatDate(stage.dateValue)}${stage.isCritical ? '\n⚠️ Критичный' : ''}${hasOverlap ? '\n⚠️ Пересечение дат' : ''}`}
+                        title={`${stage.stageName}\n${formatDate(stage.dateValue)}${stage.isCritical ? '\n⚠️ Критичный' : ''}${hasOverlap ? `\n⚠️ ${formatStageOverlap(productOverlaps.find((overlap) => overlap.stageIds.includes(stage.id)) || productOverlaps[0])}` : ''}`}
                       />
                     )
                   })}

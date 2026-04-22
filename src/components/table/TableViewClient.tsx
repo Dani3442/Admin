@@ -864,7 +864,7 @@ export function TableViewClient({
                   onChange={(event) => setOnlyWithOverlaps(event.target.checked)}
                   className="rounded border-border text-primary focus:ring-ring"
                 />
-                Только с пересечениями дат
+                Только с проблемами дат
               </label>
             </div>
           )}

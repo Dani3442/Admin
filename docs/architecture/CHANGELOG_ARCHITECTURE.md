@@ -17,6 +17,14 @@
 - Root cause: Prisma `productTemplateStage.create()` still targeted the new column even when the route used compatibility checks.
 - Introduced a compat insert owner in `src/lib/product-template-stage-compat.ts` and routed template stage inserts through it.
 
+### Stage date issue labeling
+- Fixed the stage issue wording so out-of-order dates are no longer shown as "Пересечение".
+- Root cause: `detectStageOverlaps()` already emitted two distinct issue kinds (`same_day_cluster` and `out_of_order`), but UI labels treated both as the same overlap warning.
+- Added explicit issue labels and summaries in `src/lib/utils.ts`:
+  - same-day parallel date block
+  - out-of-order date sequence
+- Updated list, card, timeline, and filter wording to use the generalized "проблемы с датами" language where the UI is not referring to the exact issue kind.
+
 ## 2026-04-10
 
 ### Established architectural docs
