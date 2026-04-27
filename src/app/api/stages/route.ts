@@ -16,7 +16,7 @@ import { createProductStageCompat } from '@/lib/product-stage-compat'
 import { getOverlapAcceptedMap, persistOverlapAccepted } from '@/lib/overlap-acceptance'
 import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
 import { sanitizeDeepStrings, sanitizeTextValue } from '@/lib/input-security'
-import { applySequentialStageDateOverride } from '@/lib/stage-schedule'
+import { applySequentialStageDateOverride, normalizeDurationDays } from '@/lib/stage-schedule'
 
 function areSameDate(left: Date | null, right: Date | null) {
   if (!left && !right) return true
@@ -405,6 +405,7 @@ export async function PATCH(req: NextRequest) {
           stageName: sanitizedStageName || template.name,
           dateValue: initialDateValue,
           plannedDate: initialDateValue,
+          durationDays: hasDurationDaysColumn ? normalizeDurationDays(Number(updates?.durationDays)) : null,
           isCritical: template.isCritical,
           affectsFinalDate: hasStageTemplateAffectsFinalDateColumn ? (template as any).affectsFinalDate ?? true : true,
           status: 'NOT_STARTED',
@@ -462,7 +463,17 @@ export async function PATCH(req: NextRequest) {
 
   const oldDate = createdMissingStage ? null : targetStage.dateValue
   const hasExplicitDateUpdate = Object.prototype.hasOwnProperty.call(updates || {}, 'dateValue')
+  const hasExplicitDurationDaysUpdate = Object.prototype.hasOwnProperty.call(updates || {}, 'durationDays')
   const newDate = hasExplicitDateUpdate ? parseDateOnly(updates?.dateValue) : null
+  const normalizedDurationDays = hasExplicitDurationDaysUpdate ? normalizeDurationDays(Number(updates?.durationDays)) : null
+
+  if (hasExplicitDurationDaysUpdate && normalizedDurationDays === null) {
+    return NextResponse.json({ error: 'Количество дней должно быть положительным числом' }, { status: 400 })
+  }
+
+  if (hasExplicitDurationDaysUpdate && !hasDurationDaysColumn) {
+    return NextResponse.json({ error: 'Для изменения количества дней нужно применить обновление схемы базы данных' }, { status: 400 })
+  }
 
   // Log change
   if (hasExplicitDateUpdate && !areSameDate(oldDate, newDate)) {
@@ -484,6 +495,12 @@ export async function PATCH(req: NextRequest) {
     delete safeUpdates.overlapAccepted
   }
 
+  if (!hasDurationDaysColumn) {
+    delete safeUpdates.durationDays
+  } else if (hasExplicitDurationDaysUpdate) {
+    safeUpdates.durationDays = normalizedDurationDays
+  }
+
   if (hasOverlapAcceptedColumn && hasExplicitDateUpdate && !areSameDate(oldDate, newDate)) {
     safeUpdates.overlapAccepted = false
   }
@@ -494,7 +511,7 @@ export async function PATCH(req: NextRequest) {
 
   let automationResult = null
 
-  if (hasExplicitDateUpdate) {
+  if (hasExplicitDateUpdate || hasExplicitDurationDaysUpdate) {
     const scheduleStages = await prisma.productStage.findMany({
       where: { productId: targetStage.productId },
       orderBy: { stageOrder: 'asc' },
@@ -504,6 +521,7 @@ export async function PATCH(req: NextRequest) {
         dateValue: true,
         plannedDate: true,
         ...(hasDurationDaysColumn ? { durationDays: true } : {}),
+        ...(hasAutoshiftColumn ? { participatesInAutoshift: true } : {}),
         stageTemplate: {
           select: {
             durationDays: true,
@@ -517,16 +535,32 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'Stage not found' }, { status: 404 })
     }
 
+    const oldDurationDays = hasDurationDaysColumn
+      ? normalizeDurationDays(
+          (scheduleStages[changedStageIndex] as { durationDays?: number | null }).durationDays ??
+          scheduleStages[changedStageIndex].stageTemplate?.durationDays
+        )
+      : null
+    const scheduleAnchorDate = hasExplicitDateUpdate
+      ? newDate
+      : scheduleStages[changedStageIndex].dateValue ?? scheduleStages[changedStageIndex].plannedDate ?? null
+    const stagesToResetOverlapAcceptance = scheduleStages
+      .slice(Math.max(0, changedStageIndex - 1))
+      .map((stage) => stage.id)
+
     const recalculatedStages = applySequentialStageDateOverride(
       scheduleStages.map((stage) => ({
         plannedDate: stage.id === targetStage.id
-          ? newDate
+          ? scheduleAnchorDate
           : stage.dateValue ?? stage.plannedDate ?? null,
-        durationDays: hasDurationDaysColumn ? (stage as { durationDays?: number | null }).durationDays ?? null : null,
+        durationDays: stage.id === targetStage.id && hasExplicitDurationDaysUpdate
+          ? normalizedDurationDays
+          : hasDurationDaysColumn ? (stage as { durationDays?: number | null }).durationDays ?? null : null,
         stageTemplateDurationDays: stage.stageTemplate?.durationDays ?? null,
+        participatesInAutoshift: hasAutoshiftColumn ? (stage as { participatesInAutoshift?: boolean | null }).participatesInAutoshift ?? true : true,
       })),
       changedStageIndex,
-      newDate
+      scheduleAnchorDate
     )
 
     await prisma.$transaction(async (tx) => {
@@ -568,6 +602,32 @@ export async function PATCH(req: NextRequest) {
         }
       }
     })
+
+    if (
+      hasExplicitDurationDaysUpdate &&
+      oldDurationDays !== null &&
+      normalizedDurationDays !== null &&
+      oldDurationDays !== normalizedDurationDays
+    ) {
+      await prisma.changeHistory.create({
+        data: {
+          productId: targetStage.productId,
+          productStageId: targetStage.id,
+          field: 'durationDays',
+          oldValue: String(oldDurationDays),
+          newValue: String(normalizedDurationDays),
+          changedById: userId,
+          reason: updates.reason || null,
+        },
+      })
+    }
+
+    if (
+      (hasExplicitDateUpdate && !areSameDate(oldDate, newDate)) ||
+      (hasExplicitDurationDaysUpdate && oldDurationDays !== normalizedDurationDays)
+    ) {
+      await persistOverlapAccepted(targetStage.productId, stagesToResetOverlapAcceptance, false, userId)
+    }
   } else {
     if (!createdMissingStage) {
       await prisma.productStage.update({
@@ -586,14 +646,6 @@ export async function PATCH(req: NextRequest) {
         userId
       )
     }
-  }
-
-  if (
-    !hasOverlapAcceptedColumn &&
-    hasExplicitDateUpdate &&
-    !areSameDate(oldDate, newDate)
-  ) {
-    await persistOverlapAccepted(targetStage.productId, [targetStage.id], false, userId)
   }
 
   await recalculateProductDerivedFields(targetStage.productId)

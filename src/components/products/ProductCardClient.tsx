@@ -71,6 +71,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
   const [showAddStageForm, setShowAddStageForm] = useState(false)
   const [newStageName, setNewStageName] = useState('')
   const [newStageDate, setNewStageDate] = useState<Date | null>(null)
+  const [newStageDurationDays, setNewStageDurationDays] = useState(1)
   const [newStageAutoshift, setNewStageAutoshift] = useState(true)
 
   const [renamingStageId, setRenamingStageId] = useState<string | null>(null)
@@ -427,6 +428,25 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
     return 'bg-muted text-muted-foreground'
   }
 
+  const getStageDurationValue = (stage: any) => {
+    const rawDuration = stage.durationDays ?? stage.stageTemplate?.durationDays ?? 1
+    const parsedDuration = Number(rawDuration)
+
+    return Number.isFinite(parsedDuration) && parsedDuration > 0 ? Math.floor(parsedDuration) : 1
+  }
+
+  const beginStageEdit = (stage: any) => {
+    setEditingStageId(stage.id)
+    setStageEditValues((prev) => ({
+      ...prev,
+      [stage.id]: {
+        ...prev[stage.id],
+        dateValue: stage.dateValue ? new Date(stage.dateValue) : null,
+        durationDays: getStageDurationValue(stage),
+      },
+    }))
+  }
+
   // Right-click context menu handler
   const handleStageContextMenu = (e: React.MouseEvent, stage: any) => {
     if (!canEdit) return
@@ -525,6 +545,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
     setShowAddStageForm(false)
     setNewStageName('')
     setNewStageDate(null)
+    setNewStageDurationDays(1)
     setNewStageAutoshift(true)
   }
 
@@ -540,6 +561,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
         body: JSON.stringify({
           stageName,
           dateValue: serializeDateOnly(newStageDate),
+          durationDays: newStageDurationDays,
           participatesInAutoshift: newStageAutoshift,
         }),
       })
@@ -967,6 +989,16 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                           panelClassName="w-[min(22rem,calc(100vw-24px))]"
                           placeholder="Дата этапа"
                         />
+                        <label className="flex flex-col gap-1 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground sm:w-40">
+                          Кол-во дней
+                          <input
+                            type="number"
+                            min={1}
+                            value={newStageDurationDays}
+                            onChange={(e) => setNewStageDurationDays(Math.max(1, Number(e.target.value) || 1))}
+                            className="input h-11 w-full text-sm normal-case tracking-normal"
+                          />
+                        </label>
                         <label className="flex min-h-11 items-center justify-between gap-3 rounded-[18px] border border-border/70 bg-card px-3 py-2 text-sm text-muted-foreground sm:h-11 sm:justify-start">
                           <span className="whitespace-nowrap">Автосдвиг</span>
                           <input
@@ -1112,10 +1144,30 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                             )}
                           </div>
 
-                          {Boolean(stage.durationDays ?? stage.stageTemplate?.durationDays) && (
-                            <div className="w-full flex-shrink-0 text-left text-xs text-muted-foreground sm:w-16 sm:text-center">
-                              {formatDurationDays(stage.durationDays ?? stage.stageTemplate?.durationDays ?? null)}
-                            </div>
+                          {isEditing ? (
+                            <label className="flex w-full flex-shrink-0 items-center gap-2 text-xs text-muted-foreground sm:w-28">
+                              <span className="sr-only">Количество дней</span>
+                              <input
+                                type="number"
+                                min={1}
+                                value={stageEditValues[stage.id]?.durationDays ?? getStageDurationValue(stage)}
+                                onChange={(e) => setStageEditValues((prev) => ({
+                                  ...prev,
+                                  [stage.id]: {
+                                    ...prev[stage.id],
+                                    durationDays: Math.max(1, Number(e.target.value) || 1),
+                                  },
+                                }))}
+                                className="input h-10 w-full text-xs"
+                                aria-label="Количество дней этапа"
+                              />
+                            </label>
+                          ) : (
+                            Boolean(stage.durationDays ?? stage.stageTemplate?.durationDays) && (
+                              <div className="w-full flex-shrink-0 text-left text-xs text-muted-foreground sm:w-16 sm:text-center">
+                                {formatDurationDays(stage.durationDays ?? stage.stageTemplate?.durationDays ?? null)}
+                              </div>
+                            )
                           )}
 
                           {canEdit && (
@@ -1131,7 +1183,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                                 </>
                               ) : (
                                 <button
-                                  onClick={() => setEditingStageId(stage.id)}
+                                  onClick={() => beginStageEdit(stage)}
                                   className="rounded-lg p-1.5 text-muted-foreground/60 transition-colors hover:bg-accent hover:text-foreground"
                                 >
                                   <Edit2 className="h-3.5 w-3.5" />
@@ -1377,16 +1429,12 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
             <button
               className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-popover-foreground hover:bg-accent"
               onClick={() => {
-                setEditingStageId(stage.id)
-                setStageEditValues((prev) => ({
-                  ...prev,
-                  [stage.id]: { ...prev[stage.id], dateValue: stage.dateValue ? new Date(stage.dateValue) : null },
-                }))
+                beginStageEdit(stage)
                 closeStageMenu()
               }}
             >
               <CalendarDays className="w-3.5 h-3.5 text-muted-foreground" />
-              Изменить дату
+              Изменить дату и дни
             </button>
             <button
               className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-popover-foreground hover:bg-accent"

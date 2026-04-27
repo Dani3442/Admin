@@ -309,7 +309,7 @@ export function detectStageOverlaps(
   }
 
   for (const [dateKey, group] of dateGroups.entries()) {
-    if (group.length < 3) continue
+    if (group.length < 2) continue
     if (group.every((stage) => stage.overlapAccepted)) continue
 
     for (const stage of group) {

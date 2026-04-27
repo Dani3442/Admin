@@ -7,10 +7,12 @@ import { recalculateProductRisk } from '@/lib/risk'
 import { recalculateProductDerivedFields } from '@/lib/product-derived-fields'
 import { createProductStageCompat } from '@/lib/product-stage-compat'
 import {
+  supportsProductStageDurationDaysColumn,
   supportsStageTemplateAffectsFinalDateColumn,
 } from '@/lib/schema-compat'
 import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
 import { sanitizeTextValue } from '@/lib/input-security'
+import { normalizeDurationDays } from '@/lib/stage-schedule'
 
 async function normalizeRemainingProductStages(
   tx: {
@@ -46,6 +48,7 @@ async function normalizeRemainingProductStages(
 
 async function getProductStageSnapshot(productId: string) {
   const hasStageTemplateAffectsFinalDateColumn = await supportsStageTemplateAffectsFinalDateColumn()
+  const hasProductStageDurationDaysColumn = await supportsProductStageDurationDaysColumn()
   const product = await prisma.product.findUnique({
     where: { id: productId },
     select: {
@@ -61,6 +64,7 @@ async function getProductStageSnapshot(productId: string) {
           dateValue: true,
           dateRaw: true,
           dateEnd: true,
+          ...(hasProductStageDurationDaysColumn ? { durationDays: true } : {}),
           status: true,
           isCompleted: true,
           isCritical: true,
@@ -173,8 +177,10 @@ export async function POST(
     const body = await req.json()
     const stageName = sanitizeTextValue(body?.stageName, { maxLength: 160 })
     const dateValue = parseDateOnly(body.dateValue)
+    const durationDays = normalizeDurationDays(Number(body?.durationDays)) ?? 1
     const participatesInAutoshift = body.participatesInAutoshift !== false
     const hasStageTemplateAffectsFinalDateColumn = await supportsStageTemplateAffectsFinalDateColumn()
+    const hasProductStageDurationDaysColumn = await supportsProductStageDurationDaysColumn()
 
     if (!stageName) {
       return NextResponse.json({ error: 'Укажите название этапа' }, { status: 400 })
@@ -194,6 +200,7 @@ export async function POST(
             dateValue: true,
             dateRaw: true,
             dateEnd: true,
+            ...(hasProductStageDurationDaysColumn ? { durationDays: true } : {}),
             status: true,
             isCompleted: true,
             isCritical: true,
@@ -288,6 +295,7 @@ export async function POST(
       status: 'NOT_STARTED',
       dateValue,
       plannedDate: dateValue,
+      durationDays,
     })
 
     const derivedProduct = await recalculateProductDerivedFields(productId)

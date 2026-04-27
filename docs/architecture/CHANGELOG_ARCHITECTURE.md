@@ -25,6 +25,20 @@
   - out-of-order date sequence
 - Updated list, card, timeline, and filter wording to use the generalized "проблемы с датами" language where the UI is not referring to the exact issue kind.
 
+### Same-day pair detection
+- Fixed same-day date problems for two adjacent stages not being detected at all.
+- Root cause: `detectStageOverlaps()` only created a `same_day_cluster` issue when a date bucket contained 3 or more stages, so a pair with the same date silently passed validation.
+- Changed the source-of-truth threshold in `src/lib/utils.ts` from 3 to 2 so pairs now surface consistently in:
+  - product card
+  - list mode
+  - table mode
+  - risk calculations
+
+### Date edit overlap reset scope
+- Fixed manual stage date edits in the product card not re-showing date issues consistently.
+- Root cause: `src/app/api/stages/route.ts` only reset overlap acceptance for the edited stage, while the actual affected segment includes the previous neighbor and all recalculated following stages.
+- Updated the route so a date change clears accepted overlap state for the whole affected chain segment before recalculating derived fields and risk.
+
 ## 2026-04-10
 
 ### Established architectural docs
