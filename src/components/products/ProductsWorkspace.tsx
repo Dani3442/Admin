@@ -281,6 +281,13 @@ export function ProductsWorkspace({
     const nextQuery = params.toString()
     router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false })
   }
+  const showMyProducts = () => {
+    if (!currentUser.id) {
+      return
+    }
+
+    setResponsibleFilter(currentUser.id)
+  }
 
   const layoutSwitcher: ReactNode = <LayoutSwitcher layout={layout} onChange={updateLayout} />
   const filters = useMemo<ProductListFilters>(() => ({
@@ -487,9 +494,23 @@ export function ProductsWorkspace({
           <div className="flex flex-col gap-3 pt-1 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
             <div className="w-full sm:w-auto">{layoutSwitcher}</div>
             {!archiveMode && (
-              <Link href={createProductHref} scroll={false} className="btn-primary w-full justify-center self-start sm:w-auto">
-                <Plus className="h-4 w-4" /> Новый продукт
-              </Link>
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+                <Link href={createProductHref} scroll={false} className="btn-primary w-full justify-center self-start sm:w-auto">
+                  <Plus className="h-4 w-4" /> Новый продукт
+                </Link>
+                <button
+                  type="button"
+                  onClick={showMyProducts}
+                  disabled={!currentUser.id}
+                  className={cn(
+                    'btn-secondary w-full justify-center self-start sm:w-auto',
+                    responsibleFilter === currentUser.id && 'border-primary bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary'
+                  )}
+                >
+                  <UserRound className="h-4 w-4" />
+                  Мои продукты
+                </button>
+              </div>
             )}
           </div>
         </div>
