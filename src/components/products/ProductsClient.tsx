@@ -16,6 +16,7 @@ import {
   Search,
   Star,
   Trash2,
+  UserPlus,
   X,
 } from 'lucide-react'
 import {
@@ -34,6 +35,7 @@ import { FilterSelect } from '@/components/ui/FilterSelect'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { FloatingContextMenu } from '@/components/ui/FloatingContextMenu'
 import { ProductRenameDialog } from '@/components/products/ProductRenameDialog'
+import { ProductResponsibleDialog } from '@/components/products/ProductResponsibleDialog'
 import { useContextMenu } from '@/hooks/useContextMenu'
 import {
   filterProducts,
@@ -149,6 +151,8 @@ export function ProductsClient({
   const [bulkActionPending, setBulkActionPending] = useState(false)
   const [savingProductId, setSavingProductId] = useState<string | null>(null)
   const [renamingProduct, setRenamingProduct] = useState<{ id: string; name: string } | null>(null)
+  const [assigningResponsibleProduct, setAssigningResponsibleProduct] = useState<{ id: string; name: string; responsibleId?: string | null } | null>(null)
+  const [selectedResponsibleId, setSelectedResponsibleId] = useState('')
   const [draggingProductId, setDraggingProductId] = useState<string | null>(null)
   const [dragOverState, setDragOverState] = useState<{ productId: string; position: 'before' | 'after' } | null>(null)
   const [dragOffset, setDragOffset] = useState<{ x: number; y: number } | null>(null)
@@ -162,7 +166,7 @@ export function ProductsClient({
     openMenuFromEvent: openContextMenuFromEvent,
   } = useContextMenu<ContextMenuState>({
     width: 240,
-    height: archiveMode ? 260 : 320,
+    height: archiveMode ? 260 : 360,
   })
 
   const canManageProducts = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUserRole) && !archiveMode
@@ -360,6 +364,63 @@ export function ProductsClient({
     }
   }
 
+  const openResponsibleDialog = (product: ProductListItem) => {
+    closeContextMenu()
+    setAssigningResponsibleProduct({
+      id: product.id,
+      name: product.name,
+      responsibleId: product.responsible?.id ?? null,
+    })
+    setSelectedResponsibleId(product.responsible?.id ?? '')
+  }
+
+  const confirmResponsibleAssignment = async () => {
+    if (!assigningResponsibleProduct || !canManageProducts || !selectedResponsibleId) return
+
+    const selectedUser = users.find((user) => user.id === selectedResponsibleId)
+    if (!selectedUser) {
+      window.alert('Выберите пользователя из списка зарегистрированных пользователей')
+      return
+    }
+
+    const previousProducts = products
+    const productId = assigningResponsibleProduct.id
+    setSavingProductId(productId)
+    updateProduct(productId, (currentProduct) => ({
+      ...currentProduct,
+      responsible: { id: selectedUser.id, name: selectedUser.name },
+    }))
+
+    try {
+      const response = await fetch(`/api/products/${productId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ responsibleId: selectedUser.id }),
+      })
+      const data = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'Не удалось назначить ответственного')
+      }
+
+      setAssigningResponsibleProduct(null)
+      setSelectedResponsibleId('')
+      setProducts((currentProducts) =>
+        currentProducts.map((product) =>
+          product.id === productId
+            ? { ...product, responsible: data?.responsible ?? { id: selectedUser.id, name: selectedUser.name } }
+            : product
+        )
+      )
+      router.refresh()
+    } catch (error: any) {
+      setProducts(previousProducts)
+      window.alert(error.message || 'Не удалось назначить ответственного')
+    } finally {
+      setSavingProductId(null)
+    }
+  }
+
   const handleDeleteProduct = async (productId: string, productName: string) => {
     setPendingDeleteProduct({ id: productId, name: productName })
   }
@@ -475,7 +536,7 @@ export function ProductsClient({
     }
   }
 
-  const handleProductRowContextMenu = useCallback((event: React.MouseEvent<HTMLTableRowElement>, productId: string) => {
+  const handleProductRowContextMenu = useCallback((event: React.MouseEvent<HTMLElement>, productId: string) => {
     suppressNavigationRef.current = true
     window.setTimeout(() => {
       suppressNavigationRef.current = false
@@ -484,7 +545,7 @@ export function ProductsClient({
     openContextMenuFromEvent(
       event,
       { productId },
-      { width: 240, height: archiveMode ? 260 : 320 }
+      { width: 240, height: archiveMode ? 260 : 360 }
     )
   }, [archiveMode, openContextMenuFromEvent])
 
@@ -880,6 +941,7 @@ export function ProductsClient({
               key={product.id}
               className="surface-panel space-y-4 p-4"
               onClick={() => handleOpenProduct(product.id)}
+              onContextMenu={(event) => handleProductRowContextMenu(event, product.id)}
             >
               <div className="flex items-start gap-3">
                 {archiveMode && selectionMode && (
@@ -1281,6 +1343,15 @@ export function ProductsClient({
                   </button>
 
                   <button
+                    onClick={() => openResponsibleDialog(contextProduct)}
+                    disabled={savingProductId === contextProduct.id}
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-popover-foreground hover:bg-accent disabled:opacity-60"
+                  >
+                    <UserPlus className="h-4 w-4 text-muted-foreground" />
+                    Добавить ответственного
+                  </button>
+
+                  <button
                     onClick={() => handleToggleProductFlag(contextProduct, 'isPinned', !contextProduct.isPinned)}
                     disabled={savingProductId === contextProduct.id}
                     className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-popover-foreground hover:bg-accent disabled:opacity-60"
@@ -1390,6 +1461,20 @@ export function ProductsClient({
         loading={Boolean(renamingProduct && savingProductId === renamingProduct.id)}
         onCancel={() => setRenamingProduct(null)}
         onConfirm={confirmRenameProduct}
+      />
+
+      <ProductResponsibleDialog
+        open={Boolean(assigningResponsibleProduct)}
+        productName={assigningResponsibleProduct?.name || ''}
+        users={users}
+        selectedUserId={selectedResponsibleId}
+        loading={Boolean(assigningResponsibleProduct && savingProductId === assigningResponsibleProduct.id)}
+        onChange={setSelectedResponsibleId}
+        onCancel={() => {
+          setAssigningResponsibleProduct(null)
+          setSelectedResponsibleId('')
+        }}
+        onConfirm={confirmResponsibleAssignment}
       />
     </div>
   )

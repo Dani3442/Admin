@@ -423,6 +423,7 @@ export function ProductsWorkspace({
             >
               <TableViewClient
                 products={tableProducts as any}
+                users={users}
                 stages={stages as any}
                 currentUserRole={currentUserRole}
                 embedded

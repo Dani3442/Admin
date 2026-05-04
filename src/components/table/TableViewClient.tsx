@@ -4,7 +4,7 @@ import { useState, useRef, useCallback, useEffect, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { Search, CheckCircle2, AlertTriangle, Plus, ChevronLeft, ChevronRight, Pencil, X, Trash2, Filter, Archive, Pin, PinOff, Star } from 'lucide-react'
+import { Search, CheckCircle2, AlertTriangle, Plus, ChevronLeft, ChevronRight, Pencil, X, Trash2, Filter, Archive, Pin, PinOff, Star, UserPlus } from 'lucide-react'
 import { cn, formatDate, detectStageOverlaps, getPriorityLabel, getStatusLabel } from '@/lib/utils'
 import { DatePicker } from '@/components/ui/DatePicker'
 import { serializeDateOnly } from '@/lib/date-only'
@@ -12,6 +12,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { FilterSelect } from '@/components/ui/FilterSelect'
 import { FloatingContextMenu } from '@/components/ui/FloatingContextMenu'
 import { ProductRenameDialog } from '@/components/products/ProductRenameDialog'
+import { ProductResponsibleDialog } from '@/components/products/ProductResponsibleDialog'
 import { buildProductHref, getRouteWithSearch } from '@/lib/navigation'
 import { useContextMenu } from '@/hooks/useContextMenu'
 import { filterProducts, sortProducts, type ProductListFilters, type ProductListSortDirection, type ProductListSortField, type ProductQuickView } from '@/lib/product-list'
@@ -42,6 +43,7 @@ interface Product {
 
 interface TableViewClientProps {
   products: Product[]
+  users: Array<{ id: string; name: string }>
   stages: Stage[]
   currentUserRole: string
   embedded?: boolean
@@ -142,6 +144,7 @@ function resolveStageMapForProduct(productStages: ProductStage[], stageTemplates
 
 export function TableViewClient({
   products: initial,
+  users,
   stages: initialStages,
   currentUserRole,
   embedded = false,
@@ -184,6 +187,8 @@ export function TableViewClient({
   const [savingProductId, setSavingProductId] = useState<string | null>(null)
   const [pendingArchiveProduct, setPendingArchiveProduct] = useState<{ id: string; name: string } | null>(null)
   const [renamingProduct, setRenamingProduct] = useState<{ id: string; name: string } | null>(null)
+  const [assigningResponsibleProduct, setAssigningResponsibleProduct] = useState<{ id: string; name: string; responsibleId?: string | null } | null>(null)
+  const [selectedResponsibleId, setSelectedResponsibleId] = useState('')
   const {
     menu: stageMenu,
     menuRef,
@@ -200,15 +205,9 @@ export function TableViewClient({
     openMenuFromEvent: openProductMenu,
   } = useContextMenu<ProductMenuState>({
     width: 240,
-    height: 320,
+    height: 360,
   })
-  const userOptions = Array.from(
-    new Map(
-      products
-        .filter((product) => product.responsible?.id && product.responsible?.name)
-        .map((product) => [product.responsible!.id, product.responsible!])
-    ).values()
-  ).sort((left, right) => left.name.localeCompare(right.name, 'ru'))
+  const userOptions = [...users].sort((left, right) => left.name.localeCompare(right.name, 'ru'))
 
   useEffect(() => {
     setProducts(initial)
@@ -446,6 +445,63 @@ export function TableViewClient({
     }
   }
 
+  const openResponsibleDialog = (product: Product) => {
+    closeProductMenu()
+    setAssigningResponsibleProduct({
+      id: product.id,
+      name: product.name,
+      responsibleId: product.responsible?.id ?? null,
+    })
+    setSelectedResponsibleId(product.responsible?.id ?? '')
+  }
+
+  const confirmResponsibleAssignment = async () => {
+    if (!assigningResponsibleProduct || !canEditTable || !selectedResponsibleId) return
+
+    const selectedUser = users.find((user) => user.id === selectedResponsibleId)
+    if (!selectedUser) {
+      window.alert('Выберите пользователя из списка зарегистрированных пользователей')
+      return
+    }
+
+    const previousProducts = products
+    const productId = assigningResponsibleProduct.id
+    setSavingProductId(productId)
+    updateProduct(productId, (currentProduct) => ({
+      ...currentProduct,
+      responsible: { id: selectedUser.id, name: selectedUser.name },
+    }))
+
+    try {
+      const response = await fetch(`/api/products/${productId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ responsibleId: selectedUser.id }),
+      })
+      const data = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'Не удалось назначить ответственного')
+      }
+
+      setAssigningResponsibleProduct(null)
+      setSelectedResponsibleId('')
+      setProducts((currentProducts) =>
+        currentProducts.map((product) =>
+          product.id === productId
+            ? { ...product, responsible: data?.responsible ?? { id: selectedUser.id, name: selectedUser.name } }
+            : product
+        )
+      )
+      router.refresh()
+    } catch (error: any) {
+      setProducts(previousProducts)
+      window.alert(error.message || 'Не удалось назначить ответственного')
+    } finally {
+      setSavingProductId(null)
+    }
+  }
+
   const confirmArchiveProduct = async () => {
     if (!pendingArchiveProduct) return
 
@@ -547,7 +603,7 @@ export function TableViewClient({
   const handleProductRowContextMenu = (event: React.MouseEvent, productId: string) => {
     if (!canEditTable) return
     closeStageMenu()
-    openProductMenu(event, { productId }, { width: 240, height: 320 })
+    openProductMenu(event, { productId }, { width: 240, height: 360 })
   }
 
   const startRename = (stage: Stage) => {
@@ -885,6 +941,7 @@ export function TableViewClient({
               key={product.id}
               className="surface-panel space-y-4 p-4"
               onClick={() => router.push(buildProductHref(product.id, currentRoute))}
+              onContextMenu={(event) => handleProductRowContextMenu(event, product.id)}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -1285,6 +1342,15 @@ export function TableViewClient({
             </button>
 
             <button
+              onClick={() => openResponsibleDialog(contextProduct)}
+              disabled={savingProductId === contextProduct.id}
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-popover-foreground hover:bg-accent disabled:opacity-60"
+            >
+              <UserPlus className="h-4 w-4 text-muted-foreground" />
+              Добавить ответственного
+            </button>
+
+            <button
               onClick={() => handleToggleProductFlag(contextProduct, 'isPinned', !contextProduct.isPinned)}
               disabled={savingProductId === contextProduct.id}
               className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-popover-foreground hover:bg-accent disabled:opacity-60"
@@ -1363,6 +1429,20 @@ export function TableViewClient({
         loading={Boolean(renamingProduct && savingProductId === renamingProduct.id)}
         onCancel={() => setRenamingProduct(null)}
         onConfirm={confirmRenameProduct}
+      />
+
+      <ProductResponsibleDialog
+        open={Boolean(assigningResponsibleProduct)}
+        productName={assigningResponsibleProduct?.name || ''}
+        users={users}
+        selectedUserId={selectedResponsibleId}
+        loading={Boolean(assigningResponsibleProduct && savingProductId === assigningResponsibleProduct.id)}
+        onChange={setSelectedResponsibleId}
+        onCancel={() => {
+          setAssigningResponsibleProduct(null)
+          setSelectedResponsibleId('')
+        }}
+        onConfirm={confirmResponsibleAssignment}
       />
 
       {/* New stage modal */}

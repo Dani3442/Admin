@@ -320,6 +320,20 @@ export async function PATCH(
     data.responsibleId = null
   }
 
+  if ('responsibleId' in data && data.responsibleId) {
+    const responsibleUser = await prisma.user.findFirst({
+      where: {
+        id: String(data.responsibleId),
+        isActive: true,
+      },
+      select: { id: true },
+    })
+
+    if (!responsibleUser) {
+      return NextResponse.json({ error: 'Ответственный должен быть зарегистрированным пользователем системы' }, { status: 400 })
+    }
+  }
+
   if ('finalDate' in data && data.finalDate) {
     data.finalDate = new Date(data.finalDate as string)
   }
@@ -335,7 +349,7 @@ export async function PATCH(
     where: { id },
     data,
     include: {
-          responsible: true,
+          responsible: { select: { id: true, name: true } },
           ...(hasProductLifecycleColumns
             ? {
             closedBy: { select: { id: true, name: true } },
