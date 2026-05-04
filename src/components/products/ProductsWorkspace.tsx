@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Filter, LayoutList, Plus, Search, Table2, X } from 'lucide-react'
+import { Filter, LayoutList, Plus, Search, Table2, UserRound, X } from 'lucide-react'
 import { FilterSelect } from '@/components/ui/FilterSelect'
 import type { ProductListFilters, ProductListItem, ProductListSortDirection, ProductListSortField, ProductQuickView } from '@/lib/product-list'
 import { cn, getPriorityLabel, getStatusLabel } from '@/lib/utils'
@@ -69,6 +69,8 @@ interface ProductsWorkspaceProps {
   productTemplates: any[]
   stageSuggestions: Array<{ id: string; name: string }>
   currentUserRole: string
+  currentUser: { id: string; name: string }
+  canViewAllProducts: boolean
   archiveMode?: boolean
 }
 
@@ -150,6 +152,30 @@ function getLayoutFromSearchParams(searchParams: Pick<URLSearchParams, 'get'>): 
   return searchParams.get('layout') === 'table' ? 'table' : 'list'
 }
 
+function resolveInitialResponsibleFilter({
+  archiveMode,
+  canViewAllProducts,
+  currentUserId,
+  searchParams,
+}: {
+  archiveMode: boolean
+  canViewAllProducts: boolean
+  currentUserId: string
+  searchParams: Pick<URLSearchParams, 'get'>
+}) {
+  const requestedResponsible = searchParams.get('responsible') || ''
+
+  if (archiveMode) {
+    return requestedResponsible
+  }
+
+  if (!canViewAllProducts) {
+    return currentUserId
+  }
+
+  return requestedResponsible || currentUserId
+}
+
 export function ProductsWorkspace({
   listProducts,
   tableProducts,
@@ -158,6 +184,8 @@ export function ProductsWorkspace({
   productTemplates,
   stageSuggestions,
   currentUserRole,
+  currentUser,
+  canViewAllProducts,
   archiveMode = false,
 }: ProductsWorkspaceProps) {
   const router = useRouter()
@@ -166,7 +194,14 @@ export function ProductsWorkspace({
   const layout = getLayoutFromSearchParams(searchParams)
   const [search, setSearch] = useState(searchParams.get('search') || '')
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '')
-  const [responsibleFilter, setResponsibleFilter] = useState(searchParams.get('responsible') || '')
+  const [responsibleFilter, setResponsibleFilter] = useState(() =>
+    resolveInitialResponsibleFilter({
+      archiveMode,
+      canViewAllProducts,
+      currentUserId: currentUser.id,
+      searchParams,
+    })
+  )
   const [priorityFilter, setPriorityFilter] = useState(searchParams.get('priority') || '')
   const [countryFilter, setCountryFilter] = useState(searchParams.get('country') || '')
   const [quickView, setQuickView] = useState<ProductQuickView>((searchParams.get('view') as ProductQuickView) || 'all')
@@ -188,6 +223,51 @@ export function ProductsWorkspace({
     const query = params.toString()
     return `${pathname}${query ? `?${query}` : ''}`
   }, [pathname, searchParams])
+  const responsibleUsers = useMemo(() => {
+    const usersById = new Map(users.map((user) => [user.id, user]))
+
+    if (currentUser.id && !usersById.has(currentUser.id)) {
+      usersById.set(currentUser.id, {
+        id: currentUser.id,
+        name: currentUser.name || 'Я',
+      })
+    }
+
+    return Array.from(usersById.values()).sort((firstUser, secondUser) =>
+      firstUser.name.localeCompare(secondUser.name, 'ru')
+    )
+  }, [currentUser.id, currentUser.name, users])
+  const responsibleOptions = useMemo(() => {
+    if (!canViewAllProducts) {
+      return [
+        {
+          value: currentUser.id,
+          label: currentUser.name ? `${currentUser.name} · мои продукты` : 'Мои продукты',
+        },
+      ]
+    }
+
+    return [
+      { value: '', label: 'Все ответственные' },
+      ...responsibleUsers.map((user) => ({
+        value: user.id,
+        label: user.id === currentUser.id ? `${user.name} · мои продукты` : user.name,
+      })),
+    ]
+  }, [canViewAllProducts, currentUser.id, currentUser.name, responsibleUsers])
+  const activeResponsibleName = useMemo(() => {
+    if (!responsibleFilter) {
+      return 'все ответственные'
+    }
+
+    const responsible = responsibleUsers.find((user) => user.id === responsibleFilter)
+
+    if (responsible?.id === currentUser.id) {
+      return responsible.name ? `${responsible.name} · мои продукты` : 'мои продукты'
+    }
+
+    return responsible?.name || 'выбранный ответственный'
+  }, [currentUser.id, responsibleFilter, responsibleUsers])
 
   const updateLayout = (nextLayout: ProductsLayoutMode) => {
     const params = new URLSearchParams(searchParams.toString())
@@ -247,7 +327,7 @@ export function ProductsWorkspace({
   const resetFilters = () => {
     setSearch('')
     setStatusFilter('')
-    setResponsibleFilter('')
+    setResponsibleFilter(archiveMode || canViewAllProducts ? '' : currentUser.id)
     setPriorityFilter('')
     setCountryFilter('')
     setQuickView('all')
@@ -343,6 +423,13 @@ export function ProductsWorkspace({
             })}
           </div>
 
+          {!archiveMode && responsibleFilter && (
+            <div className="inline-flex w-fit items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary">
+              <UserRound className="h-4 w-4" />
+              Показаны продукты: {activeResponsibleName}
+            </div>
+          )}
+
           <AnimatePresence initial={false}>
             {showAdvancedFilters && (
               <motion.div
@@ -368,11 +455,8 @@ export function ProductsWorkspace({
                     <FilterSelect
                       value={responsibleFilter}
                       onChange={setResponsibleFilter}
-                      options={[
-                        { value: '', label: 'Все ответственные' },
-                        ...users.map((user) => ({ value: user.id, label: user.name })),
-                      ]}
-                      placeholder="Все ответственные"
+                      options={responsibleOptions}
+                      placeholder={canViewAllProducts ? 'Все ответственные' : 'Мои продукты'}
                     />
                   </label>
 

@@ -8,7 +8,7 @@ import {
   supportsProductTemplateStageAutoshiftColumn,
   supportsProductTemplateStageDurationDaysColumn,
 } from '@/lib/schema-compat'
-import { getVisibleProductWhere } from '@/lib/product-access'
+import { canViewAllProducts, getVisibleProductWhere } from '@/lib/product-access'
 
 async function getProductsWorkspaceData(viewer: { id?: string | null; role?: string | null }, archived = false) {
   await recalculateAllRisksIfNeeded()
@@ -130,6 +130,11 @@ export default async function ProductsPage({
       })) as any}
       stageSuggestions={data.stageSuggestions}
       currentUserRole={(session?.user as any)?.role || 'VIEWER'}
+      currentUser={{
+        id: (session?.user as any)?.id || '',
+        name: (session?.user as any)?.name || '',
+      }}
+      canViewAllProducts={canViewAllProducts(viewer)}
       archiveMode={false}
     />
   )

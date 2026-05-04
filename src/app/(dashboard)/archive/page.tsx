@@ -7,7 +7,7 @@ import {
   supportsProductTemplateStageAutoshiftColumn,
   supportsProductTemplateStageDurationDaysColumn,
 } from '@/lib/schema-compat'
-import { canManageArchive, getVisibleProductWhere } from '@/lib/product-access'
+import { canManageArchive, canViewAllProducts, getVisibleProductWhere } from '@/lib/product-access'
 
 async function getArchiveWorkspaceData(viewer: { id?: string | null; role?: string | null }) {
   const [hasTemplateStageDurationDaysColumn, hasTemplateStageAutoshiftColumn] = await Promise.all([
@@ -111,6 +111,11 @@ export default async function ArchivePage() {
       })) as any}
       stageSuggestions={data.stageSuggestions}
       currentUserRole={(session?.user as any)?.role || 'VIEWER'}
+      currentUser={{
+        id: (session?.user as any)?.id || '',
+        name: (session?.user as any)?.name || '',
+      }}
+      canViewAllProducts={canViewAllProducts(viewer)}
       archiveMode
     />
   )
