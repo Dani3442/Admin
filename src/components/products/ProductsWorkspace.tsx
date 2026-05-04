@@ -6,7 +6,14 @@ import Link from 'next/link'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Filter, LayoutList, Plus, Search, Table2, UserRound, X } from 'lucide-react'
 import { FilterSelect } from '@/components/ui/FilterSelect'
-import type { ProductListFilters, ProductListItem, ProductListSortDirection, ProductListSortField, ProductQuickView } from '@/lib/product-list'
+import {
+  UNASSIGNED_RESPONSIBLE_FILTER,
+  type ProductListFilters,
+  type ProductListItem,
+  type ProductListSortDirection,
+  type ProductListSortField,
+  type ProductQuickView,
+} from '@/lib/product-list'
 import { cn, getPriorityLabel, getStatusLabel } from '@/lib/utils'
 import { useEffect, useMemo, type ReactNode, useState } from 'react'
 
@@ -244,11 +251,13 @@ export function ProductsWorkspace({
           value: currentUser.id,
           label: currentUser.name ? `${currentUser.name} · мои продукты` : 'Мои продукты',
         },
+        { value: UNASSIGNED_RESPONSIBLE_FILTER, label: 'Нет ответственного' },
       ]
     }
 
     return [
       { value: '', label: 'Все ответственные' },
+      { value: UNASSIGNED_RESPONSIBLE_FILTER, label: 'Нет ответственного' },
       ...responsibleUsers.map((user) => ({
         value: user.id,
         label: user.id === currentUser.id ? `${user.name} · мои продукты` : user.name,
@@ -258,6 +267,10 @@ export function ProductsWorkspace({
   const activeResponsibleName = useMemo(() => {
     if (!responsibleFilter) {
       return 'все ответственные'
+    }
+
+    if (responsibleFilter === UNASSIGNED_RESPONSIBLE_FILTER) {
+      return 'нет ответственного'
     }
 
     const responsible = responsibleUsers.find((user) => user.id === responsibleFilter)

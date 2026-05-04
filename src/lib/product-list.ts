@@ -3,6 +3,7 @@ import { detectStageOverlaps } from '@/lib/utils'
 export type ProductListSortField = 'manual' | 'name' | 'finalDate' | 'riskScore' | 'progressPercent' | 'createdAt'
 export type ProductListSortDirection = 'asc' | 'desc'
 export type ProductQuickView = 'all' | 'pinned' | 'favorite' | 'overdue' | 'atRisk'
+export const UNASSIGNED_RESPONSIBLE_FILTER = '__unassigned__'
 
 export interface ProductListStage {
   id: string
@@ -94,7 +95,12 @@ export function filterProducts(products: ProductListItem[], filters: ProductList
   return products.filter((product) => {
     if (filters.search && !product.name.toLowerCase().includes(filters.search.toLowerCase())) return false
     if (filters.status && product.status !== filters.status) return false
-    if (filters.responsibleId && product.responsible?.id !== filters.responsibleId) return false
+    if (filters.responsibleId === UNASSIGNED_RESPONSIBLE_FILTER && product.responsible?.id) return false
+    if (
+      filters.responsibleId &&
+      filters.responsibleId !== UNASSIGNED_RESPONSIBLE_FILTER &&
+      product.responsible?.id !== filters.responsibleId
+    ) return false
     if (filters.priority && product.priority !== filters.priority) return false
     if (countrySearch && !(product.country || '').toLowerCase().includes(countrySearch)) return false
 
