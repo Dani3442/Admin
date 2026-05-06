@@ -25,6 +25,7 @@ import { UserAvatar } from '@/components/users/UserAvatar'
 import { encodeCommentMentions, getCommentSegments } from '@/lib/comment-mentions'
 import { useContextMenu } from '@/hooks/useContextMenu'
 import { EDITABLE_PRODUCT_STATUSES, getEditableProductStatusOption } from '@/lib/product-status'
+import { EDITABLE_PRODUCT_PRIORITIES, getEditableProductPriorityOption } from '@/lib/product-priority'
 // Types are string-based (no Prisma enums needed)
 
 const AUTOMATION_ACTIONS = [
@@ -89,7 +90,10 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
   const commentInputRef = useRef<HTMLTextAreaElement>(null)
   const commentsScrollRef = useRef<HTMLDivElement>(null)
   const markedSeenProductRef = useRef<string | null>(null)
+  const priorityMenuRef = useRef<HTMLDivElement>(null)
   const statusMenuRef = useRef<HTMLDivElement>(null)
+  const [priorityMenuOpen, setPriorityMenuOpen] = useState(false)
+  const [prioritySaving, setPrioritySaving] = useState(false)
   const [statusMenuOpen, setStatusMenuOpen] = useState(false)
   const [statusSaving, setStatusSaving] = useState(false)
   const {
@@ -105,7 +109,30 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
   const canEdit = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUser?.role) && !product.isArchived
   const canComment = Boolean(currentUser?.id) && !product.isArchived
   const canArchiveProduct = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUser?.role)
+  const currentPriorityOption = getEditableProductPriorityOption(product.priority)
   const currentStatusOption = getEditableProductStatusOption(product.status)
+
+  useEffect(() => {
+    if (!priorityMenuOpen) return
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node
+      if (priorityMenuRef.current?.contains(target)) return
+      setPriorityMenuOpen(false)
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setPriorityMenuOpen(false)
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleEscape)
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [priorityMenuOpen])
 
   useEffect(() => {
     if (!statusMenuOpen) return
@@ -408,6 +435,39 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
       alert(error.message || 'Не удалось изменить статус продукта')
     } finally {
       setStatusSaving(false)
+    }
+  }
+
+  const changeProductPriority = async (nextPriority: string) => {
+    if (!canEdit || product.priority === nextPriority) {
+      setPriorityMenuOpen(false)
+      return
+    }
+
+    const previousProduct = product
+    setPrioritySaving(true)
+    setPriorityMenuOpen(false)
+    setProduct((prev: any) => ({ ...prev, priority: nextPriority }))
+
+    try {
+      const res = await fetch(`/api/products/${product.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ priority: nextPriority }),
+      })
+      const data = await res.json().catch(() => null)
+
+      if (!res.ok) {
+        throw new Error(data?.error || 'Не удалось изменить приоритет продукта')
+      }
+
+      setProduct((prev: any) => ({ ...prev, ...data, priority: data?.priority ?? nextPriority }))
+      router.refresh()
+    } catch (error: any) {
+      setProduct(previousProduct)
+      alert(error.message || 'Не удалось изменить приоритет продукта')
+    } finally {
+      setPrioritySaving(false)
     }
   }
 
@@ -863,7 +923,55 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 flex-wrap mb-2">
-              <span className={cn('badge border', getPriorityColor(product.priority))}>{getPriorityLabel(product.priority)}</span>
+              {canEdit && currentPriorityOption ? (
+                <div ref={priorityMenuRef} className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setPriorityMenuOpen((open) => !open)}
+                    disabled={prioritySaving}
+                    className={cn(
+                      'badge border transition hover:shadow-sm disabled:opacity-60',
+                      currentPriorityOption.badgeClassName
+                    )}
+                    aria-haspopup="menu"
+                    aria-expanded={priorityMenuOpen}
+                    title="Изменить приоритет продукта"
+                  >
+                    <span className={cn('h-2 w-2 rounded-full', currentPriorityOption.dotClassName)} />
+                    {currentPriorityOption.label}
+                  </button>
+                  {priorityMenuOpen && (
+                    <div className="absolute left-0 top-full z-50 mt-2 w-60 overflow-hidden rounded-[18px] border border-border/70 bg-popover p-1.5 text-popover-foreground shadow-xl" role="menu">
+                      {EDITABLE_PRODUCT_PRIORITIES.map((priorityOption) => {
+                        const active = product.priority === priorityOption.value
+
+                        return (
+                          <button
+                            key={priorityOption.value}
+                            type="button"
+                            onClick={() => changeProductPriority(priorityOption.value)}
+                            disabled={prioritySaving}
+                            className={cn(
+                              'flex w-full items-start gap-2 rounded-[14px] px-3 py-2 text-left text-sm transition disabled:opacity-60',
+                              active ? 'bg-accent text-popover-foreground' : 'hover:bg-accent/70'
+                            )}
+                            role="menuitem"
+                          >
+                            <span className={cn('mt-1.5 h-2.5 w-2.5 flex-shrink-0 rounded-full', priorityOption.dotClassName)} />
+                            <span className="min-w-0 flex-1">
+                              <span className="block font-medium">{priorityOption.label}</span>
+                              <span className="block text-xs text-muted-foreground">{priorityOption.description}</span>
+                            </span>
+                            {active && <span className="mt-0.5 text-xs text-muted-foreground">сейчас</span>}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <span className={cn('badge border', getPriorityColor(product.priority))}>{getPriorityLabel(product.priority)}</span>
+              )}
               {canEdit && currentStatusOption ? (
                 <div ref={statusMenuRef} className="relative">
                   <button

@@ -7,6 +7,7 @@ import { getVisibleProductWhere } from '@/lib/product-access'
 import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
 import { sanitizeDeepStrings, sanitizeTextValue, sanitizeUrlValue } from '@/lib/input-security'
 import { isEditableProductStatus } from '@/lib/product-status'
+import { isEditableProductPriority } from '@/lib/product-priority'
 
 function getProductSelect(hasProductLifecycleColumns: boolean) {
   return {
@@ -334,6 +335,10 @@ export async function PATCH(
 
   if ('status' in data && !isEditableProductStatus(data.status)) {
     return NextResponse.json({ error: 'Недопустимый статус продукта' }, { status: 400 })
+  }
+
+  if ('priority' in data && !isEditableProductPriority(data.priority)) {
+    return NextResponse.json({ error: 'Недопустимый приоритет продукта' }, { status: 400 })
   }
 
   if ('name' in data) data.name = sanitizeTextValue(data.name, { maxLength: 160 })

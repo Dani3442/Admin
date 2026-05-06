@@ -35,6 +35,7 @@ import { ProductRenameDialog } from '@/components/products/ProductRenameDialog'
 import { ProductResponsibleDialog } from '@/components/products/ProductResponsibleDialog'
 import { useContextMenu } from '@/hooks/useContextMenu'
 import { EDITABLE_PRODUCT_STATUSES } from '@/lib/product-status'
+import { EDITABLE_PRODUCT_PRIORITIES } from '@/lib/product-priority'
 import {
   filterProducts,
   hasActiveProductFilters,
@@ -163,7 +164,7 @@ export function ProductsClient({
     openMenuFromEvent: openContextMenuFromEvent,
   } = useContextMenu<ContextMenuState>({
     width: 240,
-    height: archiveMode ? 260 : 460,
+    height: archiveMode ? 260 : 620,
   })
 
   const canManageProducts = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUserRole) && !archiveMode
@@ -360,6 +361,45 @@ export function ProductsClient({
     } catch (error: any) {
       setProducts(previousProducts)
       window.alert(error.message || 'Не удалось изменить статус продукта')
+    } finally {
+      setSavingProductId(null)
+    }
+  }
+
+  const handleChangeProductPriority = async (product: ProductListItem, nextPriority: string) => {
+    if (!canManageProducts || product.priority === nextPriority) {
+      closeContextMenu()
+      return
+    }
+
+    const previousProducts = products
+    setSavingProductId(product.id)
+    updateProduct(product.id, (currentProduct) => ({ ...currentProduct, priority: nextPriority }))
+    closeContextMenu()
+
+    try {
+      const response = await fetch(`/api/products/${product.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ priority: nextPriority }),
+      })
+      const data = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'Не удалось изменить приоритет продукта')
+      }
+
+      setProducts((currentProducts) =>
+        currentProducts.map((currentProduct) =>
+          currentProduct.id === product.id
+            ? { ...currentProduct, priority: data?.priority ?? nextPriority }
+            : currentProduct
+        )
+      )
+      router.refresh()
+    } catch (error: any) {
+      setProducts(previousProducts)
+      window.alert(error.message || 'Не удалось изменить приоритет продукта')
     } finally {
       setSavingProductId(null)
     }
@@ -1354,6 +1394,32 @@ export function ProductsClient({
                     <UserPlus className="h-4 w-4 text-muted-foreground" />
                     Добавить ответственного
                   </button>
+
+                  <div className="my-1 border-t border-border/70" />
+                  <div className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                    Изменить приоритет
+                  </div>
+                  <div className="space-y-1">
+                    {EDITABLE_PRODUCT_PRIORITIES.map((priorityOption) => {
+                      const active = contextProduct.priority === priorityOption.value
+
+                      return (
+                        <button
+                          key={priorityOption.value}
+                          onClick={() => handleChangeProductPriority(contextProduct, priorityOption.value)}
+                          disabled={savingProductId === contextProduct.id}
+                          className={cn(
+                            'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition disabled:opacity-60',
+                            active ? 'bg-accent text-popover-foreground' : 'text-popover-foreground hover:bg-accent/70'
+                          )}
+                        >
+                          <span className={cn('h-2.5 w-2.5 rounded-full', priorityOption.dotClassName)} />
+                          <span className="flex-1">{priorityOption.label}</span>
+                          {active && <span className="text-xs text-muted-foreground">сейчас</span>}
+                        </button>
+                      )
+                    })}
+                  </div>
 
                   <div className="my-1 border-t border-border/70" />
                   <div className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
