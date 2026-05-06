@@ -215,7 +215,6 @@ export function ProductsWorkspace({
   const [sortField, setSortField] = useState<ProductListSortField>((searchParams.get('sort') as ProductListSortField) || 'manual')
   const [sortDirection, setSortDirection] = useState<ProductListSortDirection>(searchParams.get('dir') === 'desc' ? 'desc' : 'asc')
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(searchParams.get('advanced') === '1')
-  const [onlyWithOverlaps, setOnlyWithOverlaps] = useState(searchParams.get('overlaps') === '1')
   const createProductHref = useMemo(() => {
     const params = new URLSearchParams(searchParams.toString())
     const currentRoute = `${pathname}${params.toString() ? `?${params.toString()}` : ''}`
@@ -310,21 +309,19 @@ export function ProductsWorkspace({
     priority: priorityFilter,
     country: countryFilter,
     quickView,
-    onlyWithOverlaps,
-  }), [countryFilter, onlyWithOverlaps, priorityFilter, quickView, responsibleFilter, search, statusFilter])
+  }), [countryFilter, priorityFilter, quickView, responsibleFilter, search, statusFilter])
   const hasActiveFilters = Boolean(
     search ||
       statusFilter ||
       responsibleFilter ||
       priorityFilter ||
       countryFilter.trim() ||
-      quickView !== 'all' ||
-      onlyWithOverlaps
+      quickView !== 'all'
   )
 
   useEffect(() => {
     const params = new URLSearchParams(searchParams.toString())
-    ;['search', 'status', 'responsible', 'priority', 'country', 'view', 'sort', 'dir', 'advanced', 'overlaps'].forEach((key) => {
+    ;['search', 'status', 'responsible', 'priority', 'country', 'view', 'sort', 'dir', 'advanced'].forEach((key) => {
       params.delete(key)
     })
 
@@ -338,11 +335,10 @@ export function ProductsWorkspace({
     if (sortField !== 'manual') params.set('sort', sortField)
     if (sortField !== 'manual' && sortDirection !== 'asc') params.set('dir', sortDirection)
     if (showAdvancedFilters) params.set('advanced', '1')
-    if (onlyWithOverlaps) params.set('overlaps', '1')
 
     const nextQuery = params.toString()
     router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false })
-  }, [countryFilter, layout, onlyWithOverlaps, pathname, priorityFilter, quickView, responsibleFilter, router, search, searchParams, showAdvancedFilters, sortDirection, sortField, statusFilter])
+  }, [countryFilter, layout, pathname, priorityFilter, quickView, responsibleFilter, router, search, searchParams, showAdvancedFilters, sortDirection, sortField, statusFilter])
 
   const resetFilters = () => {
     setSearch('')
@@ -354,7 +350,6 @@ export function ProductsWorkspace({
     setSortField('manual')
     setSortDirection('asc')
     setShowAdvancedFilters(false)
-    setOnlyWithOverlaps(false)
   }
 
   return (
@@ -490,15 +485,6 @@ export function ProductsWorkspace({
                     />
                   </label>
 
-                  <label className="inline-flex items-center gap-2 pt-1 text-sm text-muted-foreground">
-                    <input
-                      type="checkbox"
-                      checked={onlyWithOverlaps}
-                      onChange={(event) => setOnlyWithOverlaps(event.target.checked)}
-                      className="rounded border-border bg-input text-primary focus:ring-ring"
-                    />
-                    Только с проблемами дат
-                  </label>
                 </div>
               </motion.div>
             )}

@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth, hasPermission, Permission } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getFinalDateFromStages } from '@/lib/product-derived-fields'
-import { getOverlapAcceptedMap } from '@/lib/overlap-acceptance'
 import { supportsProductLifecycleColumns } from '@/lib/schema-compat'
 import { getVisibleProductWhere } from '@/lib/product-access'
 import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
@@ -124,8 +123,6 @@ export async function GET(
   })
 
   if (!product) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  const overlapAcceptedById = await getOverlapAcceptedMap(id)
-
   return NextResponse.json({
     ...product,
     closedAt: hasProductLifecycleColumns ? (product as any).closedAt ?? null : null,
@@ -137,10 +134,6 @@ export async function GET(
     closedBy: hasProductLifecycleColumns ? (product as any).closedBy ?? null : null,
     archivedBy: hasProductLifecycleColumns ? (product as any).archivedBy ?? null : null,
     finalDate: getFinalDateFromStages(product.stages),
-    stages: product.stages.map((stage) => ({
-      ...stage,
-      overlapAccepted: overlapAcceptedById.get(stage.id) ?? false,
-    })),
   })
 }
 

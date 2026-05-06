@@ -104,7 +104,6 @@ export interface ProductStageWithTemplate {
   plannedDate: Date | null
   actualDate: Date | null
   daysDeviation: number | null
-  overlapAccepted: boolean
   createdAt: Date
   updatedAt: Date
   stageTemplate?: {

@@ -1,5 +1,3 @@
-import { detectStageOverlaps } from '@/lib/utils'
-
 export type ProductListSortField = 'manual' | 'name' | 'finalDate' | 'riskScore' | 'progressPercent' | 'createdAt'
 export type ProductListSortDirection = 'asc' | 'desc'
 export type ProductQuickView = 'all' | 'pinned' | 'favorite' | 'overdue' | 'atRisk'
@@ -13,7 +11,6 @@ export interface ProductListStage {
   isCritical: boolean
   status: string
   stageName: string
-  overlapAccepted?: boolean
 }
 
 export interface ProductListItem {
@@ -42,7 +39,6 @@ export interface ProductListFilters {
   priority: string
   country: string
   quickView: ProductQuickView
-  onlyWithOverlaps: boolean
 }
 
 function compareNullableDates(
@@ -84,8 +80,7 @@ export function hasActiveProductFilters(filters: ProductListFilters) {
       filters.responsibleId ||
       filters.priority ||
       filters.country.trim() ||
-      filters.quickView !== 'all' ||
-      filters.onlyWithOverlaps
+      filters.quickView !== 'all'
   )
 }
 
@@ -104,11 +99,8 @@ export function filterProducts(products: ProductListItem[], filters: ProductList
     if (filters.priority && product.priority !== filters.priority) return false
     if (countrySearch && !(product.country || '').toLowerCase().includes(countrySearch)) return false
 
-    const { overlaps } = detectStageOverlaps(product.stages)
     const overdue = isProductOverdue(product, now)
     const atRisk = product.status === 'AT_RISK' || product.riskScore >= 40
-
-    if (filters.onlyWithOverlaps && overlaps.length === 0) return false
 
     if (filters.quickView === 'pinned' && !product.isPinned) return false
     if (filters.quickView === 'favorite' && !product.isFavorite) return false

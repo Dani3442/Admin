@@ -3,7 +3,6 @@ import {
   supportsProductStageAffectsFinalDateColumn,
   supportsProductStageAutoshiftColumn,
   supportsProductStageDurationDaysColumn,
-  supportsProductStageOverlapAcceptedColumn,
 } from './schema-compat'
 
 type ProductStageCompatCreateInput = {
@@ -26,7 +25,6 @@ type ProductStageCompatCreateInput = {
   plannedDate?: Date | null
   actualDate?: Date | null
   daysDeviation?: number | null
-  overlapAccepted?: boolean
 }
 
 type ProductStageDbClient = {
@@ -40,10 +38,9 @@ export async function createProductStageCompat(
   db: ProductStageDbClient,
   input: ProductStageCompatCreateInput
 ) {
-  const [hasAffectsFinalDateColumn, hasAutoshiftColumn, hasOverlapAcceptedColumn, hasDurationDaysColumn] = await Promise.all([
+  const [hasAffectsFinalDateColumn, hasAutoshiftColumn, hasDurationDaysColumn] = await Promise.all([
     supportsProductStageAffectsFinalDateColumn(),
     supportsProductStageAutoshiftColumn(),
-    supportsProductStageOverlapAcceptedColumn(),
     supportsProductStageDurationDaysColumn(),
   ])
 
@@ -68,7 +65,6 @@ export async function createProductStageCompat(
     plannedDate: input.plannedDate ?? null,
     actualDate: input.actualDate ?? null,
     daysDeviation: input.daysDeviation ?? null,
-    overlapAccepted: input.overlapAccepted ?? false,
     createdAt: new Date(),
     updatedAt: new Date(),
   }
@@ -136,11 +132,6 @@ export async function createProductStageCompat(
     const insertIndex = columns.indexOf('responsibleId')
     columns.splice(insertIndex, 0, 'affectsFinalDate')
     values.splice(insertIndex, 0, data.affectsFinalDate)
-  }
-
-  if (hasOverlapAcceptedColumn) {
-    columns.push('overlapAccepted')
-    values.push(data.overlapAccepted)
   }
 
   const placeholders = columns.map((_, index) => `$${index + 1}`).join(', ')

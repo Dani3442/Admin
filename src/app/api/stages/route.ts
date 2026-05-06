@@ -8,12 +8,10 @@ import { recalculateProductRisk } from '@/lib/risk'
 import {
   supportsProductStageAutoshiftColumn,
   supportsProductStageDurationDaysColumn,
-  supportsProductStageOverlapAcceptedColumn,
   supportsStageTemplateAffectsFinalDateColumn,
 } from '@/lib/schema-compat'
 import { recalculateProductDerivedFields } from '@/lib/product-derived-fields'
 import { createProductStageCompat } from '@/lib/product-stage-compat'
-import { getOverlapAcceptedMap, persistOverlapAccepted } from '@/lib/overlap-acceptance'
 import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
 import { sanitizeDeepStrings, sanitizeTextValue } from '@/lib/input-security'
 import { applySequentialStageDateOverride, normalizeDurationDays } from '@/lib/stage-schedule'
@@ -22,6 +20,31 @@ function areSameDate(left: Date | null, right: Date | null) {
   if (!left && !right) return true
   if (!left || !right) return false
   return left.getTime() === right.getTime()
+}
+
+const STAGE_UPDATE_FIELDS = new Set([
+  'stageName',
+  'dateValue',
+  'dateRaw',
+  'dateEnd',
+  'durationDays',
+  'status',
+  'isCompleted',
+  'isCritical',
+  'participatesInAutoshift',
+  'affectsFinalDate',
+  'responsibleId',
+  'comment',
+  'priority',
+  'plannedDate',
+  'actualDate',
+  'daysDeviation',
+])
+
+function getSafeStageUpdates(updates: Record<string, unknown>) {
+  return Object.fromEntries(
+    Object.entries(updates).filter(([key]) => STAGE_UPDATE_FIELDS.has(key))
+  )
 }
 
 async function normalizeProductStageOrders(
@@ -146,10 +169,9 @@ export async function PATCH(req: NextRequest) {
 
   const body = sanitizeDeepStrings(await req.json(), { preserveNewlines: true }) as any
   const { stageId, stageIds, updates, applyAutomations = true, swapWithStageId, productId, stageTemplateId, stageOrder, stageName } = body
-  const [hasAutoshiftColumn, hasDurationDaysColumn, hasOverlapAcceptedColumn, hasStageTemplateAffectsFinalDateColumn] = await Promise.all([
+  const [hasAutoshiftColumn, hasDurationDaysColumn, hasStageTemplateAffectsFinalDateColumn] = await Promise.all([
     supportsProductStageAutoshiftColumn(),
     supportsProductStageDurationDaysColumn(),
-    supportsProductStageOverlapAcceptedColumn(),
     supportsStageTemplateAffectsFinalDateColumn(),
   ])
   const stageResponseSelect: Record<string, any> = {
@@ -202,16 +224,8 @@ export async function PATCH(req: NextRequest) {
     stageResponseSelect.durationDays = true
   }
 
-  if (hasOverlapAcceptedColumn) {
-    stageResponseSelect.overlapAccepted = true
-  }
-
   if (Array.isArray(stageIds) && stageIds.length > 0) {
-    const bulkUpdates = { ...(updates || {}) }
-    const requestedOverlapAccepted = bulkUpdates.overlapAccepted
-    if (!hasOverlapAcceptedColumn) {
-      delete bulkUpdates.overlapAccepted
-    }
+    const bulkUpdates = getSafeStageUpdates(updates || {})
 
     const stagesToUpdate = await prisma.productStage.findMany({
       where: { id: { in: stageIds } },
@@ -234,10 +248,6 @@ export async function PATCH(req: NextRequest) {
       })
     }
 
-    if (typeof requestedOverlapAccepted === 'boolean') {
-      await persistOverlapAccepted(targetProductId, stageIds, requestedOverlapAccepted, userId)
-    }
-
     await recalculateProductDerivedFields(targetProductId)
     await recalculateProductRisk(targetProductId)
 
@@ -258,16 +268,10 @@ export async function PATCH(req: NextRequest) {
       select: stageResponseSelect,
     })
 
-    const overlapAcceptedMap = await getOverlapAcceptedMap(targetProductId)
-    const overlapAcceptedByStageId = overlapAcceptedMap as Map<string, boolean>
-
     return NextResponse.json({
       stages: stages.map((stage) => ({
         ...stage,
         participatesInAutoshift: hasAutoshiftColumn ? (stage as any).participatesInAutoshift ?? true : true,
-        overlapAccepted: hasOverlapAcceptedColumn
-          ? (stage as any).overlapAccepted ?? false
-          : overlapAcceptedByStageId.get((stage as any).id) ?? false,
       })),
       product: updatedProduct,
     })
@@ -447,16 +451,10 @@ export async function PATCH(req: NextRequest) {
       orderBy: { stageOrder: 'asc' },
       select: stageResponseSelect,
     })
-    const overlapAcceptedMap = await getOverlapAcceptedMap(targetStage.productId)
-    const overlapAcceptedByStageId = overlapAcceptedMap as Map<string, boolean>
-
     return NextResponse.json({
       stages: updatedStages.map((stage) => ({
         ...stage,
         participatesInAutoshift: hasAutoshiftColumn ? (stage as any).participatesInAutoshift ?? true : true,
-        overlapAccepted: hasOverlapAcceptedColumn
-          ? (stage as any).overlapAccepted ?? false
-          : overlapAcceptedByStageId.get((stage as any).id) ?? false,
       })),
     })
   }
@@ -490,19 +488,12 @@ export async function PATCH(req: NextRequest) {
     })
   }
 
-  const safeUpdates = { ...(updates || {}) }
-  if (!hasOverlapAcceptedColumn) {
-    delete safeUpdates.overlapAccepted
-  }
+  const safeUpdates = getSafeStageUpdates(updates || {})
 
   if (!hasDurationDaysColumn) {
     delete safeUpdates.durationDays
   } else if (hasExplicitDurationDaysUpdate) {
     safeUpdates.durationDays = normalizedDurationDays
-  }
-
-  if (hasOverlapAcceptedColumn && hasExplicitDateUpdate && !areSameDate(oldDate, newDate)) {
-    safeUpdates.overlapAccepted = false
   }
 
   const normalizedUpdates = {
@@ -544,10 +535,6 @@ export async function PATCH(req: NextRequest) {
     const scheduleAnchorDate = hasExplicitDateUpdate
       ? newDate
       : scheduleStages[changedStageIndex].dateValue ?? scheduleStages[changedStageIndex].plannedDate ?? null
-    const stagesToResetOverlapAcceptance = scheduleStages
-      .slice(Math.max(0, changedStageIndex - 1))
-      .map((stage) => stage.id)
-
     const recalculatedStages = applySequentialStageDateOverride(
       scheduleStages.map((stage) => ({
         plannedDate: stage.id === targetStage.id
@@ -622,12 +609,6 @@ export async function PATCH(req: NextRequest) {
       })
     }
 
-    if (
-      (hasExplicitDateUpdate && !areSameDate(oldDate, newDate)) ||
-      (hasExplicitDurationDaysUpdate && oldDurationDays !== normalizedDurationDays)
-    ) {
-      await persistOverlapAccepted(targetStage.productId, stagesToResetOverlapAcceptance, false, userId)
-    }
   } else {
     if (!createdMissingStage) {
       await prisma.productStage.update({
@@ -670,8 +651,6 @@ export async function PATCH(req: NextRequest) {
     select: stageResponseSelect,
   })
   const updatedStage = stages.find((stage) => (stage as any).id === targetStage.id)
-  const overlapAcceptedMap = await getOverlapAcceptedMap(targetStage.productId)
-  const overlapAcceptedByStageId = overlapAcceptedMap as Map<string, boolean>
 
   revalidatePath('/products')
   revalidatePath('/table')
@@ -684,16 +663,10 @@ export async function PATCH(req: NextRequest) {
     stage: updatedStage ? {
       ...updatedStage,
       participatesInAutoshift: hasAutoshiftColumn ? (updatedStage as any).participatesInAutoshift ?? true : true,
-      overlapAccepted: hasOverlapAcceptedColumn
-        ? (updatedStage as any).overlapAccepted ?? false
-        : overlapAcceptedByStageId.get((updatedStage as any).id) ?? false,
     } : null,
     stages: stages.map((stage) => ({
       ...stage,
       participatesInAutoshift: hasAutoshiftColumn ? (stage as any).participatesInAutoshift ?? true : true,
-      overlapAccepted: hasOverlapAcceptedColumn
-        ? (stage as any).overlapAccepted ?? false
-        : overlapAcceptedByStageId.get((stage as any).id) ?? false,
     })),
     automationResult,
     product: updatedProduct,

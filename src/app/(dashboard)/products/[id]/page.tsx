@@ -3,7 +3,6 @@ import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { ProductCardClient } from '@/components/products/ProductCardClient'
 import { getFinalDateFromStages } from '@/lib/product-derived-fields'
-import { getOverlapAcceptedMap } from '@/lib/overlap-acceptance'
 import { supportsProductLifecycleColumns } from '@/lib/schema-compat'
 import { getVisibleProductWhere } from '@/lib/product-access'
 
@@ -101,8 +100,6 @@ async function getProduct(id: string, viewer: { id?: string | null; role?: strin
 
   if (!product) return null
 
-  const overlapAcceptedById = await getOverlapAcceptedMap(id)
-
   return {
     ...product,
     closedAt: hasProductLifecycleColumns ? (product as any).closedAt ?? null : null,
@@ -114,10 +111,6 @@ async function getProduct(id: string, viewer: { id?: string | null; role?: strin
     closedBy: hasProductLifecycleColumns ? (product as any).closedBy ?? null : null,
     archivedBy: hasProductLifecycleColumns ? (product as any).archivedBy ?? null : null,
     finalDate: getFinalDateFromStages(product.stages),
-    stages: product.stages.map((stage) => ({
-      ...stage,
-      overlapAccepted: overlapAcceptedById.get(stage.id) ?? false,
-    })),
   }
 }
 

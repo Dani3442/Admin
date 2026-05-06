@@ -6,7 +6,6 @@ import { RiskList } from '@/components/dashboard/RiskList'
 import { Recommendations } from '@/components/dashboard/Recommendations'
 import { recalculateAllRisksIfNeeded } from '@/lib/risk'
 import { addDays } from 'date-fns'
-import { detectStageOverlaps, formatStageOverlap } from '@/lib/utils'
 import { getVisibleProductWhere } from '@/lib/product-access'
 
 const DashboardCharts = dynamic(
@@ -121,16 +120,11 @@ async function getDashboardData(viewer: { id?: string | null; role?: string | nu
       }
     }
 
-    // Detect date overlaps for this product
     const riskReasons: string[] = []
     if (product.finalDate) {
       const daysLeft = Math.round((product.finalDate.getTime() - now.getTime()) / 86400000)
       if (daysLeft < 0) riskReasons.push('Финальная дата просрочена')
       else if (daysLeft < 7) riskReasons.push('Финальная дата через ' + daysLeft + ' дн.')
-    }
-    const { overlaps } = detectStageOverlaps(product.stages)
-    for (const overlap of overlaps) {
-      riskReasons.push(formatStageOverlap(overlap).slice(0, 48))
     }
     const overdueStages = product.stages.filter((s) => s.dateValue && !s.isCompleted && s.dateValue < now)
     if (overdueStages.length > 0) {

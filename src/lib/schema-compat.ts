@@ -34,10 +34,6 @@ export async function supportsProductStageAutoshiftColumn() {
   return hasDbColumn('product_stages', 'participatesInAutoshift')
 }
 
-export async function supportsProductStageOverlapAcceptedColumn() {
-  return hasDbColumn('product_stages', 'overlapAccepted')
-}
-
 export async function supportsProductStageAffectsFinalDateColumn() {
   return hasDbColumn('product_stages', 'affectsFinalDate')
 }

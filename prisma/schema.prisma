@@ -153,7 +153,6 @@ model ProductStage {
   plannedDate             DateTime?
   actualDate              DateTime?
   daysDeviation           Int?
-  overlapAccepted         Boolean   @default(false)
   createdAt               DateTime  @default(now())
   updatedAt               DateTime  @updatedAt
 

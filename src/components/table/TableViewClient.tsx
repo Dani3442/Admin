@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Search, CheckCircle2, AlertTriangle, Plus, ChevronLeft, ChevronRight, Pencil, X, Trash2, Filter, Archive, Pin, PinOff, Star, UserPlus } from 'lucide-react'
-import { cn, formatDate, detectStageOverlaps, getPriorityLabel, getStatusLabel } from '@/lib/utils'
+import { cn, formatDate, getPriorityLabel, getStatusLabel } from '@/lib/utils'
 import { DatePicker } from '@/components/ui/DatePicker'
 import { serializeDateOnly } from '@/lib/date-only'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -28,7 +28,6 @@ interface ProductStage {
   dateValue: Date | null; dateRaw: string | null;
   isCompleted: boolean; isCritical: boolean; status: string
   participatesInAutoshift?: boolean
-  overlapAccepted?: boolean
 }
 
 interface Product {
@@ -164,7 +163,6 @@ export function TableViewClient({
   const [countryFilter, setCountryFilter] = useState('')
   const [quickView, setQuickView] = useState<ProductQuickView>('all')
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
-  const [onlyWithOverlaps, setOnlyWithOverlaps] = useState(false)
   const [editingCell, setEditingCell] = useState<EditingCellState | null>(null)
   const [editValue, setEditValue] = useState<Date | null>(null)
   const [saving, setSaving] = useState(false)
@@ -687,7 +685,6 @@ export function TableViewClient({
     priority: priorityFilter,
     country: countryFilter,
     quickView,
-    onlyWithOverlaps,
   }
   const effectiveSortField = externalSortField ?? 'manual'
   const effectiveSortDirection = externalSortDirection ?? 'asc'
@@ -717,7 +714,6 @@ export function TableViewClient({
     setCountryFilter('')
     setQuickView('all')
     setShowAdvancedFilters(false)
-    setOnlyWithOverlaps(false)
   }
 
   function getCellClass(stage: ProductStage | undefined, stageTemplate: Stage): string {
@@ -843,7 +839,7 @@ export function TableViewClient({
               Фильтры
             </button>
 
-            {(search || statusFilter || responsibleFilter || priorityFilter || countryFilter.trim() || quickView !== 'all' || onlyWithOverlaps) && (
+            {(search || statusFilter || responsibleFilter || priorityFilter || countryFilter.trim() || quickView !== 'all') && (
               <button onClick={resetFilters} className="btn-secondary w-full justify-center sm:w-auto">
                 <X className="w-4 h-4" />
                 Сбросить
@@ -913,15 +909,6 @@ export function TableViewClient({
                 />
               </label>
 
-              <label className="inline-flex items-center gap-2 pt-1 text-sm text-muted-foreground">
-                <input
-                  type="checkbox"
-                  checked={onlyWithOverlaps}
-                  onChange={(event) => setOnlyWithOverlaps(event.target.checked)}
-                  className="rounded border-border text-primary focus:ring-ring"
-                />
-                Только с проблемами дат
-              </label>
             </div>
           )}
 
@@ -933,7 +920,6 @@ export function TableViewClient({
       {/* Matrix Table */}
       <div className="space-y-4 lg:hidden">
         {filteredProducts.map((product) => {
-          const { overlappingIds } = detectStageOverlaps(product.stages)
           const resolvedStageMap = resolveStageMapForProduct(product.stages, stages)
 
           return (
@@ -1002,7 +988,6 @@ export function TableViewClient({
                 <div className="space-y-2">
                   {stages.map((stageTemplate) => {
                     const stage = resolvedStageMap.get(stageTemplate.id)
-                    const hasOverlap = stage ? overlappingIds.has(stage.id) : false
                     const cellClass = getCellClass(stage, stageTemplate)
                     const cellText = getCellText(stage)
 
@@ -1014,9 +999,8 @@ export function TableViewClient({
                             <p className="mt-0.5 text-xs text-muted-foreground">{stageTemplate.durationText}</p>
                           )}
                         </div>
-                        <div className={cn('flex-shrink-0 rounded-[14px] px-2.5 py-1 text-xs font-medium', cellClass, hasOverlap && 'ring-1 ring-orange-400/70')}>
+                        <div className={cn('flex-shrink-0 rounded-[14px] px-2.5 py-1 text-xs font-medium', cellClass)}>
                           {stage?.isCompleted && <CheckCircle2 className="mr-1 inline h-3 w-3" />}
-                          {hasOverlap && <AlertTriangle className="mr-1 inline h-3 w-3 text-orange-500" />}
                           {cellText}
                         </div>
                       </div>
@@ -1117,7 +1101,6 @@ export function TableViewClient({
             </thead>
             <tbody>
               {filteredProducts.map((product, rowIdx) => {
-                const { overlappingIds } = detectStageOverlaps(product.stages)
                 const resolvedStageMap = resolveStageMapForProduct(product.stages, stages)
                 const rowBackgroundClass = rowIdx % 2 === 0 ? 'bg-card' : 'bg-muted/35'
                 const stickyProductCellBackgroundClass = rowIdx % 2 === 0 ? 'bg-card' : 'bg-muted'
@@ -1174,7 +1157,6 @@ export function TableViewClient({
                         editingCell?.stageTemplateId === stageTemplate.id
                       const cellClass = getCellClass(stage, stageTemplate)
                       const cellText = getCellText(stage)
-                      const hasOverlap = stage && overlappingIds.has(stage.id)
 
                       return (
                         <td
@@ -1198,13 +1180,12 @@ export function TableViewClient({
                             </div>
                           ) : (
                             <div
-                              className={cn(cellClass, canEditTable && 'cursor-pointer hover:opacity-80 transition-opacity', 'mx-0.5 relative', hasOverlap && 'ring-2 ring-orange-400 ring-inset')}
+                              className={cn(cellClass, canEditTable && 'cursor-pointer hover:opacity-80 transition-opacity', 'mx-0.5 relative')}
                               onClick={() => canEditTable && startEdit(product.id, stageTemplate, stage)}
                               onContextMenu={(e) => handleStageCellContextMenu(e, product.id, stage)}
-                              title={stage ? `${stage.stageName}\n${stage.dateValue ? formatDate(stage.dateValue) : stage.dateRaw || 'Нет даты'}${stage.isCritical ? '\n⚠️ Критичный этап' : ''}${hasOverlap ? '\n⚠️ Пересечение дат' : ''}` : stageTemplate.name}
+                              title={stage ? `${stage.stageName}\n${stage.dateValue ? formatDate(stage.dateValue) : stage.dateRaw || 'Нет даты'}${stage.isCritical ? '\n⚠️ Критичный этап' : ''}` : stageTemplate.name}
                             >
                               {stage?.isCompleted && <CheckCircle2 className="w-2.5 h-2.5 inline mr-0.5" />}
-                              {hasOverlap && <AlertTriangle className="w-2.5 h-2.5 inline mr-0.5 text-orange-500" />}
                               {cellText}
                             </div>
                           )}

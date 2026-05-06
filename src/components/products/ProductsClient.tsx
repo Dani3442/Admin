@@ -21,12 +21,9 @@ import {
 } from 'lucide-react'
 import {
   cn,
-  detectStageOverlaps,
   formatDate,
-  formatStageOverlap,
   getPriorityColor,
   getPriorityLabel,
-  getStageIssuesSummaryLabel,
   getStatusColor,
   getStatusLabel,
 } from '@/lib/utils'
@@ -140,7 +137,6 @@ export function ProductsClient({
   const [sortField, setSortField] = useState<ProductListSortField>(isValidSortField(searchParams.get('sort')) ? (searchParams.get('sort') as ProductListSortField) : 'manual')
   const [sortDirection, setSortDirection] = useState<ProductListSortDirection>(searchParams.get('dir') === 'desc' ? 'desc' : 'asc')
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(searchParams.get('advanced') === '1')
-  const [onlyWithOverlaps, setOnlyWithOverlaps] = useState(searchParams.get('overlaps') === '1')
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null)
   const [pendingDeleteProduct, setPendingDeleteProduct] = useState<{ id: string; name: string } | null>(null)
   const [archivingProductId, setArchivingProductId] = useState<string | null>(null)
@@ -211,7 +207,7 @@ export function ProductsClient({
 
     const params = new URLSearchParams(searchParams.toString())
 
-    ;['search', 'status', 'responsible', 'priority', 'country', 'view', 'sort', 'dir', 'advanced', 'overlaps'].forEach((key) => {
+    ;['search', 'status', 'responsible', 'priority', 'country', 'view', 'sort', 'dir', 'advanced'].forEach((key) => {
       params.delete(key)
     })
 
@@ -224,8 +220,6 @@ export function ProductsClient({
     if (sortField !== 'manual') params.set('sort', sortField)
     if (sortField !== 'manual' && sortDirection !== 'asc') params.set('dir', sortDirection)
     if (showAdvancedFilters) params.set('advanced', '1')
-    if (onlyWithOverlaps) params.set('overlaps', '1')
-
     const nextQuery = params.toString()
     const nextUrl = nextQuery ? `${window.location.pathname}?${nextQuery}` : window.location.pathname
     const currentUrl = `${window.location.pathname}${window.location.search}`
@@ -233,7 +227,7 @@ export function ProductsClient({
     if (nextUrl !== currentUrl) {
       window.history.replaceState(null, '', nextUrl)
     }
-  }, [controlsHidden, countryFilter, externalFilters, externalSortDirection, externalSortField, onlyWithOverlaps, priorityFilter, quickView, responsibleFilter, search, searchParams, showAdvancedFilters, sortDirection, sortField, statusFilter])
+  }, [controlsHidden, countryFilter, externalFilters, externalSortDirection, externalSortField, priorityFilter, quickView, responsibleFilter, search, searchParams, showAdvancedFilters, sortDirection, sortField, statusFilter])
 
   useEffect(() => {
     if (!draggingProductId) {
@@ -258,8 +252,7 @@ export function ProductsClient({
     priority: priorityFilter,
     country: countryFilter,
     quickView,
-    onlyWithOverlaps,
-  }), [countryFilter, externalFilters, onlyWithOverlaps, priorityFilter, quickView, responsibleFilter, search, statusFilter])
+  }), [countryFilter, externalFilters, priorityFilter, quickView, responsibleFilter, search, statusFilter])
   const hasActiveFilters = hasActiveProductFilters(filters)
   const filteredProducts = useMemo(() => filterProducts(products, filters), [filters, products])
   const visibleProducts = useMemo(() => sortProducts(filteredProducts, effectiveSortField, effectiveSortDirection), [effectiveSortDirection, effectiveSortField, filteredProducts])
@@ -717,7 +710,6 @@ export function ProductsClient({
     setPriorityFilter('')
     setCountryFilter('')
     setQuickView('all')
-    setOnlyWithOverlaps(false)
     setShowAdvancedFilters(false)
   }
 
@@ -857,15 +849,6 @@ export function ProductsClient({
                     />
                   </label>
 
-                  <label className="inline-flex items-center gap-2 pt-1 text-sm text-muted-foreground">
-                    <input
-                      type="checkbox"
-                      checked={onlyWithOverlaps}
-                      onChange={(event) => setOnlyWithOverlaps(event.target.checked)}
-                      className="rounded border-border text-primary focus:ring-ring"
-                    />
-                    Только с проблемами дат
-                  </label>
                 </div>
               </motion.div>
             )}
@@ -933,7 +916,6 @@ export function ProductsClient({
       <div className="space-y-4 lg:hidden">
         {visibleProducts.map((product, index) => {
           const isOverdue = Boolean(product.finalDate && new Date(product.finalDate) < now && product.status !== 'COMPLETED')
-          const { overlaps } = detectStageOverlaps(product.stages)
           const selected = selectedProductIds.includes(product.id)
 
           return (
@@ -1018,15 +1000,6 @@ export function ProductsClient({
                   </div>
                 </div>
               </div>
-
-              {overlaps.length > 0 && (
-                <div
-                  className="rounded-[20px] border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300"
-                  title={overlaps.map((overlap) => formatStageOverlap(overlap)).join(', ')}
-                >
-                  {getStageIssuesSummaryLabel(overlaps) || `Обнаружены проблемы с датами: ${overlaps.length}`}
-                </div>
-              )}
 
               <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                 <button
@@ -1149,7 +1122,6 @@ export function ProductsClient({
             <tbody className="divide-y divide-border/60">
               {visibleProducts.map((product, index) => {
                 const isOverdue = Boolean(product.finalDate && new Date(product.finalDate) < now && product.status !== 'COMPLETED')
-                const { overlaps } = detectStageOverlaps(product.stages)
                 const isDragging = draggingProductId === product.id
                 const isDropTarget = dragOverState?.productId === product.id
                 const showDropBefore = isDropTarget && dragOverState?.position === 'before'
@@ -1228,14 +1200,6 @@ export function ProductsClient({
                             <span>{product._count.comments} комм.</span>
                             {product.isPinned && <span className="font-medium text-foreground">• закреплён</span>}
                             {product.isFavorite && <span className="font-medium text-foreground">• избранное</span>}
-                            {overlaps.length > 0 && (
-                              <span
-                                className="font-medium text-amber-600 dark:text-amber-300"
-                                title={overlaps.map((overlap) => formatStageOverlap(overlap)).join(', ')}
-                              >
-                                • ⚠ {overlaps.length} проблем с датами
-                              </span>
-                            )}
                           </div>
                         </div>
                       </div>

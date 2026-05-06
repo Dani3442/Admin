@@ -5,7 +5,7 @@ import { usePathname, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval, differenceInDays, isSameDay } from 'date-fns'
 import { ru } from 'date-fns/locale'
-import { cn, formatDate, detectStageOverlaps, formatStageOverlap } from '@/lib/utils'
+import { cn, formatDate } from '@/lib/utils'
 import { ChevronLeft, ChevronRight, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { buildProductHref, getRouteWithSearch } from '@/lib/navigation'
 
@@ -140,9 +140,7 @@ export function TimelineClient({ products }: { products: Product[] }) {
             </div>
 
             {/* Product Rows */}
-            {filtered.map((product) => {
-              const { overlappingIds, overlaps: productOverlaps } = detectStageOverlaps(product.stages)
-              return (
+            {filtered.map((product) => (
               <div key={product.id} className="flex border-b border-slate-50 hover:bg-slate-50/60 group" style={{ height: 52 }}>
                 {/* Name */}
                 <div className="w-48 flex-shrink-0 px-3 py-2 border-r border-slate-100 flex flex-col justify-center">
@@ -155,11 +153,6 @@ export function TimelineClient({ products }: { products: Product[] }) {
                     </div>
                     <span className="text-[9px] text-muted-foreground">{product.progressPercent}%</span>
                     {product.riskScore >= 40 && <AlertTriangle className="w-2.5 h-2.5 text-amber-500" />}
-                    {productOverlaps.length > 0 && (
-                      <span className="text-[9px] text-orange-600 font-medium" title={productOverlaps.map((overlap) => formatStageOverlap(overlap)).join(', ')}>
-                        ⚠{productOverlaps.length}
-                      </span>
-                    )}
                   </div>
                 </div>
 
@@ -188,20 +181,18 @@ export function TimelineClient({ products }: { products: Product[] }) {
                   {product.stages.map((stage) => {
                     const left = getStageLeft(stage.dateValue)
                     if (left === null) return null
-                    const hasOverlap = overlappingIds.has(stage.id)
                     return (
                       <div
                         key={stage.id}
                         className={cn(
                           'absolute top-1/2 -translate-y-1/2 rounded-full border cursor-pointer transition-all hover:scale-125 hover:z-20',
-                          hasOverlap ? 'w-3.5 h-3.5 bg-orange-400 border-orange-600 ring-2 ring-orange-300' :
                           stage.isCompleted ? 'w-3 h-3 bg-emerald-500 border-emerald-600' :
                           stage.isCritical ? 'w-3 h-3 bg-red-500 border-red-600' :
                           stage.dateValue && new Date(stage.dateValue) < now ? 'w-2.5 h-2.5 bg-red-400 border-red-500' :
                           'w-2.5 h-2.5 bg-blue-400 border-blue-500'
                         )}
-                        style={{ left: left - 5, zIndex: hasOverlap ? 8 : 5 }}
-                        title={`${stage.stageName}\n${formatDate(stage.dateValue)}${stage.isCritical ? '\n⚠️ Критичный' : ''}${hasOverlap ? `\n⚠️ ${formatStageOverlap(productOverlaps.find((overlap) => overlap.stageIds.includes(stage.id)) || productOverlaps[0])}` : ''}`}
+                        style={{ left: left - 5, zIndex: 5 }}
+                        title={`${stage.stageName}\n${formatDate(stage.dateValue)}${stage.isCritical ? '\n⚠️ Критичный' : ''}`}
                       />
                     )
                   })}
@@ -220,8 +211,7 @@ export function TimelineClient({ products }: { products: Product[] }) {
                   })()}
                 </div>
               </div>
-              )
-            })}
+            ))}
 
             {filtered.length === 0 && (
               <div className="h-32 flex items-center justify-center text-slate-400 text-sm">
