@@ -162,15 +162,18 @@ function getLayoutFromSearchParams(searchParams: Pick<URLSearchParams, 'get'>): 
 function resolveInitialResponsibleFilter({
   archiveMode,
   canViewAllProducts,
+  currentUserRole,
   currentUserId,
   searchParams,
 }: {
   archiveMode: boolean
   canViewAllProducts: boolean
+  currentUserRole: string
   currentUserId: string
   searchParams: Pick<URLSearchParams, 'get'>
 }) {
   const requestedResponsible = searchParams.get('responsible') || ''
+  const shouldSkipPersonalDefault = ['ADMIN', 'DIRECTOR'].includes(currentUserRole)
 
   if (archiveMode) {
     return requestedResponsible
@@ -178,6 +181,10 @@ function resolveInitialResponsibleFilter({
 
   if (!canViewAllProducts) {
     return currentUserId
+  }
+
+  if (shouldSkipPersonalDefault) {
+    return requestedResponsible
   }
 
   return requestedResponsible || currentUserId
@@ -205,6 +212,7 @@ export function ProductsWorkspace({
     resolveInitialResponsibleFilter({
       archiveMode,
       canViewAllProducts,
+      currentUserRole,
       currentUserId: currentUser.id,
       searchParams,
     })
