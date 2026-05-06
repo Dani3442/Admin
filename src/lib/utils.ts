@@ -121,7 +121,7 @@ export function getStatusLabel(status: ProductStatus | string): string {
     IN_PROGRESS: 'В работе',
     AT_RISK: 'Под риском',
     DELAYED: 'Задержка',
-    COMPLETED: 'Завершён',
+    COMPLETED: 'Выполнено',
     CANCELLED: 'Отменён',
   }
   return map[status] || status

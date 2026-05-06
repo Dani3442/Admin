@@ -6,6 +6,7 @@ import { supportsProductLifecycleColumns } from '@/lib/schema-compat'
 import { getVisibleProductWhere } from '@/lib/product-access'
 import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
 import { sanitizeDeepStrings, sanitizeTextValue, sanitizeUrlValue } from '@/lib/input-security'
+import { isEditableProductStatus } from '@/lib/product-status'
 
 function getProductSelect(hasProductLifecycleColumns: boolean) {
   return {
@@ -329,6 +330,10 @@ export async function PATCH(
 
   if ('finalDate' in data && data.finalDate) {
     data.finalDate = new Date(data.finalDate as string)
+  }
+
+  if ('status' in data && !isEditableProductStatus(data.status)) {
+    return NextResponse.json({ error: 'Недопустимый статус продукта' }, { status: 400 })
   }
 
   if ('name' in data) data.name = sanitizeTextValue(data.name, { maxLength: 160 })

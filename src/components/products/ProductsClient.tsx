@@ -34,6 +34,7 @@ import { FloatingContextMenu } from '@/components/ui/FloatingContextMenu'
 import { ProductRenameDialog } from '@/components/products/ProductRenameDialog'
 import { ProductResponsibleDialog } from '@/components/products/ProductResponsibleDialog'
 import { useContextMenu } from '@/hooks/useContextMenu'
+import { EDITABLE_PRODUCT_STATUSES } from '@/lib/product-status'
 import {
   filterProducts,
   hasActiveProductFilters,
@@ -162,7 +163,7 @@ export function ProductsClient({
     openMenuFromEvent: openContextMenuFromEvent,
   } = useContextMenu<ContextMenuState>({
     width: 240,
-    height: archiveMode ? 260 : 360,
+    height: archiveMode ? 260 : 460,
   })
 
   const canManageProducts = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUserRole) && !archiveMode
@@ -320,6 +321,45 @@ export function ProductsClient({
     } catch (error: any) {
       setProducts(previousProducts)
       window.alert(error.message || 'Не удалось обновить продукт')
+    } finally {
+      setSavingProductId(null)
+    }
+  }
+
+  const handleChangeProductStatus = async (product: ProductListItem, nextStatus: string) => {
+    if (!canManageProducts || product.status === nextStatus) {
+      closeContextMenu()
+      return
+    }
+
+    const previousProducts = products
+    setSavingProductId(product.id)
+    updateProduct(product.id, (currentProduct) => ({ ...currentProduct, status: nextStatus }))
+    closeContextMenu()
+
+    try {
+      const response = await fetch(`/api/products/${product.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: nextStatus }),
+      })
+      const data = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'Не удалось изменить статус продукта')
+      }
+
+      setProducts((currentProducts) =>
+        currentProducts.map((currentProduct) =>
+          currentProduct.id === product.id
+            ? { ...currentProduct, status: data?.status ?? nextStatus }
+            : currentProduct
+        )
+      )
+      router.refresh()
+    } catch (error: any) {
+      setProducts(previousProducts)
+      window.alert(error.message || 'Не удалось изменить статус продукта')
     } finally {
       setSavingProductId(null)
     }
@@ -1314,6 +1354,32 @@ export function ProductsClient({
                     <UserPlus className="h-4 w-4 text-muted-foreground" />
                     Добавить ответственного
                   </button>
+
+                  <div className="my-1 border-t border-border/70" />
+                  <div className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                    Изменить статус
+                  </div>
+                  <div className="space-y-1">
+                    {EDITABLE_PRODUCT_STATUSES.map((statusOption) => {
+                      const active = contextProduct.status === statusOption.value
+
+                      return (
+                        <button
+                          key={statusOption.value}
+                          onClick={() => handleChangeProductStatus(contextProduct, statusOption.value)}
+                          disabled={savingProductId === contextProduct.id}
+                          className={cn(
+                            'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition disabled:opacity-60',
+                            active ? 'bg-accent text-popover-foreground' : 'text-popover-foreground hover:bg-accent/70'
+                          )}
+                        >
+                          <span className={cn('h-2.5 w-2.5 rounded-full', statusOption.dotClassName)} />
+                          <span className="flex-1">{statusOption.label}</span>
+                          {active && <span className="text-xs text-muted-foreground">сейчас</span>}
+                        </button>
+                      )
+                    })}
+                  </div>
 
                   <button
                     onClick={() => handleToggleProductFlag(contextProduct, 'isPinned', !contextProduct.isPinned)}

@@ -24,6 +24,7 @@ import { resolveBackNavigation } from '@/lib/navigation'
 import { UserAvatar } from '@/components/users/UserAvatar'
 import { encodeCommentMentions, getCommentSegments } from '@/lib/comment-mentions'
 import { useContextMenu } from '@/hooks/useContextMenu'
+import { EDITABLE_PRODUCT_STATUSES, getEditableProductStatusOption } from '@/lib/product-status'
 // Types are string-based (no Prisma enums needed)
 
 const AUTOMATION_ACTIONS = [
@@ -88,6 +89,9 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
   const commentInputRef = useRef<HTMLTextAreaElement>(null)
   const commentsScrollRef = useRef<HTMLDivElement>(null)
   const markedSeenProductRef = useRef<string | null>(null)
+  const statusMenuRef = useRef<HTMLDivElement>(null)
+  const [statusMenuOpen, setStatusMenuOpen] = useState(false)
+  const [statusSaving, setStatusSaving] = useState(false)
   const {
     menu: stageMenu,
     menuRef,
@@ -101,6 +105,30 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
   const canEdit = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUser?.role) && !product.isArchived
   const canComment = Boolean(currentUser?.id) && !product.isArchived
   const canArchiveProduct = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUser?.role)
+  const currentStatusOption = getEditableProductStatusOption(product.status)
+
+  useEffect(() => {
+    if (!statusMenuOpen) return
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node
+      if (statusMenuRef.current?.contains(target)) return
+      setStatusMenuOpen(false)
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setStatusMenuOpen(false)
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleEscape)
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [statusMenuOpen])
+
   const backNavigation = resolveBackNavigation(searchParams.get('returnTo'))
   const mentionableUsers = useMemo(
     () =>
@@ -347,6 +375,39 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
       alert(error.message || 'Не удалось переименовать продукт')
     } finally {
       setLifecycleSaving(false)
+    }
+  }
+
+  const changeProductStatus = async (nextStatus: string) => {
+    if (!canEdit || product.status === nextStatus) {
+      setStatusMenuOpen(false)
+      return
+    }
+
+    const previousProduct = product
+    setStatusSaving(true)
+    setStatusMenuOpen(false)
+    setProduct((prev: any) => ({ ...prev, status: nextStatus }))
+
+    try {
+      const res = await fetch(`/api/products/${product.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: nextStatus }),
+      })
+      const data = await res.json().catch(() => null)
+
+      if (!res.ok) {
+        throw new Error(data?.error || 'Не удалось изменить статус продукта')
+      }
+
+      setProduct((prev: any) => ({ ...prev, ...data, status: data?.status ?? nextStatus }))
+      router.refresh()
+    } catch (error: any) {
+      setProduct(previousProduct)
+      alert(error.message || 'Не удалось изменить статус продукта')
+    } finally {
+      setStatusSaving(false)
     }
   }
 
@@ -803,7 +864,55 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 flex-wrap mb-2">
               <span className={cn('badge border', getPriorityColor(product.priority))}>{getPriorityLabel(product.priority)}</span>
-              <span className={cn('badge', getStatusColor(product.status))}>{getStatusLabel(product.status)}</span>
+              {canEdit && currentStatusOption ? (
+                <div ref={statusMenuRef} className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setStatusMenuOpen((open) => !open)}
+                    disabled={statusSaving}
+                    className={cn(
+                      'badge border transition hover:shadow-sm disabled:opacity-60',
+                      currentStatusOption.badgeClassName
+                    )}
+                    aria-haspopup="menu"
+                    aria-expanded={statusMenuOpen}
+                    title="Изменить статус продукта"
+                  >
+                    <span className={cn('h-2 w-2 rounded-full', currentStatusOption.dotClassName)} />
+                    {currentStatusOption.label}
+                  </button>
+                  {statusMenuOpen && (
+                    <div className="absolute left-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-[18px] border border-border/70 bg-popover p-1.5 text-popover-foreground shadow-xl" role="menu">
+                      {EDITABLE_PRODUCT_STATUSES.map((statusOption) => {
+                        const active = product.status === statusOption.value
+
+                        return (
+                          <button
+                            key={statusOption.value}
+                            type="button"
+                            onClick={() => changeProductStatus(statusOption.value)}
+                            disabled={statusSaving}
+                            className={cn(
+                              'flex w-full items-start gap-2 rounded-[14px] px-3 py-2 text-left text-sm transition disabled:opacity-60',
+                              active ? 'bg-accent text-popover-foreground' : 'hover:bg-accent/70'
+                            )}
+                            role="menuitem"
+                          >
+                            <span className={cn('mt-1.5 h-2.5 w-2.5 flex-shrink-0 rounded-full', statusOption.dotClassName)} />
+                            <span className="min-w-0 flex-1">
+                              <span className="block font-medium">{statusOption.label}</span>
+                              <span className="block text-xs text-muted-foreground">{statusOption.description}</span>
+                            </span>
+                            {active && <span className="mt-0.5 text-xs text-muted-foreground">сейчас</span>}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <span className={cn('badge', getStatusColor(product.status))}>{getStatusLabel(product.status)}</span>
+              )}
               {product.country && <span className="badge bg-muted text-muted-foreground">{product.country}</span>}
             </div>
             <div className="mb-2 flex items-start gap-3">
