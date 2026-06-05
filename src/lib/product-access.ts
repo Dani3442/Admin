@@ -22,6 +22,10 @@ export function canViewAnalytics(viewer: ProductAccessViewer | null | undefined)
   return hasPermission(getViewerRole(viewer), Permission.VIEW_ANALYTICS)
 }
 
+export function canManageProducts(viewer: ProductAccessViewer | null | undefined) {
+  return hasPermission(getViewerRole(viewer), Permission.EDIT_STAGES)
+}
+
 export function canManageArchive(viewer: ProductAccessViewer | null | undefined) {
   return ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(getViewerRole(viewer))
 }

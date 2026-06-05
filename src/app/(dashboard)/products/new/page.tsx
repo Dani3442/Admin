@@ -1,11 +1,12 @@
 import dynamic from 'next/dynamic'
 import { redirect } from 'next/navigation'
-import { auth, hasPermission, Permission } from '@/lib/auth'
+import { auth } from '@/lib/auth'
 import { getCachedAssignableUsers, getCachedProductTemplates, getCachedStageSuggestions } from '@/lib/cached-reference-data'
 import {
   supportsProductTemplateStageAutoshiftColumn,
   supportsProductTemplateStageDurationDaysColumn,
 } from '@/lib/schema-compat'
+import { canManageProducts } from '@/lib/product-access'
 
 const NewProductForm = dynamic(
   () => import('@/components/products/NewProductForm').then((mod) => mod.NewProductForm),
@@ -57,7 +58,7 @@ export default async function NewProductPage({
   ])
 
   if (!session?.user) redirect('/login')
-  if (!hasPermission((session.user as any).role, Permission.EDIT_STAGES)) {
+  if (!canManageProducts(session.user as any)) {
     redirect('/products')
   }
 

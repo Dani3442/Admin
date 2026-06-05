@@ -8,7 +8,7 @@ import {
   supportsProductTemplateStageAutoshiftColumn,
   supportsProductTemplateStageDurationDaysColumn,
 } from '@/lib/schema-compat'
-import { canViewAllProducts, getVisibleProductWhere } from '@/lib/product-access'
+import { canManageProducts, canViewAllProducts, getVisibleProductWhere } from '@/lib/product-access'
 
 async function getProductsWorkspaceData(viewer: { id?: string | null; role?: string | null }, archived = false) {
   await recalculateAllRisksIfNeeded()
@@ -135,6 +135,7 @@ export default async function ProductsPage({
         name: (session?.user as any)?.name || '',
       }}
       canViewAllProducts={canViewAllProducts(viewer)}
+      canCreateProducts={canManageProducts(viewer)}
       archiveMode={false}
     />
   )

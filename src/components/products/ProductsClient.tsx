@@ -803,7 +803,7 @@ export function ProductsClient({
               {visibleProducts.length} из {products.length} {archiveMode ? 'архивных' : ''} продуктов
             </p>
           </div>
-          {!archiveMode && (
+          {!archiveMode && canManageProducts && (
             <Link href={createProductHref} className="btn-primary w-full justify-center sm:w-auto">
               <Plus className="w-4 h-4" /> Новый продукт
             </Link>

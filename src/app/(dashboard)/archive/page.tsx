@@ -116,6 +116,7 @@ export default async function ArchivePage() {
         name: (session?.user as any)?.name || '',
       }}
       canViewAllProducts={canViewAllProducts(viewer)}
+      canCreateProducts={false}
       archiveMode
     />
   )

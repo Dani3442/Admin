@@ -78,6 +78,7 @@ interface ProductsWorkspaceProps {
   currentUserRole: string
   currentUser: { id: string; name: string }
   canViewAllProducts: boolean
+  canCreateProducts: boolean
   archiveMode?: boolean
 }
 
@@ -200,6 +201,7 @@ export function ProductsWorkspace({
   currentUserRole,
   currentUser,
   canViewAllProducts,
+  canCreateProducts,
   archiveMode = false,
 }: ProductsWorkspaceProps) {
   const router = useRouter()
@@ -502,9 +504,11 @@ export function ProductsWorkspace({
             <div className="w-full sm:w-auto">{layoutSwitcher}</div>
             {!archiveMode && (
               <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-                <Link href={createProductHref} scroll={false} className="btn-primary w-full justify-center self-start sm:w-auto">
-                  <Plus className="h-4 w-4" /> Новый продукт
-                </Link>
+                {canCreateProducts && (
+                  <Link href={createProductHref} scroll={false} className="btn-primary w-full justify-center self-start sm:w-auto">
+                    <Plus className="h-4 w-4" /> Новый продукт
+                  </Link>
+                )}
                 <button
                   type="button"
                   onClick={showMyProducts}
