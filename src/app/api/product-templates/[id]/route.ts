@@ -11,6 +11,7 @@ import {
 } from '@/lib/schema-compat'
 import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
 import { sanitizeDeepStrings, sanitizeTextValue } from '@/lib/input-security'
+import { canManageProducts } from '@/lib/product-access'
 
 function normalizeStageName(name: string) {
   return sanitizeTextValue(name, { maxLength: 160 })
@@ -31,7 +32,7 @@ export async function PATCH(
 ) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasPermission((session.user as any).role, Permission.EDIT_STAGES)) {
+  if (!canManageProducts(session.user as any)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
