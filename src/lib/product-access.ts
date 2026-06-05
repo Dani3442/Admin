@@ -23,7 +23,7 @@ export function canViewAnalytics(viewer: ProductAccessViewer | null | undefined)
 }
 
 export function canManageProducts(viewer: ProductAccessViewer | null | undefined) {
-  return hasPermission(getViewerRole(viewer), Permission.EDIT_STAGES)
+  return hasPermission(getViewerRole(viewer), Permission.CREATE_PRODUCTS)
 }
 
 export function canManageArchive(viewer: ProductAccessViewer | null | undefined) {

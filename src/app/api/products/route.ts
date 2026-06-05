@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth, hasPermission, Permission } from '@/lib/auth'
+import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { createProduct } from '@/lib/product-create'
-import { getVisibleProductWhere } from '@/lib/product-access'
+import { canManageProducts, getVisibleProductWhere } from '@/lib/product-access'
 import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
 import { sanitizeDeepStrings, sanitizeTextValue } from '@/lib/input-security'
 
@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const viewer = session.user as any
-  if (!hasPermission((session.user as any).role, Permission.EDIT_STAGES)) {
+  if (!canManageProducts(viewer)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 

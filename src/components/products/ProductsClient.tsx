@@ -168,6 +168,7 @@ export function ProductsClient({
   })
 
   const canManageProducts = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUserRole) && !archiveMode
+  const canCreateProducts = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER', 'EMPLOYEE'].includes(currentUserRole) && !archiveMode
   const canArchiveProducts = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUserRole) && !archiveMode
   const canDeleteProducts = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUserRole)
   const currentRoute = typeof window === 'undefined'
@@ -803,7 +804,7 @@ export function ProductsClient({
               {visibleProducts.length} из {products.length} {archiveMode ? 'архивных' : ''} продуктов
             </p>
           </div>
-          {!archiveMode && canManageProducts && (
+          {canCreateProducts && (
             <Link href={createProductHref} className="btn-primary w-full justify-center sm:w-auto">
               <Plus className="w-4 h-4" /> Новый продукт
             </Link>
