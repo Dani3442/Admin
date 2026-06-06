@@ -68,6 +68,7 @@ export enum Permission {
   VIEW_ALL_PRODUCTS = 'VIEW_ALL_PRODUCTS',
   VIEW_OWN_PRODUCTS = 'VIEW_OWN_PRODUCTS',
   CREATE_PRODUCTS = 'CREATE_PRODUCTS',
+  ARCHIVE_PRODUCTS = 'ARCHIVE_PRODUCTS',
   EDIT_STAGES = 'EDIT_STAGES',
   EDIT_DATES = 'EDIT_DATES',
   MANAGE_AUTOMATIONS = 'MANAGE_AUTOMATIONS',
@@ -86,13 +87,14 @@ export function hasPermission(role: string, permission: Permission): boolean {
   const permissions: Record<string, Permission[]> = {
     ADMIN: Object.values(Permission),
     DIRECTOR: [
-      Permission.VIEW_ALL_PRODUCTS, Permission.CREATE_PRODUCTS, Permission.EDIT_STAGES, Permission.EDIT_DATES,
+      Permission.VIEW_ALL_PRODUCTS, Permission.CREATE_PRODUCTS, Permission.ARCHIVE_PRODUCTS, Permission.EDIT_STAGES, Permission.EDIT_DATES,
       Permission.VIEW_ANALYTICS, Permission.ADD_COMMENTS, Permission.MANAGE_AUTOMATIONS,
       Permission.VIEW_USER_PROFILES, Permission.EDIT_USER_PROFILES, Permission.VERIFY_USERS,
     ],
     PRODUCT_MANAGER: [
       Permission.VIEW_ALL_PRODUCTS,
       Permission.CREATE_PRODUCTS,
+      Permission.ARCHIVE_PRODUCTS,
       Permission.EDIT_STAGES,
       Permission.EDIT_DATES,
       Permission.MANAGE_AUTOMATIONS,
@@ -108,6 +110,7 @@ export function hasPermission(role: string, permission: Permission): boolean {
     EMPLOYEE: [
       Permission.VIEW_ALL_PRODUCTS,
       Permission.CREATE_PRODUCTS,
+      Permission.ARCHIVE_PRODUCTS,
       Permission.ADD_COMMENTS,
       Permission.VIEW_ANALYTICS,
     ],

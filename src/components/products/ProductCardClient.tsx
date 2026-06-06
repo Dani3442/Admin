@@ -108,7 +108,7 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
 
   const canEdit = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUser?.role) && !product.isArchived
   const canComment = Boolean(currentUser?.id) && !product.isArchived
-  const canArchiveProduct = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUser?.role)
+  const canArchiveProduct = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER', 'EMPLOYEE'].includes(currentUser?.role)
   const currentPriorityOption = getEditableProductPriorityOption(product.priority)
   const currentStatusOption = getEditableProductStatusOption(product.status)
 

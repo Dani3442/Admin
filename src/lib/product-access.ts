@@ -27,7 +27,7 @@ export function canManageProducts(viewer: ProductAccessViewer | null | undefined
 }
 
 export function canManageArchive(viewer: ProductAccessViewer | null | undefined) {
-  return ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(getViewerRole(viewer))
+  return hasPermission(getViewerRole(viewer), Permission.ARCHIVE_PRODUCTS)
 }
 
 export function getVisibleProductWhere(

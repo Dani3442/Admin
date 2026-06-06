@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { supportsProductLifecycleColumns } from '@/lib/schema-compat'
 import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
+import { canManageArchive } from '@/lib/product-access'
 
 function getValidatedIds(body: any) {
   return Array.isArray(body?.ids)
@@ -15,7 +16,7 @@ export async function POST(req: NextRequest) {
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const user = session.user as any
-  if (!['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(user.role)) {
+  if (!canManageArchive(user)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
@@ -43,6 +44,10 @@ export async function POST(req: NextRequest) {
 
   if (!ids.length) {
     return NextResponse.json({ error: 'Не выбраны продукты' }, { status: 400 })
+  }
+
+  if (action === 'deleteArchived' && !['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(user.role)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
   const archivedProducts = await prisma.product.findMany({

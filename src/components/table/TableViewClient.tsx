@@ -182,6 +182,7 @@ export function TableViewClient({
   const [newStageDuration, setNewStageDuration] = useState('')
   const [newStageAutoshift, setNewStageAutoshift] = useState(true)
   const canEditTable = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUserRole) && !archiveMode
+  const canArchiveProducts = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER', 'EMPLOYEE'].includes(currentUserRole) && !archiveMode
   const [pendingDeleteStageId, setPendingDeleteStageId] = useState<string | null>(null)
   const [deleteStageError, setDeleteStageError] = useState<string | null>(null)
   const [savingProductId, setSavingProductId] = useState<string | null>(null)
@@ -679,7 +680,7 @@ export function TableViewClient({
   }
 
   const handleProductRowContextMenu = (event: React.MouseEvent, productId: string) => {
-    if (!canEditTable) return
+    if (!canEditTable && !canArchiveProducts) return
     closeStageMenu()
     openProductMenu(event, { productId }, { width: 240, height: 360 })
   }
@@ -1365,7 +1366,7 @@ export function TableViewClient({
         </FloatingContextMenu>
       )}
 
-      {canEditTable && productMenu && contextProduct && (
+      {(canEditTable || canArchiveProducts) && productMenu && contextProduct && (
         <FloatingContextMenu
           open
           x={productMenu.x}
@@ -1390,110 +1391,118 @@ export function TableViewClient({
               Открыть продукт
             </button>
 
-            <button
-              onClick={() => {
-                closeProductMenu()
-                setRenamingProduct({ id: contextProduct.id, name: contextProduct.name })
-              }}
-              disabled={savingProductId === contextProduct.id}
-              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-popover-foreground hover:bg-accent disabled:opacity-60"
-            >
-              <Pencil className="h-4 w-4 text-muted-foreground" />
-              Переименовать продукт
-            </button>
+            {canEditTable && (
+              <>
+                <button
+                  onClick={() => {
+                    closeProductMenu()
+                    setRenamingProduct({ id: contextProduct.id, name: contextProduct.name })
+                  }}
+                  disabled={savingProductId === contextProduct.id}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-popover-foreground hover:bg-accent disabled:opacity-60"
+                >
+                  <Pencil className="h-4 w-4 text-muted-foreground" />
+                  Переименовать продукт
+                </button>
 
-            <button
-              onClick={() => openResponsibleDialog(contextProduct)}
-              disabled={savingProductId === contextProduct.id}
-              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-popover-foreground hover:bg-accent disabled:opacity-60"
-            >
-              <UserPlus className="h-4 w-4 text-muted-foreground" />
-              Добавить ответственного
-            </button>
+                <button
+                  onClick={() => openResponsibleDialog(contextProduct)}
+                  disabled={savingProductId === contextProduct.id}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-popover-foreground hover:bg-accent disabled:opacity-60"
+                >
+                  <UserPlus className="h-4 w-4 text-muted-foreground" />
+                  Добавить ответственного
+                </button>
 
-            <div className="my-1 border-t border-border/70" />
-            <div className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-              Изменить приоритет
-            </div>
-            <div className="space-y-1">
-              {EDITABLE_PRODUCT_PRIORITIES.map((priorityOption) => {
-                const active = contextProduct.priority === priorityOption.value
+                <div className="my-1 border-t border-border/70" />
+                <div className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  Изменить приоритет
+                </div>
+                <div className="space-y-1">
+                  {EDITABLE_PRODUCT_PRIORITIES.map((priorityOption) => {
+                    const active = contextProduct.priority === priorityOption.value
 
-                return (
-                  <button
-                    key={priorityOption.value}
-                    onClick={() => handleChangeProductPriority(contextProduct, priorityOption.value)}
-                    disabled={savingProductId === contextProduct.id}
-                    className={cn(
-                      'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition disabled:opacity-60',
-                      active ? 'bg-accent text-popover-foreground' : 'text-popover-foreground hover:bg-accent/70'
-                    )}
-                  >
-                    <span className={cn('h-2.5 w-2.5 rounded-full', priorityOption.dotClassName)} />
-                    <span className="flex-1">{priorityOption.label}</span>
-                    {active && <span className="text-xs text-muted-foreground">сейчас</span>}
-                  </button>
-                )
-              })}
-            </div>
+                    return (
+                      <button
+                        key={priorityOption.value}
+                        onClick={() => handleChangeProductPriority(contextProduct, priorityOption.value)}
+                        disabled={savingProductId === contextProduct.id}
+                        className={cn(
+                          'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition disabled:opacity-60',
+                          active ? 'bg-accent text-popover-foreground' : 'text-popover-foreground hover:bg-accent/70'
+                        )}
+                      >
+                        <span className={cn('h-2.5 w-2.5 rounded-full', priorityOption.dotClassName)} />
+                        <span className="flex-1">{priorityOption.label}</span>
+                        {active && <span className="text-xs text-muted-foreground">сейчас</span>}
+                      </button>
+                    )
+                  })}
+                </div>
 
-            <div className="my-1 border-t border-border/70" />
-            <div className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-              Изменить статус
-            </div>
-            <div className="space-y-1">
-              {EDITABLE_PRODUCT_STATUSES.map((statusOption) => {
-                const active = contextProduct.status === statusOption.value
+                <div className="my-1 border-t border-border/70" />
+                <div className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  Изменить статус
+                </div>
+                <div className="space-y-1">
+                  {EDITABLE_PRODUCT_STATUSES.map((statusOption) => {
+                    const active = contextProduct.status === statusOption.value
 
-                return (
-                  <button
-                    key={statusOption.value}
-                    onClick={() => handleChangeProductStatus(contextProduct, statusOption.value)}
-                    disabled={savingProductId === contextProduct.id}
-                    className={cn(
-                      'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition disabled:opacity-60',
-                      active ? 'bg-accent text-popover-foreground' : 'text-popover-foreground hover:bg-accent/70'
-                    )}
-                  >
-                    <span className={cn('h-2.5 w-2.5 rounded-full', statusOption.dotClassName)} />
-                    <span className="flex-1">{statusOption.label}</span>
-                    {active && <span className="text-xs text-muted-foreground">сейчас</span>}
-                  </button>
-                )
-              })}
-            </div>
+                    return (
+                      <button
+                        key={statusOption.value}
+                        onClick={() => handleChangeProductStatus(contextProduct, statusOption.value)}
+                        disabled={savingProductId === contextProduct.id}
+                        className={cn(
+                          'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition disabled:opacity-60',
+                          active ? 'bg-accent text-popover-foreground' : 'text-popover-foreground hover:bg-accent/70'
+                        )}
+                      >
+                        <span className={cn('h-2.5 w-2.5 rounded-full', statusOption.dotClassName)} />
+                        <span className="flex-1">{statusOption.label}</span>
+                        {active && <span className="text-xs text-muted-foreground">сейчас</span>}
+                      </button>
+                    )
+                  })}
+                </div>
 
-            <button
-              onClick={() => handleToggleProductFlag(contextProduct, 'isPinned', !contextProduct.isPinned)}
-              disabled={savingProductId === contextProduct.id}
-              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-popover-foreground hover:bg-accent disabled:opacity-60"
-            >
-              {contextProduct.isPinned ? (
-                <PinOff className="h-4 w-4 text-muted-foreground" />
-              ) : (
-                <Pin className="h-4 w-4 text-muted-foreground" />
-              )}
-              {contextProduct.isPinned ? 'Открепить' : 'Закрепить наверху'}
-            </button>
+                <button
+                  onClick={() => handleToggleProductFlag(contextProduct, 'isPinned', !contextProduct.isPinned)}
+                  disabled={savingProductId === contextProduct.id}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-popover-foreground hover:bg-accent disabled:opacity-60"
+                >
+                  {contextProduct.isPinned ? (
+                    <PinOff className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <Pin className="h-4 w-4 text-muted-foreground" />
+                  )}
+                  {contextProduct.isPinned ? 'Открепить' : 'Закрепить наверху'}
+                </button>
 
-            <button
-              onClick={() => handleToggleProductFlag(contextProduct, 'isFavorite', !contextProduct.isFavorite)}
-              disabled={savingProductId === contextProduct.id}
-              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-popover-foreground hover:bg-accent disabled:opacity-60"
-            >
-              <Star className={cn('h-4 w-4', contextProduct.isFavorite ? 'fill-amber-100 text-amber-500 dark:fill-amber-500/20 dark:text-amber-300' : 'text-muted-foreground')} />
-              {contextProduct.isFavorite ? 'Убрать из избранного' : 'Добавить в избранное'}
-            </button>
+                <button
+                  onClick={() => handleToggleProductFlag(contextProduct, 'isFavorite', !contextProduct.isFavorite)}
+                  disabled={savingProductId === contextProduct.id}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-popover-foreground hover:bg-accent disabled:opacity-60"
+                >
+                  <Star className={cn('h-4 w-4', contextProduct.isFavorite ? 'fill-amber-100 text-amber-500 dark:fill-amber-500/20 dark:text-amber-300' : 'text-muted-foreground')} />
+                  {contextProduct.isFavorite ? 'Убрать из избранного' : 'Добавить в избранное'}
+                </button>
+              </>
+            )}
 
-            <div className="my-1 border-t border-border/70" />
-            <button
-              onClick={() => setPendingArchiveProduct({ id: contextProduct.id, name: contextProduct.name })}
-              disabled={savingProductId === contextProduct.id}
-              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-amber-700 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-500/10 disabled:opacity-60"
-            >
-              <Archive className="h-4 w-4" />
-              {savingProductId === contextProduct.id ? 'Архивация...' : 'Архивировать продукт'}
-            </button>
+            {canArchiveProducts && (
+              <>
+                <div className="my-1 border-t border-border/70" />
+                <button
+                  onClick={() => setPendingArchiveProduct({ id: contextProduct.id, name: contextProduct.name })}
+                  disabled={savingProductId === contextProduct.id}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-amber-700 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-500/10 disabled:opacity-60"
+                >
+                  <Archive className="h-4 w-4" />
+                  {savingProductId === contextProduct.id ? 'Архивация...' : 'Архивировать продукт'}
+                </button>
+              </>
+            )}
           </div>
         </FloatingContextMenu>
       )}

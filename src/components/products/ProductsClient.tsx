@@ -169,7 +169,7 @@ export function ProductsClient({
 
   const canManageProducts = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUserRole) && !archiveMode
   const canCreateProducts = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER', 'EMPLOYEE'].includes(currentUserRole) && !archiveMode
-  const canArchiveProducts = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUserRole) && !archiveMode
+  const canArchiveProducts = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER', 'EMPLOYEE'].includes(currentUserRole) && !archiveMode
   const canDeleteProducts = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUserRole)
   const currentRoute = typeof window === 'undefined'
     ? getRouteWithSearch(pathname, searchParams.toString())
@@ -969,15 +969,17 @@ export function ProductsClient({
                     <RotateCcw className="h-4 w-4" />
                     Восстановить
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setBulkAction('deleteArchived')}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-100 dark:text-red-300 dark:hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-                    disabled={!selectedProductIds.length || bulkActionPending}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Удалить
-                  </button>
+                  {canDeleteProducts && (
+                    <button
+                      type="button"
+                      onClick={() => setBulkAction('deleteArchived')}
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-100 dark:text-red-300 dark:hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                      disabled={!selectedProductIds.length || bulkActionPending}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Удалить
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={handleClearSelection}

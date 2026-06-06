@@ -148,8 +148,16 @@ export async function PATCH(
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const user = session.user as any
   const role = user.role
+  const body = sanitizeDeepStrings(await req.json(), { preserveNewlines: true }) as any
+  const action = body?.action as 'close' | 'archive' | 'restore' | undefined
+  const canEditProduct = hasPermission(role, Permission.EDIT_STAGES)
+  const canArchiveProduct = hasPermission(role, Permission.ARCHIVE_PRODUCTS)
 
-  if (!hasPermission(role, Permission.EDIT_STAGES)) {
+  if (action === 'archive' || action === 'restore') {
+    if (!canArchiveProduct) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+  } else if (!canEditProduct) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
@@ -170,8 +178,6 @@ export async function PATCH(
     return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } })
   }
 
-  const body = sanitizeDeepStrings(await req.json(), { preserveNewlines: true }) as any
-  const action = body?.action as 'close' | 'archive' | 'restore' | undefined
   const hasProductLifecycleColumns = await supportsProductLifecycleColumns()
 
   if (action === 'close') {
@@ -219,7 +225,7 @@ export async function PATCH(
     if (!hasProductLifecycleColumns) {
       return NextResponse.json({ error: 'Для архивации продукта нужно применить обновление схемы базы данных' }, { status: 409 })
     }
-    if (!['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(role)) {
+    if (!canArchiveProduct) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
@@ -259,7 +265,7 @@ export async function PATCH(
     if (!hasProductLifecycleColumns) {
       return NextResponse.json({ error: 'Для восстановления продукта нужно применить обновление схемы базы данных' }, { status: 409 })
     }
-    if (!['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(role)) {
+    if (!canArchiveProduct) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
