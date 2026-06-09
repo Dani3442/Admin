@@ -117,6 +117,21 @@ export function DatePicker({
       ) {
         return
       }
+
+      const committedDisplayValue = formatDateInputValue(value)
+      if (displayValue !== committedDisplayValue) {
+        const parsed = parseDateInputValue(displayValue)
+
+        if (!displayValue.trim()) {
+          onChange(null)
+        } else if (parsed) {
+          onChange(parsed)
+          setViewDate(parsed)
+        } else {
+          setDisplayValue(committedDisplayValue)
+        }
+      }
+
       setIsOpen(false)
     }
 
@@ -129,7 +144,7 @@ export function DatePicker({
       window.removeEventListener('scroll', handleWindowChange, true)
       document.removeEventListener('pointerdown', handlePointerDown)
     }
-  }, [isOpen, syncPosition])
+  }, [displayValue, isOpen, onChange, syncPosition, value])
 
   useEffect(() => {
     if (!isOpen) return

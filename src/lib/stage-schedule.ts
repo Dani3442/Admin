@@ -22,6 +22,37 @@ function hasParallelAnchor(currentDate: Date | null | undefined, previousDate: D
   return differenceInCalendarDays(startOfDay(currentDate), startOfDay(previousDate)) === 0
 }
 
+function resolveNextStageDate<T extends SequentialStageInput>({
+  cursor,
+  currentStage,
+  previousStage,
+  previousResolvedStage,
+  preserveExistingDate,
+}: {
+  cursor: Date
+  currentStage: T
+  previousStage: T
+  previousResolvedStage: T
+  preserveExistingDate: boolean
+}) {
+  const currentDate = currentStage.plannedDate ? startOfDay(currentStage.plannedDate) : null
+  const preserveParallelDate = hasParallelAnchor(currentStage.plannedDate, previousStage.plannedDate)
+
+  if (preserveParallelDate) {
+    return cursor
+  }
+
+  if (previousResolvedStage.participatesInAutoshift === false) {
+    return currentDate ?? cursor
+  }
+
+  if (preserveExistingDate && currentDate) {
+    return currentDate
+  }
+
+  return addDays(cursor, previousResolvedStage.durationDays ?? 1)
+}
+
 export function deriveSequentialStageDurations<T extends SequentialStageInput>(stages: T[]) {
   let previousResolvedDuration: number | null = null
 
@@ -72,11 +103,13 @@ export function recalculateSequentialStageDates<T extends SequentialStageInput>(
       }
     }
 
-    const previousDuration = stagesWithDurations[index - 1].durationDays ?? 1
-    const preserveParallelDate = hasParallelAnchor(stages[index].plannedDate, stages[index - 1].plannedDate)
-    if (!preserveParallelDate && stagesWithDurations[index - 1].participatesInAutoshift !== false) {
-      cursor = addDays(cursor, previousDuration)
-    }
+    cursor = resolveNextStageDate({
+      cursor,
+      currentStage: stages[index],
+      previousStage: stages[index - 1],
+      previousResolvedStage: stagesWithDurations[index - 1],
+      preserveExistingDate: false,
+    })
 
     return {
       ...stage,
@@ -105,11 +138,50 @@ export function buildSequentialStageSchedule<T extends SequentialStageInput>(
 
   return stagesWithDurations.map((stage, index) => {
     if (index > 0) {
-      const previousDuration = stagesWithDurations[index - 1].durationDays ?? 1
-      const preserveParallelDate = hasParallelAnchor(stages[index].plannedDate, stages[index - 1].plannedDate)
-      if (!preserveParallelDate && stagesWithDurations[index - 1].participatesInAutoshift !== false) {
-        cursor = addDays(cursor, previousDuration)
-      }
+      cursor = resolveNextStageDate({
+        cursor,
+        currentStage: stages[index],
+        previousStage: stages[index - 1],
+        previousResolvedStage: stagesWithDurations[index - 1],
+        preserveExistingDate: false,
+      })
+    }
+
+    return {
+      ...(stages[index] as T),
+      plannedDate: cursor,
+      effectiveDurationDays: stage.durationDays ?? 1,
+    }
+  })
+}
+
+export function fillMissingSequentialStageDates<T extends SequentialStageInput>(
+  stages: T[]
+): Array<SequentialStageScheduleItem<T>> {
+  const stagesWithDurations = deriveSequentialStageDurations(stages)
+
+  if (stagesWithDurations.length === 0) return []
+
+  const firstStageStart = stagesWithDurations[0].plannedDate
+  if (!firstStageStart) {
+    return stagesWithDurations.map((stage, index) => ({
+      ...(stages[index] as T),
+      plannedDate: null,
+      effectiveDurationDays: stage.durationDays ?? 1,
+    }))
+  }
+
+  let cursor = startOfDay(firstStageStart)
+
+  return stagesWithDurations.map((stage, index) => {
+    if (index > 0) {
+      cursor = resolveNextStageDate({
+        cursor,
+        currentStage: stages[index],
+        previousStage: stages[index - 1],
+        previousResolvedStage: stagesWithDurations[index - 1],
+        preserveExistingDate: true,
+      })
     }
 
     return {
@@ -156,11 +228,13 @@ export function applySequentialStageDateOverride<T extends SequentialStageInput>
       }
     }
 
-    const previousDuration = stagesWithDurations[index - 1].durationDays ?? 1
-    const preserveParallelDate = hasParallelAnchor(stages[index].plannedDate, stages[index - 1].plannedDate)
-    if (!preserveParallelDate && stagesWithDurations[index - 1].participatesInAutoshift !== false) {
-      cursor = addDays(cursor, previousDuration)
-    }
+    cursor = resolveNextStageDate({
+      cursor,
+      currentStage: stages[index],
+      previousStage: stages[index - 1],
+      previousResolvedStage: stagesWithDurations[index - 1],
+      preserveExistingDate: false,
+    })
 
     return {
       ...(stages[index] as T),

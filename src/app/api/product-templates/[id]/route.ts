@@ -3,7 +3,7 @@ import { revalidatePath } from 'next/cache'
 import { auth, hasPermission, Permission } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { parseDateOnly } from '@/lib/date-only'
-import { buildSequentialStageSchedule } from '@/lib/stage-schedule'
+import { fillMissingSequentialStageDates } from '@/lib/stage-schedule'
 import { createProductTemplateStageCompat } from '@/lib/product-template-stage-compat'
 import {
   supportsProductTemplateStageAutoshiftColumn,
@@ -75,7 +75,7 @@ export async function PATCH(
           stageTemplateDurationDays: null,
           }))
         .filter((stage: { stageName: string }) => stage.stageName)
-    const stages = buildSequentialStageSchedule(preparedStages)
+    const stages = fillMissingSequentialStageDates(preparedStages)
 
     if (stages.length === 0) {
       return NextResponse.json({ error: 'Добавьте хотя бы один этап в шаблон' }, { status: 400 })

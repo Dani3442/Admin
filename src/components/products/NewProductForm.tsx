@@ -9,7 +9,10 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import type { ProductTemplateData, ProductTemplateStageData } from '@/types'
 import { serializeDateOnly } from '@/lib/date-only'
 import { formatDate } from '@/lib/utils'
-import { applySequentialStageDateOverride, buildSequentialStageSchedule } from '@/lib/stage-schedule'
+import {
+  applySequentialStageDateOverride,
+  fillMissingSequentialStageDates,
+} from '@/lib/stage-schedule'
 
 const PRIORITIES = [
   { value: 'CRITICAL', label: 'Критический' },
@@ -52,26 +55,12 @@ function createDraftStage(index = 0): TemplateDraftStage {
   }
 }
 
-function recalculateDraftStages(stages: TemplateDraftStage[]) {
-  return buildSequentialStageSchedule(
+function hydrateSelectedTemplateStages(stages: ProductTemplateStageData[]) {
+  return fillMissingSequentialStageDates(
     stages.map((stage) => ({
       ...stage,
-      stageTemplateDurationDays: null,
-    }))
-  ).map((stage) => ({
-    id: stage.id,
-    stageName: stage.stageName,
-    plannedDate: stage.plannedDate,
-    durationDays: stage.durationDays ?? null,
-    effectiveDurationDays: stage.effectiveDurationDays,
-    participatesInAutoshift: stage.participatesInAutoshift,
-  }))
-}
-
-function recalculateSelectedTemplateStages(stages: SelectedTemplateStageOverride[]) {
-  return buildSequentialStageSchedule(
-    stages.map((stage) => ({
-      ...stage,
+      plannedDate: stage.plannedDate ? new Date(stage.plannedDate) : null,
+      durationDays: stage.durationDays ?? null,
       stageTemplateDurationDays: stage.stageTemplateDurationDays ?? null,
     }))
   ).map((stage) => ({
@@ -79,16 +68,6 @@ function recalculateSelectedTemplateStages(stages: SelectedTemplateStageOverride
     durationDays: stage.durationDays ?? null,
     effectiveDurationDays: stage.effectiveDurationDays,
   }))
-}
-
-function hydrateSelectedTemplateStages(stages: ProductTemplateStageData[]) {
-  return recalculateSelectedTemplateStages(
-    stages.map((stage) => ({
-      ...stage,
-      plannedDate: stage.plannedDate ? new Date(stage.plannedDate) : null,
-      durationDays: stage.durationDays ?? null,
-    }))
-  )
 }
 
 export function NewProductForm({
@@ -196,8 +175,17 @@ export function NewProductForm({
           return { ...stage, ...patch }
         })
 
-        if ('plannedDate' in patch && targetIndex >= 0) {
-          return applySequentialStageDateOverride(nextStages, targetIndex, patch.plannedDate ?? null).map((stage) => ({
+        const affectsSchedule =
+          'plannedDate' in patch ||
+          'durationDays' in patch ||
+          'participatesInAutoshift' in patch
+
+        if (affectsSchedule && targetIndex >= 0) {
+          return applySequentialStageDateOverride(
+            nextStages,
+            targetIndex,
+            nextStages[targetIndex].plannedDate
+          ).map((stage) => ({
             id: stage.id,
             stageName: stage.stageName,
             plannedDate: stage.plannedDate,
@@ -211,7 +199,7 @@ export function NewProductForm({
           return nextStages.map((stage) => ({ ...stage, plannedDate: null, effectiveDurationDays: null }))
         }
 
-        return recalculateDraftStages(nextStages)
+        return nextStages
       }
     )
   }
@@ -229,8 +217,17 @@ export function NewProductForm({
           return { ...stage, ...patch }
         })
 
-        if ('plannedDate' in patch && targetIndex >= 0) {
-          return applySequentialStageDateOverride(nextStages, targetIndex, patch.plannedDate ?? null).map((stage) => ({
+        const affectsSchedule =
+          'plannedDate' in patch ||
+          'durationDays' in patch ||
+          'participatesInAutoshift' in patch
+
+        if (affectsSchedule && targetIndex >= 0) {
+          return applySequentialStageDateOverride(
+            nextStages,
+            targetIndex,
+            nextStages[targetIndex].plannedDate
+          ).map((stage) => ({
             ...stage,
             durationDays: stage.durationDays ?? null,
             effectiveDurationDays: stage.effectiveDurationDays,
@@ -241,13 +238,29 @@ export function NewProductForm({
           return nextStages.map((stage) => ({ ...stage, plannedDate: null, effectiveDurationDays: null }))
         }
 
-        return recalculateSelectedTemplateStages(nextStages)
+        return nextStages
       }
     )
   }
 
   const addTemplateStage = () => {
-    setTemplateStages((prev) => recalculateDraftStages([...prev, createDraftStage(prev.length)]))
+    setTemplateStages((prev) => {
+      const nextStages = [...prev, createDraftStage(prev.length)]
+      const anchorIndex = Math.max(0, prev.length - 1)
+
+      return applySequentialStageDateOverride(
+        nextStages,
+        anchorIndex,
+        nextStages[anchorIndex].plannedDate
+      ).map((stage) => ({
+        id: stage.id,
+        stageName: stage.stageName,
+        plannedDate: stage.plannedDate,
+        durationDays: stage.durationDays ?? null,
+        effectiveDurationDays: stage.effectiveDurationDays,
+        participatesInAutoshift: stage.participatesInAutoshift,
+      }))
+    })
   }
 
   const removeTemplateStage = (stageId: string) => {
@@ -255,7 +268,22 @@ export function NewProductForm({
       if (prev.length === 1) {
         return [{ ...prev[0], stageName: '', plannedDate: null, durationDays: 1, effectiveDurationDays: 1, participatesInAutoshift: true }]
       }
-      return recalculateDraftStages(prev.filter((stage) => stage.id !== stageId))
+      const removedIndex = prev.findIndex((stage) => stage.id === stageId)
+      const nextStages = prev.filter((stage) => stage.id !== stageId)
+      const anchorIndex = Math.max(0, Math.min(removedIndex - 1, nextStages.length - 1))
+
+      return applySequentialStageDateOverride(
+        nextStages,
+        anchorIndex,
+        nextStages[anchorIndex].plannedDate
+      ).map((stage) => ({
+        id: stage.id,
+        stageName: stage.stageName,
+        plannedDate: stage.plannedDate,
+        durationDays: stage.durationDays ?? null,
+        effectiveDurationDays: stage.effectiveDurationDays,
+        participatesInAutoshift: stage.participatesInAutoshift,
+      }))
     })
   }
 

@@ -1,5 +1,14 @@
 # Architecture Changelog
 
+## 2026-06-09
+
+### Template schedule stability
+- Preserved manually entered template dates when templates are saved or used to create products.
+- Changed schedule recalculation so duration and autoshift edits only cascade from the edited stage forward.
+- Disabled autoshift now keeps the following explicit date as a stable boundary instead of collapsing it onto the previous stage.
+- Date input typed from the keyboard is committed when focus moves to another control, including an immediate save action.
+- Added regression verification for manual date anchors, missing dates, disabled autoshift, and parallel stage blocks.
+
 ## 2026-04-20
 
 ### Parallel template stages

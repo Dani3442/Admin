@@ -7,7 +7,7 @@ import {
   supportsProductTemplateReferenceColumn,
   supportsProductTemplateStageDurationDaysColumn,
 } from '@/lib/schema-compat'
-import { recalculateSequentialStageDates } from '@/lib/stage-schedule'
+import { fillMissingSequentialStageDates } from '@/lib/stage-schedule'
 import { sanitizeNullableText, sanitizeTextValue, sanitizeUrlValue } from '@/lib/input-security'
 
 export interface CreateProductStageOverrideInput {
@@ -161,7 +161,7 @@ export async function createProduct(input: CreateProductInput) {
           participatesInAutoshift: true,
         }))
 
-    const templateStages = recalculateSequentialStageDates(rawTemplateStages).map((stage) => ({
+    const templateStages = fillMissingSequentialStageDates(rawTemplateStages).map((stage) => ({
       ...stage,
       dateValue: stage.plannedDate,
     }))

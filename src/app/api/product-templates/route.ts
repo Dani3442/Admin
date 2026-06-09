@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { parseDateOnly } from '@/lib/date-only'
-import { buildSequentialStageSchedule } from '@/lib/stage-schedule'
+import { fillMissingSequentialStageDates } from '@/lib/stage-schedule'
 import { createProductTemplateStageCompat } from '@/lib/product-template-stage-compat'
 import {
   supportsProductTemplateStageAutoshiftColumn,
@@ -159,7 +159,7 @@ export async function POST(req: NextRequest) {
 
       let nextOrder = (existingStageTemplates.at(-1)?.order ?? -1) + 1
 
-      const scheduledStages = buildSequentialStageSchedule(stages)
+      const scheduledStages = fillMissingSequentialStageDates(stages)
 
       const resolvedStages: Array<{
         stageTemplateId: string
