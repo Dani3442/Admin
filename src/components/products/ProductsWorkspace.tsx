@@ -174,7 +174,7 @@ function resolveInitialResponsibleFilter({
   searchParams: Pick<URLSearchParams, 'get'>
 }) {
   const requestedResponsible = searchParams.get('responsible') || ''
-  const shouldSkipPersonalDefault = ['ADMIN', 'DIRECTOR'].includes(currentUserRole)
+  const shouldSkipPersonalDefault = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUserRole)
 
   if (archiveMode) {
     return requestedResponsible

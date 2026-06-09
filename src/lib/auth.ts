@@ -12,6 +12,16 @@ function normalizeSessionAvatar(avatar: string | null | undefined) {
   return trimmed
 }
 
+const PRODUCT_MANAGER_ACCESS_EMAILS = new Set([
+  'shaykhutdinovaar@11i.pro',
+])
+
+function getEffectiveRole(email: string, storedRole: string) {
+  return PRODUCT_MANAGER_ACCESS_EMAILS.has(email.trim().toLowerCase())
+    ? 'PRODUCT_MANAGER'
+    : storedRole
+}
+
 export type AppSession = {
   user: {
     id: string
@@ -57,7 +67,7 @@ export async function auth(): Promise<AppSession> {
       email: user.email,
       name: user.name,
       lastName: user.lastName,
-      role: user.role,
+      role: getEffectiveRole(user.email, user.role),
       avatar: normalizeSessionAvatar(user.avatar),
     },
   }
