@@ -37,6 +37,7 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/scripts/sync-access-overrides.js ./scripts/sync-access-overrides.js
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
@@ -49,5 +50,5 @@ EXPOSE 3000
 ENV PORT 3000
 ENV HOSTNAME "0.0.0.0"
 
-# Run DB sync and start
-CMD ["sh", "-c", "npx prisma db push --accept-data-loss && node server.js"]
+# Run DB sync, apply targeted access grants, and start
+CMD ["sh", "-c", "npx prisma db push --accept-data-loss && node scripts/sync-access-overrides.js && node server.js"]
