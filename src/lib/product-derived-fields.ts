@@ -15,10 +15,18 @@ export function getProgressPercentFromStages(stages: DerivedStage[]) {
 }
 
 export function getFinalDateFromStages(stages: DerivedStage[]) {
-  if (stages.length === 0) return null
+  let finalDate: Date | null = null
 
-  const lastStage = [...stages].sort((left, right) => right.stageOrder - left.stageOrder)[0]
-  return lastStage?.dateValue ?? lastStage?.plannedDate ?? null
+  for (const stage of stages) {
+    const stageDate = stage.dateValue ?? stage.plannedDate ?? null
+    if (!stageDate || Number.isNaN(stageDate.getTime())) continue
+
+    if (!finalDate || stageDate.getTime() > finalDate.getTime()) {
+      finalDate = stageDate
+    }
+  }
+
+  return finalDate
 }
 
 export async function recalculateProductDerivedFields(productId: string) {

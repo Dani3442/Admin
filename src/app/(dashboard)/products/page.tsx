@@ -9,6 +9,7 @@ import {
   supportsProductTemplateStageDurationDaysColumn,
 } from '@/lib/schema-compat'
 import { canManageProducts, canViewAllProducts, getVisibleProductWhere } from '@/lib/product-access'
+import { getFinalDateFromStages } from '@/lib/product-derived-fields'
 
 async function getProductsWorkspaceData(viewer: { id?: string | null; role?: string | null }, archived = false) {
   await recalculateAllRisksIfNeeded()
@@ -49,6 +50,7 @@ async function getProductsWorkspaceData(viewer: { id?: string | null; role?: str
         stageOrder: true,
         stageName: true,
         dateValue: true,
+        plannedDate: true,
         dateRaw: true,
         isCompleted: true,
         isCritical: true,
@@ -70,9 +72,14 @@ async function getProductsWorkspaceData(viewer: { id?: string | null; role?: str
     getCachedStageSuggestions(),
   ])
 
+  const productsWithDerivedFinalDate = products.map((product) => ({
+    ...product,
+    finalDate: getFinalDateFromStages(product.stages),
+  }))
+
   return {
-    listProducts: products,
-    tableProducts: products,
+    listProducts: productsWithDerivedFinalDate,
+    tableProducts: productsWithDerivedFinalDate,
     users: users.map((user) => ({ id: user.id, name: user.name })),
     stages,
     productTemplates,

@@ -1,5 +1,13 @@
 # Architecture Changelog
 
+## 2026-06-10
+
+### Product final date invariant
+- Product `finalDate` is now calculated as the maximum date across all product stages, not the date of the stage with the greatest order.
+- Adding, editing, deleting, or globally removing a stage reuses the same derived-field recalculation.
+- Product and archive workspaces derive the displayed final date from stages so records saved with the former calculation are shown correctly.
+- Added regression verification for later additions, date edits, removal of the latest stage, planned-date fallback, and empty stage lists.
+
 ## 2026-06-09
 
 ### Template schedule stability

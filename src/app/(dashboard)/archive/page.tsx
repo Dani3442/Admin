@@ -8,6 +8,7 @@ import {
   supportsProductTemplateStageDurationDaysColumn,
 } from '@/lib/schema-compat'
 import { canManageArchive, canViewAllProducts, getVisibleProductWhere } from '@/lib/product-access'
+import { getFinalDateFromStages } from '@/lib/product-derived-fields'
 
 async function getArchiveWorkspaceData(viewer: { id?: string | null; role?: string | null }) {
   const [hasTemplateStageDurationDaysColumn, hasTemplateStageAutoshiftColumn] = await Promise.all([
@@ -47,6 +48,7 @@ async function getArchiveWorkspaceData(viewer: { id?: string | null; role?: stri
         stageOrder: true,
         stageName: true,
         dateValue: true,
+        plannedDate: true,
         dateRaw: true,
         isCompleted: true,
         isCritical: true,
@@ -68,9 +70,14 @@ async function getArchiveWorkspaceData(viewer: { id?: string | null; role?: stri
     getCachedStageSuggestions(),
   ])
 
+  const productsWithDerivedFinalDate = products.map((product) => ({
+    ...product,
+    finalDate: getFinalDateFromStages(product.stages),
+  }))
+
   return {
-    listProducts: products,
-    tableProducts: products,
+    listProducts: productsWithDerivedFinalDate,
+    tableProducts: productsWithDerivedFinalDate,
     users: users.map((user) => ({ id: user.id, name: user.name })),
     stages,
     productTemplates,

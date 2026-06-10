@@ -3,29 +3,13 @@ import { revalidatePath } from 'next/cache'
 import { auth, hasPermission, Permission } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { recalculateProductRisk } from '@/lib/risk'
+import { recalculateProductDerivedFields } from '@/lib/product-derived-fields'
 import { createProductStageCompat } from '@/lib/product-stage-compat'
 import {
   supportsStageTemplateAffectsFinalDateColumn,
 } from '@/lib/schema-compat'
 import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
 import { sanitizeDeepStrings, sanitizeTextValue } from '@/lib/input-security'
-
-async function updateProductProgress(productId: string) {
-  const stages = await prisma.productStage.findMany({
-    where: { productId },
-    select: { isCompleted: true },
-  })
-
-  const completedCount = stages.filter((stage) => stage.isCompleted).length
-  const progressPercent = stages.length > 0
-    ? Math.round((completedCount / stages.length) * 100)
-    : 0
-
-  await prisma.product.update({
-    where: { id: productId },
-    data: { progressPercent },
-  })
-}
 
 async function normalizeRemainingProductStages(
   tx: any,
@@ -507,7 +491,7 @@ export async function DELETE(req: NextRequest) {
 
     await Promise.allSettled(
       affectedProductIds.map(async (productId) => {
-        await updateProductProgress(productId)
+        await recalculateProductDerivedFields(productId)
         await recalculateProductRisk(productId)
       })
     )
