@@ -1106,7 +1106,7 @@ export function TableViewClient({
             <thead className="sticky top-0 z-10">
               <tr>
                 <th
-                  className="sticky left-0 z-20 border-b border-r border-border/70 bg-muted px-4 py-3 text-left text-[15px] font-medium leading-6 text-muted-foreground relative"
+                  className="sticky left-0 z-20 h-auto whitespace-normal border-b border-r border-border/70 bg-muted px-4 py-3 align-middle text-left text-[15px] font-medium leading-6 text-muted-foreground [overflow-wrap:anywhere] relative"
                   style={{ width: columnWidths.__product, minWidth: 120 }}
                 >
                   Продукт
@@ -1116,7 +1116,7 @@ export function TableViewClient({
                   />
                 </th>
                 <th
-                  className="border-b border-r border-border/70 bg-muted px-2 py-3 text-center text-[15px] font-medium leading-6 text-muted-foreground relative"
+                  className="h-auto whitespace-normal border-b border-r border-border/70 bg-muted px-2 py-3 align-middle text-center text-[15px] font-medium leading-6 text-muted-foreground [overflow-wrap:anywhere] relative"
                   style={{ width: columnWidths.__progress, minWidth: 60 }}
                 >
                   Прогресс
@@ -1128,7 +1128,7 @@ export function TableViewClient({
                 {stages.map((stage, idx) => (
                   <th
                     key={stage.id}
-                    className="group relative border-b border-r border-border/70 bg-muted px-2 py-3 text-center text-muted-foreground"
+                    className="group relative h-auto whitespace-normal border-b border-r border-border/70 bg-muted px-2 py-3 align-middle text-center text-muted-foreground [overflow-wrap:anywhere]"
                     style={{ width: columnWidths[stage.id], minWidth: 60 }}
                     title={`ПКМ: управление этапом\n${stage.name}`}
                     onContextMenu={(e) => handleStageHeaderClick(e, stage)}
@@ -1149,7 +1149,7 @@ export function TableViewClient({
                         />
                       </div>
                     ) : (
-                      <div className="cursor-context-menu break-words whitespace-normal text-[15px] font-medium leading-6 text-muted-foreground">
+                      <div className="cursor-context-menu whitespace-normal text-[15px] font-medium leading-6 text-muted-foreground [overflow-wrap:anywhere]">
                         {stage.name}
                       </div>
                     )}

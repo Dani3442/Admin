@@ -131,12 +131,20 @@
   h1,
   h2,
   h3,
-  th,
   td,
   p,
   span,
   label {
     text-wrap: pretty;
+  }
+
+  thead th {
+    height: auto;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: normal;
+    text-wrap: wrap;
+    vertical-align: middle;
   }
 
   a,
@@ -224,7 +232,9 @@
   }
 
   .table-header {
-    @apply border-b border-border/80 bg-muted/35 px-4 py-3 text-left text-[15px] font-medium leading-6 text-muted-foreground;
+    @apply h-auto whitespace-normal border-b border-border/80 bg-muted/35 px-4 py-3 align-middle text-left text-[15px] font-medium leading-6 text-muted-foreground;
+    overflow-wrap: anywhere;
+    word-break: normal;
   }
 
   .surface-panel {
