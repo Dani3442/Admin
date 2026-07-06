@@ -30,6 +30,20 @@ function createSupabaseAdminClientIfConfigured() {
   })
 }
 
+async function hasColumn(tableName, columnName) {
+  const rows = await prisma.$queryRaw`
+    SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = ${tableName}
+        AND column_name = ${columnName}
+    ) AS "exists"
+  `
+
+  return Boolean(rows[0]?.exists)
+}
+
 async function findSupabaseUserByEmail(supabase, email) {
   let page = 1
 
@@ -88,6 +102,7 @@ async function syncSupabasePassword(input) {
 async function main() {
   const email = normalizeEmail(process.env.RESET_EMAIL || process.env.ADMIN_EMAIL)
   const password = getRequiredEnv('RESET_PASSWORD')
+  const telegramId = process.env.RESET_TELEGRAM_ID?.trim() || null
 
   if (!email) {
     throw new Error('RESET_EMAIL or ADMIN_EMAIL is required')
@@ -122,6 +137,46 @@ async function main() {
     select: { id: true },
   })
 
+  let telegramStatus = 'skipped'
+  if (telegramId) {
+    const [hasTelegramId, hasTelegramChatId, hasConnectionStatus, hasConnectedAt] = await Promise.all([
+      hasColumn('users', 'telegram_id'),
+      hasColumn('users', 'telegram_chat_id'),
+      hasColumn('users', 'telegram_connection_status'),
+      hasColumn('users', 'telegram_connected_at'),
+    ])
+
+    if (hasTelegramId || hasTelegramChatId) {
+      const setClauses = []
+      const values = []
+
+      if (hasTelegramId) {
+        values.push(telegramId)
+        setClauses.push(`"telegram_id" = $${values.length}`)
+      }
+      if (hasTelegramChatId) {
+        values.push(telegramId)
+        setClauses.push(`"telegram_chat_id" = $${values.length}`)
+      }
+      if (hasConnectionStatus) {
+        values.push('CONNECTED')
+        setClauses.push(`"telegram_connection_status" = $${values.length}`)
+      }
+      if (hasConnectedAt) {
+        setClauses.push('"telegram_connected_at" = NOW()')
+      }
+
+      values.push(user.id)
+      await prisma.$executeRawUnsafe(
+        `UPDATE "users" SET ${setClauses.join(', ')} WHERE "id" = $${values.length}`,
+        ...values
+      )
+      telegramStatus = 'linked'
+    } else {
+      telegramStatus = 'skipped: schema has no telegram columns'
+    }
+  }
+
   let supabaseStatus = 'skipped'
   try {
     supabaseStatus = await syncSupabasePassword({
@@ -136,6 +191,7 @@ async function main() {
 
   console.log(`Password reset complete for ${user.email}`)
   console.log(`Local user: updated`)
+  if (telegramId) console.log(`Telegram ID: ${telegramStatus}`)
   console.log(`Supabase user: ${supabaseStatus}`)
 }
 

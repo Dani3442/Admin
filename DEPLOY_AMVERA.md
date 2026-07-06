@@ -57,6 +57,7 @@ git push amvera main
 | `ADMIN_PASSWORD` | `Admin1234!` | Пароль (измените!) |
 | `ADMIN_NAME` | `Данила` | Имя администратора |
 | `TELEGRAM_BOT_TOKEN` | токен Telegram-бота | Нужен для отправки уведомлений из прода |
+| `TELEGRAM_BOT_USERNAME` | username бота без `@` | Нужен для входа через Telegram |
 
 `SUPABASE_SERVICE_ROLE_KEY` храните только на сервере и никогда не передавайте во фронтенд.
 
@@ -156,6 +157,21 @@ RESET_EMAIL="user@example.com" RESET_PASSWORD="new-secure-password" npm run auth
 
 Команда не удаляет данные и не трогает продукты. Она обновляет bcrypt-пароль в `users`, активирует пользователя и при наличии `SUPABASE_SERVICE_ROLE_KEY` создаёт/обновляет пользователя Supabase с тем же паролем.
 Если Supabase service key невалиден или не задан, локальный пароль всё равно будет обновлён; в логах появится предупреждение по Supabase.
+
+Для одновременной привязки Telegram ID:
+
+```bash
+RESET_EMAIL="user@example.com" RESET_PASSWORD="new-secure-password" RESET_TELEGRAM_ID="6778090342" npm run auth:reset-password
+```
+
+## Вход через Telegram
+
+Telegram Login Widget работает только для пользователей, у которых в `users.telegram_id` или `users.telegram_chat_id` указан Telegram ID. Для работы на проде:
+
+1. В Amvera env задайте `TELEGRAM_BOT_TOKEN` и `TELEGRAM_BOT_USERNAME`.
+2. В BotFather откройте настройки бота → Web Login и добавьте публичный домен админки в Allowed URLs.
+3. Для Данилы привяжите `6778090342` через `RESET_TELEGRAM_ID` или `npm run db:prod:templates`.
+4. После деплоя на странице `/login` появится кнопка Telegram.
 
 ---
 

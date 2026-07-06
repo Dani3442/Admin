@@ -28,6 +28,11 @@ const RECIPIENT_SEEDS = {
   ivanResponsible: { type: 'chat', name: 'Иван + Ответственный' },
 }
 
+const USER_NAME_ALIASES = {
+  'Данила': ['Данила', 'Данил'],
+  'Бух': ['Бух', 'Бухгалтер', 'Бухгалтерия'],
+}
+
 const RF_STAGES = [
   {
     name: '1. Реф на продукт',
@@ -245,12 +250,13 @@ function getRecipientId(recipient) {
 }
 
 async function findUserByName(tx, name) {
+  const aliases = USER_NAME_ALIASES[name] || [name]
   return tx.user.findFirst({
     where: {
       OR: [
-        { name: { equals: name, mode: 'insensitive' } },
-        { lastName: { equals: name, mode: 'insensitive' } },
-        { email: { contains: name, mode: 'insensitive' } },
+        ...aliases.map((alias) => ({ name: { equals: alias, mode: 'insensitive' } })),
+        ...aliases.map((alias) => ({ lastName: { equals: alias, mode: 'insensitive' } })),
+        ...aliases.map((alias) => ({ email: { contains: alias, mode: 'insensitive' } })),
       ],
     },
     select: { id: true, name: true, lastName: true, telegramId: true, telegramChatId: true },

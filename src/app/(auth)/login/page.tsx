@@ -1,17 +1,83 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Package, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme/ThemeToggle'
 
 export default function LoginPage() {
   const router = useRouter()
+  const telegramContainerRef = useRef<HTMLDivElement | null>(null)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [telegramBotUsername, setTelegramBotUsername] = useState<string | null>(null)
+  const [telegramLoading, setTelegramLoading] = useState(false)
+
+  useEffect(() => {
+    let mounted = true
+
+    fetch('/api/auth/telegram-login')
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (mounted && data?.botUsername) setTelegramBotUsername(data.botUsername)
+      })
+      .catch(() => undefined)
+
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!telegramBotUsername || !telegramContainerRef.current) return
+
+    const container = telegramContainerRef.current
+    container.innerHTML = ''
+
+    ;(window as any).onTelegramAuth = async (user: unknown) => {
+      setTelegramLoading(true)
+      setError('')
+
+      try {
+        const response = await fetch('/api/auth/telegram-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(user),
+        })
+
+        if (!response.ok) {
+          setError('Telegram не привязан к пользователю или подпись не прошла проверку')
+          setTelegramLoading(false)
+          return
+        }
+
+        router.refresh()
+        router.push('/dashboard')
+      } catch {
+        setError('Не удалось войти через Telegram')
+        setTelegramLoading(false)
+      }
+    }
+
+    const script = document.createElement('script')
+    script.src = 'https://telegram.org/js/telegram-widget.js?22'
+    script.async = true
+    script.setAttribute('data-telegram-login', telegramBotUsername)
+    script.setAttribute('data-size', 'large')
+    script.setAttribute('data-radius', '14')
+    script.setAttribute('data-request-access', 'write')
+    script.setAttribute('data-userpic', 'false')
+    script.setAttribute('data-onauth', 'onTelegramAuth(user)')
+    container.appendChild(script)
+
+    return () => {
+      container.innerHTML = ''
+      delete (window as any).onTelegramAuth
+    }
+  }, [router, telegramBotUsername])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -117,6 +183,20 @@ export default function LoginPage() {
                 'Войти'
               )}
             </button>
+
+            {telegramBotUsername && (
+              <div className="space-y-3 pt-1">
+                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  <span className="h-px flex-1 bg-border/60" />
+                  <span>или</span>
+                  <span className="h-px flex-1 bg-border/60" />
+                </div>
+                <div className="flex min-h-11 justify-center" ref={telegramContainerRef} />
+                {telegramLoading && (
+                  <p className="text-center text-xs text-muted-foreground">Проверяем Telegram...</p>
+                )}
+              </div>
+            )}
           </form>
         </div>
       </div>
