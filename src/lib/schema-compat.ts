@@ -42,6 +42,10 @@ export async function supportsProductStageDurationDaysColumn() {
   return hasDbColumn('product_stages', 'durationDays')
 }
 
+export async function supportsProductStageDescriptionColumn() {
+  return hasDbColumn('product_stages', 'description')
+}
+
 export async function supportsStageTemplateAffectsFinalDateColumn() {
   return hasDbColumn('stage_templates', 'affectsFinalDate')
 }
@@ -72,6 +76,19 @@ export async function supportsTemplateTelegramNotificationSettingsTable() {
 
 export async function supportsProductSubStageResponsibleColumn() {
   return hasDbColumn('product_substages', 'responsibleId')
+}
+
+export async function supportsProductSubStagesTable() {
+  return hasDbColumn('product_substages', 'stageId')
+}
+
+export async function supportsTelegramNotificationSettingsTables() {
+  const [settings, recipients] = await Promise.all([
+    hasDbColumn('telegram_notification_settings', 'id'),
+    hasDbColumn('telegram_recipients', 'id'),
+  ])
+
+  return settings && recipients
 }
 
 export async function supportsProductTemplateReferenceColumn() {

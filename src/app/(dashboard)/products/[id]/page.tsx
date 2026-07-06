@@ -5,18 +5,35 @@ import { ProductCardClient } from '@/components/products/ProductCardClient'
 import { getFinalDateFromStages } from '@/lib/product-derived-fields'
 import {
   supportsProductLifecycleColumns,
+  supportsProductStageDescriptionColumn,
+  supportsProductStageStartRulesColumns,
+  supportsProductSubStagesTable,
   supportsProductTemplateStageAutoshiftColumn,
   supportsProductTemplateStageDurationDaysColumn,
   supportsProductTemplateStageStartRulesColumns,
   supportsProductTemplateSubStagesTable,
   supportsTemplateTelegramNotificationSettingsTable,
+  supportsTelegramNotificationSettingsTables,
 } from '@/lib/schema-compat'
 import { getCachedProductTemplates } from '@/lib/cached-reference-data'
 import { getVisibleProductWhere } from '@/lib/product-access'
 import { processDueStageStartsForProduct } from '@/lib/stage-workflow'
 
 async function getProduct(id: string, viewer: { id?: string | null; role?: string | null }) {
-  const hasProductLifecycleColumns = await supportsProductLifecycleColumns()
+  const [
+    hasProductLifecycleColumns,
+    hasProductStageDescriptionColumn,
+    hasProductStageStartRulesColumns,
+    hasProductSubStagesTable,
+    hasTelegramNotificationSettingsTables,
+  ] = await Promise.all([
+    supportsProductLifecycleColumns(),
+    supportsProductStageDescriptionColumn(),
+    supportsProductStageStartRulesColumns(),
+    supportsProductSubStagesTable(),
+    supportsTelegramNotificationSettingsTables(),
+  ])
+
   const product = await prisma.product.findFirst({
     where: getVisibleProductWhere(viewer, { id }),
     select: {
@@ -61,7 +78,7 @@ async function getProduct(id: string, viewer: { id?: string | null; role?: strin
           stageTemplateId: true,
           stageOrder: true,
           stageName: true,
-          description: true,
+          ...(hasProductStageDescriptionColumn ? { description: true } : {}),
           dateValue: true,
           dateRaw: true,
           dateEnd: true,
@@ -74,13 +91,17 @@ async function getProduct(id: string, viewer: { id?: string | null; role?: strin
           responsibleId: true,
           comment: true,
           priority: true,
-          startDate: true,
-          endDate: true,
           plannedDate: true,
-          autoStartAt: true,
-          startTrigger: true,
-          startDelayDays: true,
-          startReferenceStageOrder: true,
+          ...(hasProductStageStartRulesColumns
+            ? {
+                startDate: true,
+                endDate: true,
+                autoStartAt: true,
+                startTrigger: true,
+                startDelayDays: true,
+                startReferenceStageOrder: true,
+              }
+            : {}),
           actualDate: true,
           daysDeviation: true,
           createdAt: true,
@@ -97,30 +118,42 @@ async function getProduct(id: string, viewer: { id?: string | null; role?: strin
             },
           },
           responsible: { select: { id: true, name: true } },
-          subStages: {
-            orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
-            select: {
-              id: true,
-              stageId: true,
-              name: true,
-              description: true,
-              responsibleId: true,
-              status: true,
-              startDate: true,
-              endDate: true,
-              sortOrder: true,
-              createdAt: true,
-              updatedAt: true,
-              telegramNotificationSettings: {
-                orderBy: { createdAt: 'desc' },
-                include: { recipient: true },
-              },
-            },
-          },
-          telegramNotificationSettings: {
-            orderBy: { createdAt: 'desc' },
-            include: { recipient: true },
-          },
+          ...(hasProductSubStagesTable
+            ? {
+                subStages: {
+                  orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+                  select: {
+                    id: true,
+                    stageId: true,
+                    name: true,
+                    description: true,
+                    responsibleId: true,
+                    status: true,
+                    startDate: true,
+                    endDate: true,
+                    sortOrder: true,
+                    createdAt: true,
+                    updatedAt: true,
+                    ...(hasTelegramNotificationSettingsTables
+                      ? {
+                          telegramNotificationSettings: {
+                            orderBy: { createdAt: 'desc' },
+                            include: { recipient: true },
+                          },
+                        }
+                      : {}),
+                  },
+                },
+              }
+            : {}),
+          ...(hasTelegramNotificationSettingsTables
+            ? {
+                telegramNotificationSettings: {
+                  orderBy: { createdAt: 'desc' },
+                  include: { recipient: true },
+                },
+              }
+            : {}),
         },
       },
       comments: {
@@ -150,6 +183,22 @@ async function getProduct(id: string, viewer: { id?: string | null; role?: strin
     archiveReason: hasProductLifecycleColumns ? (product as any).archiveReason ?? null : null,
     closedBy: hasProductLifecycleColumns ? (product as any).closedBy ?? null : null,
     archivedBy: hasProductLifecycleColumns ? (product as any).archivedBy ?? null : null,
+    stages: product.stages.map((stage) => ({
+      ...stage,
+      description: hasProductStageDescriptionColumn ? (stage as any).description ?? null : null,
+      startDate: hasProductStageStartRulesColumns ? (stage as any).startDate ?? null : null,
+      endDate: hasProductStageStartRulesColumns ? (stage as any).endDate ?? null : null,
+      autoStartAt: hasProductStageStartRulesColumns ? (stage as any).autoStartAt ?? null : null,
+      startTrigger: hasProductStageStartRulesColumns ? (stage as any).startTrigger : undefined,
+      startDelayDays: hasProductStageStartRulesColumns ? (stage as any).startDelayDays ?? 0 : 0,
+      startReferenceStageOrder: hasProductStageStartRulesColumns
+        ? (stage as any).startReferenceStageOrder ?? null
+        : null,
+      subStages: hasProductSubStagesTable ? (stage as any).subStages ?? [] : [],
+      telegramNotificationSettings: hasTelegramNotificationSettingsTables
+        ? (stage as any).telegramNotificationSettings ?? []
+        : [],
+    })),
     finalDate: getFinalDateFromStages(product.stages),
   }
 }
@@ -176,15 +225,17 @@ export default async function ProductPage({
     hasTemplateStageStartRulesColumns,
     hasTemplateSubStagesTable,
     hasTemplateTelegramSettingsTable,
+    hasProductStageStartRulesColumns,
   ] = await Promise.all([
     supportsProductTemplateStageDurationDaysColumn(),
     supportsProductTemplateStageAutoshiftColumn(),
     supportsProductTemplateStageStartRulesColumns(),
     supportsProductTemplateSubStagesTable(),
     supportsTemplateTelegramNotificationSettingsTable(),
+    supportsProductStageStartRulesColumns(),
   ])
 
-  if (viewer?.id) {
+  if (viewer?.id && hasProductStageStartRulesColumns) {
     await processDueStageStartsForProduct(id)
   }
 
