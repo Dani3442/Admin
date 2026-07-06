@@ -360,7 +360,7 @@ async function main() {
         await rebuildProduct(tx, product, template)
       }
     },
-    { maxWait: 10000, timeout: 120000 }
+    { maxWait: 30000, timeout: 1800000 }
   )
 
   const afterCounts = await getCounts()

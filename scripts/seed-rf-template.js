@@ -19,6 +19,7 @@ const RECIPIENT_SEEDS = {
   ivan: { type: 'user', name: 'Иван', telegramId: '95692828' },
   director: { type: 'user', name: 'Данила', telegramId: '6778090342' },
   bella: { type: 'user', name: 'Белла' },
+  olya: { type: 'user', name: 'Оля' },
   accountant: { type: 'user', name: 'Бух' },
   warehouse: { type: 'chat', name: 'Склад', chatId: envValue('TELEGRAM_WAREHOUSE_CHAT_ID') },
   novinki: { type: 'chat', name: 'новинки', chatId: envValue('TELEGRAM_NOVINKI_CHAT_ID') },
@@ -31,6 +32,7 @@ const RECIPIENT_SEEDS = {
 const USER_NAME_ALIASES = {
   'Данила': ['Данила', 'Данил'],
   'Бух': ['Бух', 'Бухгалтер', 'Бухгалтерия'],
+  'Оля': ['Оля', 'Ольга'],
 }
 
 const RF_STAGES = [
@@ -190,36 +192,217 @@ const RF_STAGES = [
 ]
 
 const CHINA_STAGE_SEEDS = [
-  { name: 'формирование ТЗ', durationText: '1 день', durationDays: 1, isCritical: false, affectsFinalDate: false },
-  { name: 'согласование + правки ТЗ', durationText: '1 день', durationDays: 1, isCritical: false, affectsFinalDate: false },
-  { name: 'таргет', durationText: '1 день', durationDays: 1, isCritical: false, affectsFinalDate: false },
-  { name: 'расслыка запроса', durationText: '1 день', durationDays: 1, isCritical: false, affectsFinalDate: false },
-  { name: 'сбор + анализ предложений', durationText: '1 неделя', durationDays: 7, isCritical: false, affectsFinalDate: false },
-  { name: 'согласовать тару', durationText: '1 день', durationDays: 1, isCritical: false, affectsFinalDate: false },
-  { name: 'рассчитать стоимость логистики пердварительно', durationText: null, durationDays: null, isCritical: false, affectsFinalDate: false },
-  { name: 'согласовать экономику', durationText: '1 день', durationDays: 1, isCritical: false, affectsFinalDate: false },
-  { name: 'вся информация для макета - собрать', durationText: '2 дня', durationDays: 2, isCritical: false, affectsFinalDate: false },
-  { name: 'написать тз на макет', durationText: '1 день', durationDays: 1, isCritical: false, affectsFinalDate: false },
-  { name: 'подписать контракт + инвойс', durationText: '3 дня', durationDays: 3, isCritical: false, affectsFinalDate: false },
-  { name: 'оплата инвойса', durationText: '3 дня', durationDays: 3, isCritical: false, affectsFinalDate: false },
-  { name: 'изготовление макета + согласование', durationText: '5 дней', durationDays: 5, isCritical: false, affectsFinalDate: false },
-  { name: 'согласование визуала', durationText: '1 день', durationDays: 1, isCritical: false, affectsFinalDate: false },
-  { name: 'отправить макет, запустить изготовление образцов', durationText: '1 день', durationDays: 1, isCritical: false, affectsFinalDate: false },
-  { name: 'изготовление образцов', durationText: '30 дней', durationDays: 30, isCritical: false, affectsFinalDate: false },
-  { name: 'доставка образцов карго', durationText: '7 дней', durationDays: 7, isCritical: false, affectsFinalDate: false },
-  { name: 'фокус группа да/нет', durationText: null, durationDays: null, isCritical: false, affectsFinalDate: false },
-  { name: 'тестирование образцов', durationText: null, durationDays: null, isCritical: false, affectsFinalDate: false },
-  { name: 'завести киз, шк, артикул', durationText: '1 день', durationDays: 1, isCritical: false, affectsFinalDate: false },
-  { name: 'подготовка к белому ввозу на декларирование', durationText: '7 дней', durationDays: 7, isCritical: false, affectsFinalDate: false },
-  { name: 'правки по макету на белый ввоз', durationText: '3 дня', durationDays: 3, isCritical: false, affectsFinalDate: false },
-  { name: 'отправить новый макет, запустить работу', durationText: '1 день', durationDays: 1, isCritical: false, affectsFinalDate: false },
-  { name: 'отправить макет на белом фоне в отдел продаж', durationText: '1 день', durationDays: 1, isCritical: false, affectsFinalDate: false },
-  { name: 'ввоз белых образцов + декларирование', durationText: '?', durationDays: null, isCritical: false, affectsFinalDate: false },
-  { name: 'инвойс партия', durationText: null, durationDays: null, isCritical: true, affectsFinalDate: false },
-  { name: 'оплата партия', durationText: null, durationDays: null, isCritical: true, affectsFinalDate: false },
-  { name: 'запуск варки + варка', durationText: null, durationDays: null, isCritical: true, affectsFinalDate: true },
-  { name: 'инспекция перед отправкой', durationText: null, durationDays: null, isCritical: true, affectsFinalDate: true },
-  { name: 'доставка', durationText: null, durationDays: null, isCritical: true, affectsFinalDate: true },
+  {
+    name: '1. Реф на продукт',
+    durationText: '7 рабочих дней',
+    durationDays: 7,
+    startTrigger: 'PRODUCT_CREATED',
+    stageNotifications: [
+      {
+        eventType: 'stage_completed',
+        recipientKey: 'novinki',
+        messageTemplate: 'custom',
+        customMessage:
+          'Реф на продукт завершён\n\nПродукт: {product_name}\nЭтап: {stage_name}\nОтветственный: {responsible_user}\nДата закрытия: {end_date}',
+      },
+    ],
+  },
+  {
+    name: '2. ТЗ Фабрика',
+    durationText: '2 рабочих дня',
+    durationDays: 2,
+    startTrigger: 'PREVIOUS_STAGE_COMPLETED',
+    subStages: [
+      { name: 'Написать', recipientKey: 'responsible' },
+      { name: 'Согласовать', responsibleName: 'Катя', recipientKey: 'katya' },
+      { name: 'Таргет', responsibleName: 'Катя', recipientKey: 'katya' },
+    ],
+  },
+  {
+    name: '3. Сбор предложений',
+    durationText: '10 рабочих дней',
+    durationDays: 10,
+    startTrigger: 'PREVIOUS_STAGE_COMPLETED',
+    stageNotifications: [{ eventType: 'stage_started', recipientKey: 'responsible' }],
+    subStages: [
+      { name: 'Цены дать с таргет', recipientKey: 'responsible' },
+      { name: 'Согласовать цены тару', description: 'Катя + Иван', responsibleName: 'Катя', recipientKey: 'katya' },
+      { name: 'Чек банка', description: 'Оля бух + пр', recipientKey: 'accountant' },
+    ],
+  },
+  {
+    name: '4.1. Подготовка карго образцов',
+    durationText: '1,5 календарных месяца',
+    durationDays: 45,
+    startTrigger: 'PREVIOUS_STAGE_COMPLETED',
+    subStages: [
+      { name: 'Создание названий ru/англ + арт', responsibleName: 'Катя', recipientKey: 'katya' },
+      { name: 'ТЗ дизу', recipientKey: 'responsible' },
+      { name: 'Согласовать ТЗ', responsibleName: 'Катя', recipientKey: 'katya' },
+      { name: 'Счет оплатить образцы', recipientKey: 'responsible' },
+      { name: 'Создание макета', responsibleName: 'Белла', recipientKey: 'bella' },
+      { name: 'Отдать макет на ФК + производство', recipientKey: 'responsible' },
+    ],
+  },
+  {
+    name: '4.2. Доставка карго',
+    durationText: '1 календарная неделя',
+    durationDays: 7,
+    startTrigger: 'PREVIOUS_STAGE_COMPLETED',
+    stageNotifications: [{ eventType: 'stage_started', recipientKey: 'kirill' }],
+  },
+  {
+    name: '4.3. Тест карго',
+    durationText: '3 рабочих дня',
+    durationDays: 3,
+    startTrigger: 'PREVIOUS_STAGE_COMPLETED',
+    stageNotifications: [{ eventType: 'stage_started', recipientKey: 'katya' }],
+  },
+  {
+    name: '5.2. Образец 064',
+    durationText: '2 календарные недели',
+    durationDays: 14,
+    startTrigger: 'PREVIOUS_STAGE_COMPLETED',
+    subStages: [
+      { name: 'Подготовка образцов', recipientKey: 'responsible' },
+      { name: 'Вопросы ввоза', recipientKey: 'olya' },
+      { name: 'Ввоз', recipientKey: 'olya' },
+    ],
+  },
+  {
+    name: '5.1. Документация 064',
+    durationText: '2,5 календарных месяца. Старт через 1 месяц после начала 4.1.',
+    durationDays: 75,
+    startTrigger: 'STAGE_STARTED',
+    startReferenceStageOrder: 3,
+    startDelayDays: 30,
+    stageNotifications: [{ eventType: 'stage_started', recipientKey: 'responsible' }],
+    subStages: [
+      { name: 'Инвойс 064', description: 'Оля + бух + ответственный', recipientKey: 'responsible' },
+      { name: 'Контракт', description: 'Оля + бух + ответственный', recipientKey: 'responsible' },
+      { name: 'Все документы', description: 'Оля + бух + ответственный', recipientKey: 'responsible' },
+      { name: 'Этикетка 064', description: 'Оля + бух + ответственный', recipientKey: 'responsible' },
+    ],
+  },
+  {
+    name: '7.1. Подготовка к запуску',
+    durationText: '15 календарных дней. Старт одновременно с 5.1.',
+    durationDays: 15,
+    startTrigger: 'STAGE_STARTED',
+    startReferenceStageOrder: 7,
+    stageNotifications: [{ eventType: 'stage_started', recipientKey: 'responsible' }],
+    subStages: [
+      { name: 'Создать карточки в нашем каталоге', description: '2 дня. Аделя + пр.', responsibleName: 'Аделя', recipientKey: 'adel' },
+      { name: 'Чистовое ТЗ дизайн', description: '1 день', recipientKey: 'responsible' },
+      { name: 'Согласование ТЗ', description: '1 день', responsibleName: 'Катя', recipientKey: 'katya' },
+      { name: 'Заново согласовать цены', description: '1 день. Катя + Иван.', responsibleName: 'Катя', recipientKey: 'katya' },
+      { name: 'Делаем макет', description: '5 дней', responsibleName: 'Белла', recipientKey: 'bella' },
+      { name: 'Делаем визуал', description: '5 дней. Пр + Илья.', recipientKey: 'responsible' },
+    ],
+  },
+  {
+    name: '6.1. Декларация',
+    durationText: '2,5 календарных месяца. Старт через 30 дней после запуска продукта.',
+    durationDays: 75,
+    startTrigger: 'PRODUCT_CREATED',
+    startDelayDays: 30,
+    stageNotifications: [{ eventType: 'stage_started', recipientKey: 'katya' }],
+  },
+  {
+    name: '6.2. Декларация',
+    durationText: '18 дней. Старт вместе с 6.1.',
+    durationDays: 18,
+    startTrigger: 'STAGE_STARTED',
+    startReferenceStageOrder: 9,
+    subStages: [
+      { name: 'Подключить ДС в карточку 43', description: 'Оля + Аделя + пр.', responsibleName: 'Аделя', recipientKey: 'adel' },
+    ],
+  },
+  {
+    name: '7.2. Запуск производства',
+    durationText: '5 рабочих дней',
+    durationDays: 5,
+    startTrigger: 'STAGE_COMPLETED',
+    startReferenceStageOrder: 6,
+    subStages: [
+      { name: 'Инвойс партия', description: 'Оля + пр.', recipientKey: 'responsible' },
+      { name: 'Оплата 50%', description: 'Оля + бух.', recipientKey: 'accountant' },
+      { name: 'Отдать макет в работу', description: '1 день', recipientKey: 'responsible' },
+      { name: 'Запустить варку', description: '1 день', recipientKey: 'responsible' },
+    ],
+  },
+  {
+    name: '7.3. Производство',
+    durationText: '35 календарных дней',
+    durationDays: 35,
+    startTrigger: 'PREVIOUS_STAGE_COMPLETED',
+  },
+  {
+    name: '7.4. Инспекция',
+    durationText: 'Старт через 15 дней после запуска 7.3.',
+    durationDays: null,
+    startTrigger: 'STAGE_STARTED',
+    startReferenceStageOrder: 12,
+    startDelayDays: 15,
+    subStages: [
+      { name: 'Чек-лист подготовка + согласовать', description: '2 рабочих дня. Катя + пр.', responsibleName: 'Катя', recipientKey: 'katya' },
+      { name: 'Счет инспекция запрос + оплата', description: '5 рабочих дней', recipientKey: 'responsible' },
+      { name: 'Согласовать дату', recipientKey: 'responsible' },
+    ],
+  },
+  {
+    name: '7.5. Подготовка для продаж',
+    durationText: 'Старт через 15 дней после запуска 7.3.',
+    durationDays: null,
+    startTrigger: 'STAGE_STARTED',
+    startReferenceStageOrder: 12,
+    startDelayDays: 15,
+    stageNotifications: [
+      {
+        eventType: 'stage_started',
+        recipientKey: 'novinki',
+        messageTemplate: 'custom',
+        customMessage:
+          'Прошу взять в работу продукт\n\nПродукт: {product_name}\nЭтап: {stage_name}\nСрок: {end_date}',
+      },
+    ],
+    subStages: [
+      { name: 'Внести продукты в каталог для продаж', description: '1 рабочий день', recipientKey: 'responsible' },
+      { name: 'Сделать руками макет', description: '3 рабочих дня. Пр + Белла.', recipientKey: 'responsible' },
+      { name: 'Оповестить продажников о новинках', description: '1 день', recipientKey: 'responsible' },
+    ],
+  },
+  {
+    name: '7.6. Подготовка к доставке',
+    durationText: '7 рабочих дней',
+    durationDays: 7,
+    startTrigger: 'STAGE_COMPLETED',
+    startReferenceStageOrder: 12,
+    subStages: [
+      { name: 'Оля + ответственный', recipientKey: 'responsible' },
+    ],
+  },
+  {
+    name: '8. Доставка',
+    durationText: '1 календарный месяц',
+    durationDays: 30,
+    startTrigger: 'PREVIOUS_STAGE_COMPLETED',
+    subStages: [
+      { name: 'Отдать в печать', description: '1 день', recipientKey: 'responsible' },
+    ],
+  },
+  {
+    name: '9. Продукция на складе',
+    durationText: '4 рабочих дня',
+    durationDays: 4,
+    startTrigger: 'PREVIOUS_STAGE_COMPLETED',
+    subStages: [
+      { name: 'Инспекция', description: '1 день', responsibleName: 'Катя', recipientKey: 'katya' },
+      { name: 'Доп. упаковка', description: '3 дня', recipientKey: 'warehouse' },
+      { name: 'Оповещение продаж', recipientKey: 'responsible' },
+      { name: 'Анонс в общий чат', description: 'Катя + чат новинки', responsibleName: 'Катя', recipientKey: 'katya' },
+    ],
+  },
 ]
 
 function templateDescription() {
@@ -231,7 +414,11 @@ function templateDescription() {
 }
 
 function chinaDescription() {
-  return 'Китайский основной шаблон запуска продукта: 30 этапов старой основной цепочки без предзаполненных дат.'
+  return [
+    'Китайский основной шаблон запуска продукта по актуальному ТЗ.',
+    'Основная цепочка включает карго-образцы, документацию 064, декларации, производство, инспекцию, подготовку для продаж и склад.',
+    'Параллельные ветки запускаются через startTrigger/startReferenceStageOrder/startDelayDays. Групповые чаты без chat_id сохранены выключенными до заполнения реального chat_id.',
+  ].join('\n')
 }
 
 function hasChatTarget(recipient) {
@@ -473,7 +660,7 @@ async function upsertRfTemplate(tx, recipientByKey) {
   }
 }
 
-async function upsertChinaTemplate(tx) {
+async function upsertChinaTemplate(tx, recipientByKey) {
   let template = await tx.productTemplate.findFirst({
     where: { name: CHINA_TEMPLATE_NAME },
     select: { id: true },
@@ -516,13 +703,22 @@ async function upsertChinaTemplate(tx) {
     where: { productTemplateId: template.id },
   })
 
+  const userIdByName = new Map()
+  for (const name of ['Катя', 'Аделя', 'Белла', 'Иван', 'Кирилл', 'Оля']) {
+    userIdByName.set(name, await findUserIdByName(tx, name))
+  }
+
+  let templateNotificationCount = 0
+  let subStageCount = 0
+  let enabledSubStageNotificationCount = 0
+
   for (const [stageOrder, stage] of CHINA_STAGE_SEEDS.entries()) {
     const stageTemplate = await getOrCreateStageTemplate(tx, {
       ...stage,
       participatesInAutoshift: true,
     })
 
-    await tx.productTemplateStage.create({
+    const createdStage = await tx.productTemplateStage.create({
       data: {
         productTemplateId: template.id,
         stageTemplateId: stageTemplate.id,
@@ -530,34 +726,86 @@ async function upsertChinaTemplate(tx) {
         stageName: stage.name,
         durationDays: stage.durationDays ?? null,
         participatesInAutoshift: true,
-        startTrigger: stageOrder === 0 ? 'PRODUCT_CREATED' : 'PREVIOUS_STAGE_COMPLETED',
-        startDelayDays: 0,
-        startReferenceStageOrder: null,
+        startTrigger: stage.startTrigger ?? (stageOrder === 0 ? 'PRODUCT_CREATED' : 'PREVIOUS_STAGE_COMPLETED'),
+        startDelayDays: stage.startDelayDays ?? 0,
+        startReferenceStageOrder: stage.startReferenceStageOrder ?? null,
       },
     })
+
+    for (const notification of stage.stageNotifications ?? []) {
+      const recipient = recipientByKey.get(notification.recipientKey)
+      if (!recipient) continue
+
+      await tx.telegramTemplateNotificationSetting.create({
+        data: {
+          productTemplateId: template.id,
+          productTemplateStageId: createdStage.id,
+          eventType: notification.eventType,
+          recipientType: getRecipientType(recipient),
+          recipientId: getRecipientId(recipient),
+          messageTemplate:
+            notification.messageTemplate ??
+            (notification.eventType === 'stage_started' ? 'stage_started_simple' : 'stage_completed_simple'),
+          customMessage: notification.customMessage ?? null,
+          isEnabled: hasChatTarget(recipient),
+        },
+      })
+      templateNotificationCount += 1
+    }
+
+    for (const [subStageIndex, subStage] of (stage.subStages ?? []).entries()) {
+      const recipient = subStage.recipientKey ? recipientByKey.get(subStage.recipientKey) : null
+      const notifyOnComplete = Boolean(recipient && hasChatTarget(recipient))
+      const responsibleId = subStage.responsibleName ? userIdByName.get(subStage.responsibleName) ?? null : null
+
+      await tx.productTemplateSubStage.create({
+        data: {
+          productTemplateId: template.id,
+          productTemplateStageId: createdStage.id,
+          name: subStage.name,
+          description: subStage.description ?? null,
+          responsibleId,
+          notifyOnStart: false,
+          notifyOnComplete,
+          telegramRecipientType: getRecipientType(recipient),
+          telegramRecipientId: getRecipientId(recipient),
+          telegramMessageTemplate: subStage.messageTemplate ?? 'substage_completed_simple',
+          telegramCustomMessage: subStage.customMessage ?? null,
+          sortOrder: subStageIndex,
+        },
+      })
+      subStageCount += 1
+      if (notifyOnComplete) enabledSubStageNotificationCount += 1
+    }
   }
 
   return {
     id: template.id,
     stageCount: CHINA_STAGE_SEEDS.length,
+    subStageCount,
+    templateNotificationCount,
+    enabledSubStageNotificationCount,
   }
 }
 
 async function upsertTemplates() {
-  return prisma.$transaction(async (tx) => {
-    const recipientByKey = await ensureRecipientMap(tx)
-    const rf = await upsertRfTemplate(tx, recipientByKey)
-    const china = await upsertChinaTemplate(tx)
-    const recipientsWithTargets = Array.from(recipientByKey.values()).filter(hasChatTarget).length
-    const recipientsTotal = recipientByKey.size
+  return prisma.$transaction(
+    async (tx) => {
+      const recipientByKey = await ensureRecipientMap(tx)
+      const rf = await upsertRfTemplate(tx, recipientByKey)
+      const china = await upsertChinaTemplate(tx, recipientByKey)
+      const recipientsWithTargets = Array.from(recipientByKey.values()).filter(hasChatTarget).length
+      const recipientsTotal = recipientByKey.size
 
-    return {
-      rf,
-      china,
-      recipientsTotal,
-      recipientsWithTargets,
-    }
-  })
+      return {
+        rf,
+        china,
+        recipientsTotal,
+        recipientsWithTargets,
+      }
+    },
+    { maxWait: 15000, timeout: 120000 }
+  )
 }
 
 upsertTemplates()
@@ -569,6 +817,9 @@ upsertTemplates()
     console.log(`RF enabled substage notifications: ${result.rf.enabledSubStageNotificationCount}`)
     console.log(`China template: ${result.china.id}`)
     console.log(`China stages: ${result.china.stageCount}`)
+    console.log(`China substages: ${result.china.subStageCount}`)
+    console.log(`China stage notification rules: ${result.china.templateNotificationCount}`)
+    console.log(`China enabled substage notifications: ${result.china.enabledSubStageNotificationCount}`)
     console.log(`Telegram recipients: ${result.recipientsWithTargets}/${result.recipientsTotal} with chat target`)
   })
   .catch((error) => {
