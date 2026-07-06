@@ -24,18 +24,20 @@ function areSameDate(left: Date | null, right: Date | null) {
 
 const STAGE_UPDATE_FIELDS = new Set([
   'stageName',
+  'description',
   'dateValue',
   'dateRaw',
   'dateEnd',
   'durationDays',
   'status',
-  'isCompleted',
   'isCritical',
   'participatesInAutoshift',
   'affectsFinalDate',
   'responsibleId',
   'comment',
   'priority',
+  'startDate',
+  'endDate',
   'plannedDate',
   'actualDate',
   'daysDeviation',
@@ -179,6 +181,7 @@ export async function PATCH(req: NextRequest) {
     stageTemplateId: true,
     stageOrder: true,
     stageName: true,
+    description: true,
     dateValue: true,
     dateRaw: true,
     dateEnd: true,
@@ -189,6 +192,8 @@ export async function PATCH(req: NextRequest) {
     responsibleId: true,
     comment: true,
     priority: true,
+    startDate: true,
+    endDate: true,
     plannedDate: true,
     actualDate: true,
     daysDeviation: true,
@@ -212,7 +217,31 @@ export async function PATCH(req: NextRequest) {
             durationText: true,
             durationDays: true,
             isCritical: true,
-          },
+        },
+    },
+    subStages: {
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+      select: {
+        id: true,
+        stageId: true,
+        name: true,
+        description: true,
+        responsibleId: true,
+        status: true,
+        startDate: true,
+        endDate: true,
+        sortOrder: true,
+        createdAt: true,
+        updatedAt: true,
+        telegramNotificationSettings: {
+          orderBy: { createdAt: 'desc' },
+          include: { recipient: true },
+        },
+      },
+    },
+    telegramNotificationSettings: {
+      orderBy: { createdAt: 'desc' },
+      include: { recipient: true },
     },
   }
 
@@ -226,6 +255,12 @@ export async function PATCH(req: NextRequest) {
 
   if (Array.isArray(stageIds) && stageIds.length > 0) {
     const bulkUpdates = getSafeStageUpdates(updates || {})
+    if (bulkUpdates.status === 'COMPLETED') {
+      return NextResponse.json(
+        { error: 'Этап закрывается автоматически после выполнения всех подэтапов' },
+        { status: 400 }
+      )
+    }
 
     const stagesToUpdate = await prisma.productStage.findMany({
       where: { id: { in: stageIds } },
@@ -288,6 +323,7 @@ export async function PATCH(req: NextRequest) {
           stageOrder: true,
           stageTemplateId: true,
           stageName: true,
+          status: true,
           dateValue: true,
         },
       })
@@ -316,6 +352,7 @@ export async function PATCH(req: NextRequest) {
         stageOrder: true,
         stageTemplateId: true,
         stageName: true,
+        status: true,
         dateValue: true,
       },
     })
@@ -333,6 +370,7 @@ export async function PATCH(req: NextRequest) {
           stageOrder: true,
           stageTemplateId: true,
           stageName: true,
+          status: true,
           dateValue: true,
         },
       })
@@ -362,6 +400,7 @@ export async function PATCH(req: NextRequest) {
           stageOrder: true,
           stageTemplateId: true,
           stageName: true,
+          status: true,
           dateValue: true,
         },
       })
@@ -423,6 +462,7 @@ export async function PATCH(req: NextRequest) {
           stageOrder: tempStageOrder,
           stageTemplateId,
           stageName: sanitizedStageName || template.name,
+          status: 'NOT_STARTED',
           dateValue: initialDateValue,
         }
         createdMissingStage = true
@@ -489,6 +529,12 @@ export async function PATCH(req: NextRequest) {
   }
 
   const safeUpdates = getSafeStageUpdates(updates || {})
+  if (safeUpdates.status === 'COMPLETED') {
+    return NextResponse.json(
+      { error: 'Этап закрывается автоматически после выполнения всех подэтапов' },
+      { status: 400 }
+    )
+  }
 
   if (!hasDurationDaysColumn) {
     delete safeUpdates.durationDays
@@ -498,6 +544,14 @@ export async function PATCH(req: NextRequest) {
 
   const normalizedUpdates = {
     ...safeUpdates,
+  }
+
+  const shouldSetStageStartDate =
+    normalizedUpdates.status === 'IN_PROGRESS' &&
+    targetStage.status !== 'IN_PROGRESS'
+
+  if (shouldSetStageStartDate && !normalizedUpdates.startDate) {
+    normalizedUpdates.startDate = new Date()
   }
 
   let automationResult = null

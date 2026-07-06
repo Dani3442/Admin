@@ -2,7 +2,13 @@ import { randomUUID } from 'crypto'
 import {
   supportsProductTemplateStageAutoshiftColumn,
   supportsProductTemplateStageDurationDaysColumn,
+  hasDbColumn,
 } from './schema-compat'
+import {
+  normalizeStageStartDelayDays,
+  normalizeStageStartReferenceOrder,
+  normalizeStageStartTrigger,
+} from './stage-start-rules'
 
 type ProductTemplateStageCompatCreateInput = {
   productTemplateId: string
@@ -12,6 +18,9 @@ type ProductTemplateStageCompatCreateInput = {
   plannedDate?: Date | null
   durationDays?: number | null
   participatesInAutoshift?: boolean
+  startTrigger?: string
+  startDelayDays?: number | null
+  startReferenceStageOrder?: number | null
 }
 
 type ProductTemplateStageDbClient = {
@@ -26,6 +35,7 @@ export async function createProductTemplateStageCompat(
     supportsProductTemplateStageDurationDaysColumn(),
     supportsProductTemplateStageAutoshiftColumn(),
   ])
+  const hasStartRulesColumns = await hasDbColumn('product_template_stages', 'startTrigger')
 
   const data = {
     id: randomUUID(),
@@ -36,6 +46,9 @@ export async function createProductTemplateStageCompat(
     plannedDate: input.plannedDate ?? null,
     durationDays: input.durationDays ?? null,
     participatesInAutoshift: input.participatesInAutoshift ?? true,
+    startTrigger: normalizeStageStartTrigger(input.startTrigger, input.stageOrder),
+    startDelayDays: normalizeStageStartDelayDays(input.startDelayDays),
+    startReferenceStageOrder: normalizeStageStartReferenceOrder(input.startReferenceStageOrder),
     createdAt: new Date(),
     updatedAt: new Date(),
   }
@@ -70,6 +83,12 @@ export async function createProductTemplateStageCompat(
   if (hasAutoshiftColumn) {
     columns.splice(hasDurationDaysColumn ? 7 : 6, 0, 'participatesInAutoshift')
     values.splice(hasDurationDaysColumn ? 7 : 6, 0, data.participatesInAutoshift)
+  }
+
+  if (hasStartRulesColumns) {
+    const insertIndex = columns.indexOf('createdAt')
+    columns.splice(insertIndex, 0, 'startTrigger', 'startDelayDays', 'startReferenceStageOrder')
+    values.splice(insertIndex, 0, data.startTrigger, data.startDelayDays, data.startReferenceStageOrder)
   }
 
   const placeholders = columns.map((_, index) => `$${index + 1}`).join(', ')

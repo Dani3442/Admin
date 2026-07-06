@@ -5,6 +5,8 @@ import { getCachedAssignableUsers, getCachedProductTemplates, getCachedStageSugg
 import {
   supportsProductTemplateStageAutoshiftColumn,
   supportsProductTemplateStageDurationDaysColumn,
+  supportsProductTemplateStageStartRulesColumns,
+  supportsProductTemplateSubStagesTable,
 } from '@/lib/schema-compat'
 import { canManageProducts } from '@/lib/product-access'
 
@@ -16,14 +18,26 @@ const NewProductForm = dynamic(
 )
 
 async function getCreateProductData() {
-  const [hasProductTemplateStageDurationDaysColumn, hasProductTemplateStageAutoshiftColumn] = await Promise.all([
+  const [
+    hasProductTemplateStageDurationDaysColumn,
+    hasProductTemplateStageAutoshiftColumn,
+    hasProductTemplateStageStartRulesColumns,
+    hasProductTemplateSubStagesTable,
+  ] = await Promise.all([
     supportsProductTemplateStageDurationDaysColumn(),
     supportsProductTemplateStageAutoshiftColumn(),
+    supportsProductTemplateStageStartRulesColumns(),
+    supportsProductTemplateSubStagesTable(),
   ])
 
   const [users, productTemplates, stageSuggestions] = await Promise.all([
     getCachedAssignableUsers(),
-    getCachedProductTemplates(hasProductTemplateStageDurationDaysColumn, hasProductTemplateStageAutoshiftColumn),
+    getCachedProductTemplates(
+      hasProductTemplateStageDurationDaysColumn,
+      hasProductTemplateStageAutoshiftColumn,
+      hasProductTemplateStageStartRulesColumns,
+      hasProductTemplateSubStagesTable
+    ),
     getCachedStageSuggestions(),
   ])
 
@@ -40,6 +54,13 @@ async function getCreateProductData() {
         durationDays: hasProductTemplateStageDurationDaysColumn ? (stage as any).durationDays ?? null : null,
         stageTemplateDurationDays: stage.stageTemplate.durationDays ?? null,
         participatesInAutoshift: hasProductTemplateStageAutoshiftColumn ? (stage as any).participatesInAutoshift ?? true : true,
+        startTrigger: hasProductTemplateStageStartRulesColumns ? (stage as any).startTrigger : undefined,
+        startDelayDays: hasProductTemplateStageStartRulesColumns ? (stage as any).startDelayDays ?? 0 : 0,
+        startReferenceStageOrder: hasProductTemplateStageStartRulesColumns
+          ? (stage as any).startReferenceStageOrder ?? null
+          : null,
+        subStages: hasProductTemplateSubStagesTable ? (stage as any).subStages ?? [] : [],
+        telegramNotificationSettings: (stage as any).telegramNotificationSettings ?? [],
       })),
     })),
     stageSuggestions,

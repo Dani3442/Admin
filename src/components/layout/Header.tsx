@@ -28,7 +28,6 @@ import { UserAvatar } from '@/components/users/UserAvatar'
 import { ThemeToggle } from '@/components/theme/ThemeToggle'
 import { cn, getRoleLabel, getUserDisplayName } from '@/lib/utils'
 import { buildProductHref, getRouteWithSearch } from '@/lib/navigation'
-import { createClient } from '@/lib/supabase/client'
 
 interface Notification {
   id: string
@@ -52,13 +51,11 @@ const NAV_ITEMS: Array<{
 }> = [
   { label: 'Дашборд', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Продукты', href: '/products', icon: Package },
-  { label: 'Автоматизации', href: '/automations', icon: Zap },
   { label: 'Пользователи', href: '/users', icon: Users, adminOnly: true },
   { label: 'Архив', href: '/archive', icon: Archive },
 ]
 
 export function Header({ user }: HeaderProps) {
-  const [supabase] = useState(() => createClient())
   const [profileUser, setProfileUser] = useState(user)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
@@ -172,7 +169,7 @@ export function Header({ user }: HeaderProps) {
   }
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut()
+    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => null)
     setMobileNavOpen(false)
     setProfileOpen(false)
     router.push('/login')
@@ -240,7 +237,7 @@ export function Header({ user }: HeaderProps) {
       <div className="page-shell flex justify-center">
         <motion.div
           layout
-          className="floating-island flex w-full max-w-[1060px] items-center gap-2 px-2.5 py-2.5 sm:gap-2.5"
+          className="floating-island admin-top-island flex w-full max-w-[980px] items-center gap-2 px-2.5 py-2.5 sm:gap-2.5"
           transition={{ type: 'spring', stiffness: 360, damping: 32 }}
         >
           <button
@@ -466,6 +463,17 @@ export function Header({ user }: HeaderProps) {
                         </span>
                         <ChevronRight className="h-4 w-4 text-muted-foreground" />
                       </Link>
+                      <Link
+                        href="/automations"
+                        onClick={() => setProfileOpen(false)}
+                        className="flex items-center justify-between rounded-[18px] px-3 py-2.5 text-sm text-foreground transition hover:bg-accent hover:text-accent-foreground"
+                      >
+                        <span className="flex items-center gap-2">
+                          <Zap className="h-4 w-4 text-muted-foreground" />
+                          Автоматизации
+                        </span>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      </Link>
                     </div>
 
                     <div className="mt-2 border-t border-border/80 pt-2">
@@ -583,6 +591,17 @@ export function Header({ user }: HeaderProps) {
                       <span className="flex items-center gap-2">
                         <Settings className="h-4 w-4 text-muted-foreground" />
                         Настройки
+                      </span>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </Link>
+                    <Link
+                      href="/automations"
+                      onClick={() => setMobileNavOpen(false)}
+                      className="flex items-center justify-between rounded-[18px] px-3 py-2.5 text-sm text-foreground transition hover:bg-accent hover:text-accent-foreground"
+                    >
+                      <span className="flex items-center gap-2">
+                        <Zap className="h-4 w-4 text-muted-foreground" />
+                        Автоматизации
                       </span>
                       <ChevronRight className="h-4 w-4 text-muted-foreground" />
                     </Link>

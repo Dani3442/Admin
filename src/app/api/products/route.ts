@@ -35,7 +35,18 @@ export async function GET(req: NextRequest) {
   if (priority) where.priority = priority
   if (search) where.name = { contains: sanitizeTextValue(search, { maxLength: 160 }) }
   if (responsible) where.responsibleId = sanitizeTextValue(responsible, { maxLength: 128 })
-  if (country) where.country = sanitizeTextValue(country, { maxLength: 80 })
+  if (country) {
+    const safeCountry = sanitizeTextValue(country, { maxLength: 80 })
+    const normalizedCountry = safeCountry.toLowerCase()
+    if (normalizedCountry === 'рф' || normalizedCountry.includes('рос') || normalizedCountry.includes('russia')) {
+      where.OR = [
+        { country: { contains: 'Россия', mode: 'insensitive' } },
+        { country: { contains: 'РФ', mode: 'insensitive' } },
+      ]
+    } else {
+      where.country = { contains: safeCountry, mode: 'insensitive' }
+    }
+  }
 
   const productListSelect = {
     id: true,
@@ -68,6 +79,7 @@ export async function GET(req: NextRequest) {
             stageTemplateId: true,
             stageOrder: true,
             stageName: true,
+            description: true,
             dateValue: true,
             dateRaw: true,
             dateEnd: true,
@@ -79,6 +91,8 @@ export async function GET(req: NextRequest) {
             responsibleId: true,
             comment: true,
             priority: true,
+            startDate: true,
+            endDate: true,
             plannedDate: true,
             actualDate: true,
             daysDeviation: true,
@@ -94,6 +108,30 @@ export async function GET(req: NextRequest) {
                 isCritical: true,
                 affectsFinalDate: true,
               },
+            },
+            subStages: {
+              orderBy: [{ sortOrder: 'asc' as const }, { createdAt: 'asc' as const }],
+              select: {
+                id: true,
+                stageId: true,
+                name: true,
+                description: true,
+                responsibleId: true,
+                status: true,
+                startDate: true,
+                endDate: true,
+                sortOrder: true,
+                createdAt: true,
+                updatedAt: true,
+                telegramNotificationSettings: {
+                  orderBy: { createdAt: 'desc' as const },
+                  include: { recipient: true },
+                },
+              },
+            },
+            telegramNotificationSettings: {
+              orderBy: { createdAt: 'desc' as const },
+              include: { recipient: true },
             },
           },
         }

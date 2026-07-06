@@ -3,8 +3,16 @@ import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { ProductCardClient } from '@/components/products/ProductCardClient'
 import { getFinalDateFromStages } from '@/lib/product-derived-fields'
-import { supportsProductLifecycleColumns } from '@/lib/schema-compat'
+import {
+  supportsProductLifecycleColumns,
+  supportsProductTemplateStageAutoshiftColumn,
+  supportsProductTemplateStageDurationDaysColumn,
+  supportsProductTemplateStageStartRulesColumns,
+  supportsProductTemplateSubStagesTable,
+} from '@/lib/schema-compat'
+import { getCachedProductTemplates } from '@/lib/cached-reference-data'
 import { getVisibleProductWhere } from '@/lib/product-access'
+import { processDueStageStartsForProduct } from '@/lib/stage-workflow'
 
 async function getProduct(id: string, viewer: { id?: string | null; role?: string | null }) {
   const hasProductLifecycleColumns = await supportsProductLifecycleColumns()
@@ -52,6 +60,7 @@ async function getProduct(id: string, viewer: { id?: string | null; role?: strin
           stageTemplateId: true,
           stageOrder: true,
           stageName: true,
+          description: true,
           dateValue: true,
           dateRaw: true,
           dateEnd: true,
@@ -64,7 +73,13 @@ async function getProduct(id: string, viewer: { id?: string | null; role?: strin
           responsibleId: true,
           comment: true,
           priority: true,
+          startDate: true,
+          endDate: true,
           plannedDate: true,
+          autoStartAt: true,
+          startTrigger: true,
+          startDelayDays: true,
+          startReferenceStageOrder: true,
           actualDate: true,
           daysDeviation: true,
           createdAt: true,
@@ -81,6 +96,30 @@ async function getProduct(id: string, viewer: { id?: string | null; role?: strin
             },
           },
           responsible: { select: { id: true, name: true } },
+          subStages: {
+            orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+            select: {
+              id: true,
+              stageId: true,
+              name: true,
+              description: true,
+              responsibleId: true,
+              status: true,
+              startDate: true,
+              endDate: true,
+              sortOrder: true,
+              createdAt: true,
+              updatedAt: true,
+              telegramNotificationSettings: {
+                orderBy: { createdAt: 'desc' },
+                include: { recipient: true },
+              },
+            },
+          },
+          telegramNotificationSettings: {
+            orderBy: { createdAt: 'desc' },
+            include: { recipient: true },
+          },
         },
       },
       comments: {
@@ -130,10 +169,31 @@ export default async function ProductPage({
   const { id } = await params
   const session = await auth()
   const viewer = (session?.user as any) ?? null
+  const [
+    hasTemplateStageDurationDaysColumn,
+    hasTemplateStageAutoshiftColumn,
+    hasTemplateStageStartRulesColumns,
+    hasTemplateSubStagesTable,
+  ] = await Promise.all([
+    supportsProductTemplateStageDurationDaysColumn(),
+    supportsProductTemplateStageAutoshiftColumn(),
+    supportsProductTemplateStageStartRulesColumns(),
+    supportsProductTemplateSubStagesTable(),
+  ])
 
-  const [product, users] = await Promise.all([
+  if (viewer?.id) {
+    await processDueStageStartsForProduct(id)
+  }
+
+  const [product, users, productTemplates] = await Promise.all([
     getProduct(id, viewer),
     getUsers(),
+    getCachedProductTemplates(
+      hasTemplateStageDurationDaysColumn,
+      hasTemplateStageAutoshiftColumn,
+      hasTemplateStageStartRulesColumns,
+      hasTemplateSubStagesTable
+    ),
   ])
 
   if (!product) notFound()
@@ -142,6 +202,26 @@ export default async function ProductPage({
     <ProductCardClient
       product={product as any}
       users={users}
+      productTemplates={productTemplates.map((template) => ({
+        ...template,
+        stages: template.stages.map((stage) => ({
+          id: stage.id,
+          stageTemplateId: stage.stageTemplateId,
+          stageOrder: stage.stageOrder,
+          stageName: stage.stageName,
+          plannedDate: stage.plannedDate,
+          durationDays: hasTemplateStageDurationDaysColumn ? (stage as any).durationDays ?? null : null,
+          stageTemplateDurationDays: stage.stageTemplate.durationDays ?? null,
+          participatesInAutoshift: hasTemplateStageAutoshiftColumn ? (stage as any).participatesInAutoshift ?? true : true,
+          startTrigger: hasTemplateStageStartRulesColumns ? (stage as any).startTrigger : undefined,
+          startDelayDays: hasTemplateStageStartRulesColumns ? (stage as any).startDelayDays ?? 0 : 0,
+          startReferenceStageOrder: hasTemplateStageStartRulesColumns
+            ? (stage as any).startReferenceStageOrder ?? null
+            : null,
+          subStages: hasTemplateSubStagesTable ? (stage as any).subStages ?? [] : [],
+          telegramNotificationSettings: (stage as any).telegramNotificationSettings ?? [],
+        })),
+      })) as any}
       currentUser={session?.user as any}
     />
   )

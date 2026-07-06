@@ -7,10 +7,28 @@ import { createProductTemplateStageCompat } from '@/lib/product-template-stage-c
 import {
   supportsProductTemplateStageAutoshiftColumn,
   supportsProductTemplateStageDurationDaysColumn,
+  supportsProductTemplateStageStartRulesColumns,
+  supportsProductTemplateSubStagesTable,
 } from '@/lib/schema-compat'
+import {
+  normalizeStageStartDelayDays,
+  normalizeStageStartReferenceOrder,
+  normalizeStageStartTrigger,
+} from '@/lib/stage-start-rules'
 import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
 import { sanitizeDeepStrings, sanitizeTextValue } from '@/lib/input-security'
 import { canManageProducts } from '@/lib/product-access'
+import {
+  normalizeTemplateTelegramNotifications,
+  saveTemplateTelegramNotifications,
+  templateTelegramNotificationInclude,
+} from '@/lib/template-telegram-notifications'
+import {
+  createProductTemplateSubStages,
+  normalizeTemplateSubStages,
+  templateSubStageSelect,
+  type TemplateSubStagePayload,
+} from '@/lib/template-substages'
 
 function normalizeStageName(name: string) {
   return sanitizeTextValue(name, { maxLength: 160 })
@@ -23,14 +41,20 @@ type TemplateStagePayload = {
   durationDays: number | null
   participatesInAutoshift: boolean
   stageTemplateDurationDays: number | null
+  startTrigger: string
+  startDelayDays: number
+  startReferenceStageOrder: number | null
+  subStages: TemplateSubStagePayload[]
 }
 
 export async function GET() {
   const session = await auth()
   if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const [hasDurationDaysColumn, hasAutoshiftColumn] = await Promise.all([
+  const [hasDurationDaysColumn, hasAutoshiftColumn, hasStartRulesColumns, hasTemplateSubStagesTable] = await Promise.all([
     supportsProductTemplateStageDurationDaysColumn(),
     supportsProductTemplateStageAutoshiftColumn(),
+    supportsProductTemplateStageStartRulesColumns(),
+    supportsProductTemplateSubStagesTable(),
   ])
 
   const templates = await prisma.productTemplate.findMany({
@@ -50,11 +74,30 @@ export async function GET() {
           plannedDate: true,
           ...(hasDurationDaysColumn ? { durationDays: true } : {}),
           ...(hasAutoshiftColumn ? { participatesInAutoshift: true } : {}),
+          ...(hasStartRulesColumns
+            ? {
+                startTrigger: true,
+                startDelayDays: true,
+                startReferenceStageOrder: true,
+              }
+            : {}),
           stageTemplate: {
             select: {
               durationDays: true,
             },
           },
+          telegramNotificationSettings: {
+            orderBy: { createdAt: 'desc' },
+            include: templateTelegramNotificationInclude,
+          },
+          ...(hasTemplateSubStagesTable
+            ? {
+                subStages: {
+                  orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+                  select: templateSubStageSelect,
+                },
+              }
+            : {}),
         },
       },
     },
@@ -73,6 +116,11 @@ export async function GET() {
         durationDays: hasDurationDaysColumn ? stage.durationDays ?? null : null,
         stageTemplateDurationDays: stage.stageTemplate.durationDays ?? null,
         participatesInAutoshift: hasAutoshiftColumn ? (stage as any).participatesInAutoshift ?? true : true,
+        startTrigger: normalizeStageStartTrigger((stage as any).startTrigger, stage.stageOrder),
+        startDelayDays: normalizeStageStartDelayDays((stage as any).startDelayDays),
+        startReferenceStageOrder: normalizeStageStartReferenceOrder((stage as any).startReferenceStageOrder),
+        subStages: hasTemplateSubStagesTable ? (stage as any).subStages ?? [] : [],
+        telegramNotificationSettings: stage.telegramNotificationSettings,
       })),
     }))
   )
@@ -97,9 +145,11 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = sanitizeDeepStrings(await req.json(), { preserveNewlines: true }) as any
-    const [hasDurationDaysColumn, hasAutoshiftColumn] = await Promise.all([
+    const [hasDurationDaysColumn, hasAutoshiftColumn, hasStartRulesColumns, hasTemplateSubStagesTable] = await Promise.all([
       supportsProductTemplateStageDurationDaysColumn(),
       supportsProductTemplateStageAutoshiftColumn(),
+      supportsProductTemplateStageStartRulesColumns(),
+      supportsProductTemplateSubStagesTable(),
     ])
     const templateName = sanitizeTextValue(body?.name, { maxLength: 160 })
     const description = sanitizeTextValue(body?.description, { preserveNewlines: true, maxLength: 1000 })
@@ -116,6 +166,10 @@ export async function POST(req: NextRequest) {
             : null,
         participatesInAutoshift: stage?.participatesInAutoshift !== false,
         stageTemplateDurationDays: null,
+        startTrigger: normalizeStageStartTrigger(stage?.startTrigger, index),
+        startDelayDays: normalizeStageStartDelayDays(stage?.startDelayDays),
+        startReferenceStageOrder: normalizeStageStartReferenceOrder(stage?.startReferenceStageOrder),
+        subStages: normalizeTemplateSubStages(stage?.subStages),
       }))
       .filter((stage: { stageName: string }) => stage.stageName)
 
@@ -141,6 +195,11 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       )
     }
+
+    const notificationSettings = normalizeTemplateTelegramNotifications(
+      body?.telegramNotificationSettings,
+      stages.length
+    )
 
     const template = await prisma.$transaction(async (tx) => {
       const existingStageTemplates = await tx.stageTemplate.findMany({
@@ -168,6 +227,10 @@ export async function POST(req: NextRequest) {
         plannedDate: Date | null
         durationDays: number | null
         participatesInAutoshift: boolean
+        startTrigger: string
+        startDelayDays: number
+        startReferenceStageOrder: number | null
+        subStages: TemplateSubStagePayload[]
       }> = scheduledStages.map((stage) => ({
         stageTemplateId: '',
         stageOrder: stage.stageOrder,
@@ -175,6 +238,10 @@ export async function POST(req: NextRequest) {
         plannedDate: stage.plannedDate,
         durationDays: stage.durationDays ?? null,
         participatesInAutoshift: stage.participatesInAutoshift !== false,
+        startTrigger: normalizeStageStartTrigger(stage.startTrigger, stage.stageOrder),
+        startDelayDays: normalizeStageStartDelayDays(stage.startDelayDays),
+        startReferenceStageOrder: normalizeStageStartReferenceOrder(stage.startReferenceStageOrder),
+        subStages: stage.subStages,
       }))
 
       for (const stage of resolvedStages) {
@@ -218,8 +285,10 @@ export async function POST(req: NextRequest) {
         select: { id: true },
       })
 
+      const createdTemplateStages = []
+
       for (const stage of resolvedStages) {
-        await createProductTemplateStageCompat(tx as any, {
+        const createdStage = await createProductTemplateStageCompat(tx as any, {
           productTemplateId: createdTemplate.id,
           stageTemplateId: stage.stageTemplateId,
           stageOrder: stage.stageOrder,
@@ -227,8 +296,22 @@ export async function POST(req: NextRequest) {
           plannedDate: stage.plannedDate,
           durationDays: stage.durationDays ?? null,
           participatesInAutoshift: stage.participatesInAutoshift,
+          startTrigger: stage.startTrigger,
+          startDelayDays: stage.startDelayDays,
+          startReferenceStageOrder: stage.startReferenceStageOrder,
         })
+        createdTemplateStages.push(createdStage)
+        if (hasTemplateSubStagesTable && stage.subStages.length > 0) {
+          await createProductTemplateSubStages(tx as any, createdStage.id, stage.subStages)
+        }
       }
+
+      await saveTemplateTelegramNotifications(
+        tx as any,
+        createdTemplate.id,
+        createdTemplateStages,
+        notificationSettings
+      )
 
       return tx.productTemplate.findUniqueOrThrow({
         where: { id: createdTemplate.id },
@@ -243,11 +326,30 @@ export async function POST(req: NextRequest) {
               plannedDate: true,
               ...(hasDurationDaysColumn ? { durationDays: true } : {}),
               ...(hasAutoshiftColumn ? { participatesInAutoshift: true } : {}),
+              ...(hasStartRulesColumns
+                ? {
+                    startTrigger: true,
+                    startDelayDays: true,
+                    startReferenceStageOrder: true,
+                  }
+                : {}),
               stageTemplate: {
                 select: {
                   durationDays: true,
                 },
               },
+              telegramNotificationSettings: {
+                orderBy: { createdAt: 'desc' },
+                include: templateTelegramNotificationInclude,
+              },
+              ...(hasTemplateSubStagesTable
+                ? {
+                    subStages: {
+                      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+                      select: templateSubStageSelect,
+                    },
+                  }
+                : {}),
             },
           },
         },
@@ -265,6 +367,11 @@ export async function POST(req: NextRequest) {
         durationDays: hasDurationDaysColumn ? stage.durationDays ?? null : null,
         stageTemplateDurationDays: stage.stageTemplate.durationDays ?? null,
         participatesInAutoshift: hasAutoshiftColumn ? (stage as any).participatesInAutoshift ?? true : true,
+        startTrigger: normalizeStageStartTrigger((stage as any).startTrigger, stage.stageOrder),
+        startDelayDays: normalizeStageStartDelayDays((stage as any).startDelayDays),
+        startReferenceStageOrder: normalizeStageStartReferenceOrder((stage as any).startReferenceStageOrder),
+        subStages: hasTemplateSubStagesTable ? (stage as any).subStages ?? [] : [],
+        telegramNotificationSettings: stage.telegramNotificationSettings,
       })),
     }, { status: 201 })
   } catch (error) {

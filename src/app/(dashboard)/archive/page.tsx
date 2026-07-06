@@ -6,14 +6,23 @@ import { getCachedAssignableUsers, getCachedProductTemplates, getCachedStageSugg
 import {
   supportsProductTemplateStageAutoshiftColumn,
   supportsProductTemplateStageDurationDaysColumn,
+  supportsProductTemplateStageStartRulesColumns,
+  supportsProductTemplateSubStagesTable,
 } from '@/lib/schema-compat'
 import { canManageArchive, canViewAllProducts, getVisibleProductWhere } from '@/lib/product-access'
 import { getFinalDateFromStages } from '@/lib/product-derived-fields'
 
 async function getArchiveWorkspaceData(viewer: { id?: string | null; role?: string | null }) {
-  const [hasTemplateStageDurationDaysColumn, hasTemplateStageAutoshiftColumn] = await Promise.all([
+  const [
+    hasTemplateStageDurationDaysColumn,
+    hasTemplateStageAutoshiftColumn,
+    hasTemplateStageStartRulesColumns,
+    hasTemplateSubStagesTable,
+  ] = await Promise.all([
     supportsProductTemplateStageDurationDaysColumn(),
     supportsProductTemplateStageAutoshiftColumn(),
+    supportsProductTemplateStageStartRulesColumns(),
+    supportsProductTemplateSubStagesTable(),
   ])
   const visibleProductsWhere = getVisibleProductWhere(viewer, { isArchived: true })
 
@@ -66,7 +75,12 @@ async function getArchiveWorkspaceData(viewer: { id?: string | null; role?: stri
     }),
     getCachedAssignableUsers(),
     getCachedStageTemplates(),
-    getCachedProductTemplates(hasTemplateStageDurationDaysColumn, hasTemplateStageAutoshiftColumn),
+    getCachedProductTemplates(
+      hasTemplateStageDurationDaysColumn,
+      hasTemplateStageAutoshiftColumn,
+      hasTemplateStageStartRulesColumns,
+      hasTemplateSubStagesTable
+    ),
     getCachedStageSuggestions(),
   ])
 
@@ -84,6 +98,8 @@ async function getArchiveWorkspaceData(viewer: { id?: string | null; role?: stri
     stageSuggestions,
     hasTemplateStageDurationDaysColumn,
     hasTemplateStageAutoshiftColumn,
+    hasTemplateStageStartRulesColumns,
+    hasTemplateSubStagesTable,
   }
 }
 
@@ -114,6 +130,13 @@ export default async function ArchivePage() {
           durationDays: data.hasTemplateStageDurationDaysColumn ? (stage as any).durationDays ?? null : null,
           stageTemplateDurationDays: stage.stageTemplate.durationDays ?? null,
           participatesInAutoshift: data.hasTemplateStageAutoshiftColumn ? (stage as any).participatesInAutoshift ?? true : true,
+          startTrigger: data.hasTemplateStageStartRulesColumns ? (stage as any).startTrigger : undefined,
+          startDelayDays: data.hasTemplateStageStartRulesColumns ? (stage as any).startDelayDays ?? 0 : 0,
+          startReferenceStageOrder: data.hasTemplateStageStartRulesColumns
+            ? (stage as any).startReferenceStageOrder ?? null
+            : null,
+          subStages: data.hasTemplateSubStagesTable ? (stage as any).subStages ?? [] : [],
+          telegramNotificationSettings: (stage as any).telegramNotificationSettings ?? [],
         })),
       })) as any}
       stageSuggestions={data.stageSuggestions}

@@ -1,5 +1,6 @@
 import { unstable_cache } from 'next/cache'
 import { prisma } from '@/lib/prisma'
+import { templateSubStageSelect } from '@/lib/template-substages'
 
 const REFERENCE_REVALIDATE_SECONDS = 60
 
@@ -41,39 +42,6 @@ const getCachedStageSuggestionsInternal = unstable_cache(
   { revalidate: REFERENCE_REVALIDATE_SECONDS }
 )
 
-const getCachedProductTemplatesInternal = unstable_cache(
-  async (hasDurationDaysColumn: boolean, hasAutoshiftColumn: boolean) =>
-    prisma.productTemplate.findMany({
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        createdAt: true,
-        updatedAt: true,
-        stages: {
-          orderBy: { stageOrder: 'asc' },
-          select: {
-            id: true,
-            stageTemplateId: true,
-            stageOrder: true,
-            stageName: true,
-            plannedDate: true,
-            ...(hasDurationDaysColumn ? { durationDays: true } : {}),
-            ...(hasAutoshiftColumn ? { participatesInAutoshift: true } : {}),
-            stageTemplate: {
-              select: {
-                durationDays: true,
-              },
-            },
-          },
-        },
-      },
-      orderBy: [{ createdAt: 'desc' }],
-    }),
-  ['product-templates-v1'],
-  { revalidate: REFERENCE_REVALIDATE_SECONDS }
-)
-
 export async function getCachedAssignableUsers() {
   return getCachedAssignableUsersInternal()
 }
@@ -86,6 +54,56 @@ export async function getCachedStageSuggestions() {
   return getCachedStageSuggestionsInternal()
 }
 
-export async function getCachedProductTemplates(hasDurationDaysColumn: boolean, hasAutoshiftColumn: boolean) {
-  return getCachedProductTemplatesInternal(hasDurationDaysColumn, hasAutoshiftColumn)
+export async function getCachedProductTemplates(
+  hasDurationDaysColumn: boolean,
+  hasAutoshiftColumn: boolean,
+  hasStartRulesColumns = true,
+  hasTemplateSubStagesTable = true
+) {
+  return prisma.productTemplate.findMany({
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      createdAt: true,
+      updatedAt: true,
+      stages: {
+        orderBy: { stageOrder: 'asc' },
+        select: {
+          id: true,
+          stageTemplateId: true,
+          stageOrder: true,
+          stageName: true,
+          plannedDate: true,
+          ...(hasDurationDaysColumn ? { durationDays: true } : {}),
+          ...(hasAutoshiftColumn ? { participatesInAutoshift: true } : {}),
+          ...(hasStartRulesColumns
+            ? {
+                startTrigger: true,
+                startDelayDays: true,
+                startReferenceStageOrder: true,
+              }
+            : {}),
+          stageTemplate: {
+            select: {
+              durationDays: true,
+            },
+          },
+          telegramNotificationSettings: {
+            orderBy: { createdAt: 'desc' },
+            include: { recipient: true },
+          },
+          ...(hasTemplateSubStagesTable
+            ? {
+                subStages: {
+                  orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+                  select: templateSubStageSelect,
+                },
+              }
+            : {}),
+        },
+      },
+    },
+    orderBy: [{ createdAt: 'desc' }],
+  })
 }

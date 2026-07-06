@@ -2,23 +2,34 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Check, ChevronDown, Layers3, Plus, Save, Trash2 } from 'lucide-react'
+import { ArrowLeft, Bell, Check, ChevronDown, Layers3, ListChecks, Plus, Save, Trash2, Zap } from 'lucide-react'
 import Link from 'next/link'
 import { DatePicker } from '@/components/ui/DatePicker'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
-import type { ProductTemplateData, ProductTemplateStageData } from '@/types'
+import type { ProductTemplateData, ProductTemplateStageData, StageStartTrigger } from '@/types'
 import { serializeDateOnly } from '@/lib/date-only'
-import { formatDate } from '@/lib/utils'
 import {
   applySequentialStageDateOverride,
   fillMissingSequentialStageDates,
 } from '@/lib/stage-schedule'
+import {
+  normalizeStageStartDelayDays,
+  normalizeStageStartReferenceOrder,
+  normalizeStageStartTrigger,
+} from '@/lib/stage-start-rules'
 
 const PRIORITIES = [
   { value: 'CRITICAL', label: 'Критический' },
   { value: 'HIGH', label: 'Высокий' },
   { value: 'MEDIUM', label: 'Средний' },
   { value: 'LOW', label: 'Низкий' },
+]
+
+const STAGE_START_TRIGGER_OPTIONS: Array<{ value: StageStartTrigger; label: string }> = [
+  { value: 'PRODUCT_CREATED', label: 'От создания' },
+  { value: 'PREVIOUS_STAGE_COMPLETED', label: 'После предыдущего' },
+  { value: 'STAGE_STARTED', label: 'После старта этапа' },
+  { value: 'STAGE_COMPLETED', label: 'После завершения этапа' },
 ]
 
 interface TemplateDraftStage {
@@ -28,11 +39,58 @@ interface TemplateDraftStage {
   durationDays: number | null
   effectiveDurationDays?: number | null
   participatesInAutoshift: boolean
+  startTrigger: StageStartTrigger
+  startDelayDays: number
+  startReferenceStageOrder: number | null
+  subStages: TemplateChecklistItem[]
 }
 
 interface SelectedTemplateStageOverride extends ProductTemplateStageData {
   effectiveDurationDays?: number | null
+  subStages?: TemplateChecklistItem[]
 }
+
+interface TemplateChecklistItem {
+  id: string
+  name: string
+  description: string | null
+  responsibleId: string | null
+  notifyOnStart: boolean
+  notifyOnComplete: boolean
+  telegramRecipientType: 'user' | 'chat'
+  telegramRecipientId: string
+  telegramMessageTemplate: string
+  telegramCustomMessage: string
+  sortOrder: number
+}
+
+interface TemplateTelegramDraft {
+  isEnabled: boolean
+  recipientType: 'user' | 'chat'
+  recipientId: string
+  messageTemplate: string
+  customMessage: string
+}
+
+type TemplateStageCardLike = {
+  id: string
+  stageName: string
+  plannedDate: Date | null
+  durationDays?: number | null
+  effectiveDurationDays?: number | null
+  participatesInAutoshift: boolean
+  startTrigger?: StageStartTrigger
+  startDelayDays?: number | null
+  startReferenceStageOrder?: number | null
+  subStages?: TemplateChecklistItem[]
+}
+
+const TEMPLATE_TELEGRAM_EVENTS = [
+  { value: 'stage_completed', label: 'Завершение этапа', defaultTemplate: 'stage_completed_simple' },
+  { value: 'stage_started', label: 'Начало этапа', defaultTemplate: 'stage_started_simple' },
+] as const
+
+type TemplateTelegramEventType = (typeof TEMPLATE_TELEGRAM_EVENTS)[number]['value']
 
 interface NewProductFormProps {
   users: Array<{ id: string; name: string }>
@@ -52,7 +110,46 @@ function createDraftStage(index = 0): TemplateDraftStage {
     durationDays: index === 0 ? 1 : null,
     effectiveDurationDays: index === 0 ? 1 : null,
     participatesInAutoshift: true,
+    startTrigger: index === 0 ? 'PRODUCT_CREATED' : 'PREVIOUS_STAGE_COMPLETED',
+    startDelayDays: 0,
+    startReferenceStageOrder: null,
+    subStages: [],
   }
+}
+
+function createTemplateChecklistItem(index = 0): TemplateChecklistItem {
+  return {
+    id: `substage-${Math.random().toString(36).slice(2, 10)}`,
+    name: '',
+    description: null,
+    responsibleId: null,
+    notifyOnStart: false,
+    notifyOnComplete: true,
+    telegramRecipientType: 'user',
+    telegramRecipientId: '',
+    telegramMessageTemplate: 'substage_completed_simple',
+    telegramCustomMessage: '',
+    sortOrder: index,
+  }
+}
+
+function normalizeTemplateChecklistItems(subStages: any[] | undefined): TemplateChecklistItem[] {
+  return (Array.isArray(subStages) ? subStages : [])
+    .map((subStage, index) => ({
+      id: String(subStage?.id || `substage-${Math.random().toString(36).slice(2, 10)}`),
+      name: String(subStage?.name || ''),
+      description: subStage?.description || null,
+      responsibleId: subStage?.responsibleId || null,
+      notifyOnStart: false,
+      notifyOnComplete: subStage?.notifyOnComplete !== false,
+      telegramRecipientType: (subStage?.telegramRecipientType === 'chat' ? 'chat' : 'user') as 'user' | 'chat',
+      telegramRecipientId: String(subStage?.telegramRecipientId || ''),
+      telegramMessageTemplate: String(subStage?.telegramMessageTemplate || 'substage_completed_simple'),
+      telegramCustomMessage: String(subStage?.telegramCustomMessage || ''),
+      sortOrder: Number.isInteger(Number(subStage?.sortOrder)) ? Number(subStage.sortOrder) : index,
+    }))
+    .filter((subStage) => subStage.name.trim())
+    .map((subStage, index) => ({ ...subStage, sortOrder: index }))
 }
 
 function hydrateSelectedTemplateStages(stages: ProductTemplateStageData[]) {
@@ -62,12 +159,94 @@ function hydrateSelectedTemplateStages(stages: ProductTemplateStageData[]) {
       plannedDate: stage.plannedDate ? new Date(stage.plannedDate) : null,
       durationDays: stage.durationDays ?? null,
       stageTemplateDurationDays: stage.stageTemplateDurationDays ?? null,
+      startTrigger: normalizeStageStartTrigger(stage.startTrigger, stage.stageOrder),
+      startDelayDays: normalizeStageStartDelayDays(stage.startDelayDays),
+      startReferenceStageOrder: normalizeStageStartReferenceOrder(stage.startReferenceStageOrder),
+      subStages: normalizeTemplateChecklistItems(stage.subStages as any),
     }))
   ).map((stage) => ({
     ...stage,
     durationDays: stage.durationDays ?? null,
     effectiveDurationDays: stage.effectiveDurationDays,
+    startTrigger: normalizeStageStartTrigger(stage.startTrigger, stage.stageOrder),
+    startDelayDays: normalizeStageStartDelayDays(stage.startDelayDays),
+    startReferenceStageOrder: normalizeStageStartReferenceOrder(stage.startReferenceStageOrder),
+    subStages: normalizeTemplateChecklistItems(stage.subStages as any),
   }))
+}
+
+function getTemplateTelegramDraftKey(stageId: string, eventType: TemplateTelegramEventType) {
+  return `${stageId}:${eventType}`
+}
+
+function getDefaultTemplateTelegramMessage(_eventType: TemplateTelegramEventType) {
+  return _eventType === 'stage_started' ? 'stage_started_simple' : 'stage_completed_simple'
+}
+
+function createTemplateTelegramDraft(setting?: any, eventType: TemplateTelegramEventType = 'stage_completed'): TemplateTelegramDraft {
+  return {
+    isEnabled: Boolean(setting?.isEnabled),
+    recipientType: setting?.recipientType === 'chat' ? 'chat' : 'user',
+    recipientId: setting?.recipientId || '',
+    messageTemplate: setting?.messageTemplate || getDefaultTemplateTelegramMessage(eventType),
+    customMessage: setting?.customMessage || '',
+  }
+}
+
+function getTemplateStageTelegramSetting(stage: { telegramNotificationSettings?: any[] }, eventType: TemplateTelegramEventType) {
+  return (stage.telegramNotificationSettings || []).find((setting) => setting.eventType === eventType) || null
+}
+
+function hydrateTemplateTelegramDrafts(stages: Array<{ id: string; telegramNotificationSettings?: any[] }>) {
+  const next: Record<string, TemplateTelegramDraft> = {}
+
+  for (const stage of stages) {
+    for (const eventOption of TEMPLATE_TELEGRAM_EVENTS) {
+      const setting = getTemplateStageTelegramSetting(stage, eventOption.value)
+      if (setting) {
+        next[getTemplateTelegramDraftKey(stage.id, eventOption.value)] = createTemplateTelegramDraft(
+          setting,
+          eventOption.value
+        )
+      }
+    }
+  }
+
+  return next
+}
+
+function getTemplateTelegramDraft(
+  drafts: Record<string, TemplateTelegramDraft>,
+  stageId: string,
+  eventType: TemplateTelegramEventType
+) {
+  return drafts[getTemplateTelegramDraftKey(stageId, eventType)] || createTemplateTelegramDraft(null, eventType)
+}
+
+function buildTemplateTelegramSettingsPayload(
+  stages: Array<{ id: string }>,
+  drafts: Record<string, TemplateTelegramDraft>
+) {
+  return stages.flatMap((stage, index) =>
+    TEMPLATE_TELEGRAM_EVENTS.flatMap((eventOption) => {
+      const draft = drafts[getTemplateTelegramDraftKey(stage.id, eventOption.value)]
+      if (!draft) return []
+
+      const hasCustomContent = draft.customMessage.trim().length > 0
+      const hasRecipient = draft.recipientId.trim().length > 0
+      if (!draft.isEnabled && !hasRecipient && !hasCustomContent) return []
+
+      return [{
+        stageOrder: index,
+        eventType: eventOption.value,
+        recipientType: draft.recipientType,
+        recipientId: draft.recipientId || null,
+        messageTemplate: draft.messageTemplate || eventOption.defaultTemplate,
+        customMessage: draft.customMessage.trim() || null,
+        isEnabled: draft.isEnabled,
+      }]
+    })
+  )
 }
 
 export function NewProductForm({
@@ -98,6 +277,10 @@ export function NewProductForm({
   const [selectedTemplateStages, setSelectedTemplateStages] = useState<SelectedTemplateStageOverride[]>([])
   const [selectedTemplateName, setSelectedTemplateName] = useState('')
   const [selectedTemplateDescription, setSelectedTemplateDescription] = useState('')
+  const [telegramRecipients, setTelegramRecipients] = useState<any[]>([])
+  const [telegramRecipientsLoading, setTelegramRecipientsLoading] = useState(false)
+  const [templateTelegramDrafts, setTemplateTelegramDrafts] = useState<Record<string, TemplateTelegramDraft>>({})
+  const [selectedTemplateTelegramDrafts, setSelectedTemplateTelegramDrafts] = useState<Record<string, TemplateTelegramDraft>>({})
   const templateSelectRef = useRef<HTMLDivElement | null>(null)
 
   const [form, setForm] = useState({
@@ -126,6 +309,7 @@ export function NewProductForm({
       setSelectedTemplateName('')
       setSelectedTemplateDescription('')
       setSelectedTemplateError('')
+      setSelectedTemplateTelegramDrafts({})
       return
     }
 
@@ -135,7 +319,29 @@ export function NewProductForm({
     setSelectedTemplateStages(
       hydrateSelectedTemplateStages(selectedTemplate.stages)
     )
+    setSelectedTemplateTelegramDrafts(hydrateTemplateTelegramDrafts(selectedTemplate.stages))
   }, [selectedTemplate])
+
+  useEffect(() => {
+    let cancelled = false
+    setTelegramRecipientsLoading(true)
+
+    fetch('/api/telegram/recipients')
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error('Не удалось загрузить Telegram-получателей')))
+      .then((data) => {
+        if (!cancelled) setTelegramRecipients(Array.isArray(data?.recipients) ? data.recipients : [])
+      })
+      .catch(() => {
+        if (!cancelled) setTelegramRecipients([])
+      })
+      .finally(() => {
+        if (!cancelled) setTelegramRecipientsLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     if (!templateSelectOpen) return
@@ -185,13 +391,17 @@ export function NewProductForm({
             nextStages,
             targetIndex,
             nextStages[targetIndex].plannedDate
-          ).map((stage) => ({
+          ).map((stage, index) => ({
             id: stage.id,
             stageName: stage.stageName,
             plannedDate: stage.plannedDate,
             durationDays: stage.durationDays ?? null,
             effectiveDurationDays: stage.effectiveDurationDays,
             participatesInAutoshift: stage.participatesInAutoshift,
+            startTrigger: normalizeStageStartTrigger(stage.startTrigger, index),
+            startDelayDays: normalizeStageStartDelayDays(stage.startDelayDays),
+            startReferenceStageOrder: normalizeStageStartReferenceOrder(stage.startReferenceStageOrder),
+            subStages: normalizeTemplateChecklistItems((stage as any).subStages),
           }))
         }
 
@@ -231,6 +441,10 @@ export function NewProductForm({
             ...stage,
             durationDays: stage.durationDays ?? null,
             effectiveDurationDays: stage.effectiveDurationDays,
+            startTrigger: normalizeStageStartTrigger(stage.startTrigger, stage.stageOrder),
+            startDelayDays: normalizeStageStartDelayDays(stage.startDelayDays),
+            startReferenceStageOrder: normalizeStageStartReferenceOrder(stage.startReferenceStageOrder),
+            subStages: normalizeTemplateChecklistItems((stage as any).subStages),
           }))
         }
 
@@ -252,13 +466,17 @@ export function NewProductForm({
         nextStages,
         anchorIndex,
         nextStages[anchorIndex].plannedDate
-      ).map((stage) => ({
+      ).map((stage, index) => ({
         id: stage.id,
         stageName: stage.stageName,
         plannedDate: stage.plannedDate,
         durationDays: stage.durationDays ?? null,
         effectiveDurationDays: stage.effectiveDurationDays,
         participatesInAutoshift: stage.participatesInAutoshift,
+        startTrigger: normalizeStageStartTrigger(stage.startTrigger, index),
+        startDelayDays: normalizeStageStartDelayDays(stage.startDelayDays),
+        startReferenceStageOrder: normalizeStageStartReferenceOrder(stage.startReferenceStageOrder),
+        subStages: normalizeTemplateChecklistItems((stage as any).subStages),
       }))
     })
   }
@@ -266,7 +484,18 @@ export function NewProductForm({
   const removeTemplateStage = (stageId: string) => {
     setTemplateStages((prev) => {
       if (prev.length === 1) {
-        return [{ ...prev[0], stageName: '', plannedDate: null, durationDays: 1, effectiveDurationDays: 1, participatesInAutoshift: true }]
+        return [{
+          ...prev[0],
+          stageName: '',
+          plannedDate: null,
+          durationDays: 1,
+          effectiveDurationDays: 1,
+          participatesInAutoshift: true,
+          startTrigger: 'PRODUCT_CREATED',
+          startDelayDays: 0,
+          startReferenceStageOrder: null,
+          subStages: [],
+        }]
       }
       const removedIndex = prev.findIndex((stage) => stage.id === stageId)
       const nextStages = prev.filter((stage) => stage.id !== stageId)
@@ -276,14 +505,74 @@ export function NewProductForm({
         nextStages,
         anchorIndex,
         nextStages[anchorIndex].plannedDate
-      ).map((stage) => ({
+      ).map((stage, index) => ({
         id: stage.id,
         stageName: stage.stageName,
         plannedDate: stage.plannedDate,
         durationDays: stage.durationDays ?? null,
         effectiveDurationDays: stage.effectiveDurationDays,
         participatesInAutoshift: stage.participatesInAutoshift,
+        startTrigger: normalizeStageStartTrigger(stage.startTrigger, index),
+        startDelayDays: normalizeStageStartDelayDays(stage.startDelayDays),
+        startReferenceStageOrder: normalizeStageStartReferenceOrder(stage.startReferenceStageOrder),
+        subStages: normalizeTemplateChecklistItems((stage as any).subStages),
       }))
+    })
+  }
+
+  const updateTemplateChecklistItem = (
+    stageId: string,
+    itemId: string,
+    patch: Partial<TemplateChecklistItem>
+  ) => {
+    updateTemplateStage(stageId, {
+      subStages: (templateStages.find((stage) => stage.id === stageId)?.subStages || []).map((item) =>
+        item.id === itemId ? { ...item, ...patch } : item
+      ),
+    })
+  }
+
+  const addTemplateChecklistItem = (stageId: string) => {
+    const stage = templateStages.find((candidate) => candidate.id === stageId)
+    updateTemplateStage(stageId, {
+      subStages: [...(stage?.subStages || []), createTemplateChecklistItem(stage?.subStages?.length || 0)],
+    })
+  }
+
+  const removeTemplateChecklistItem = (stageId: string, itemId: string) => {
+    const stage = templateStages.find((candidate) => candidate.id === stageId)
+    updateTemplateStage(stageId, {
+      subStages: (stage?.subStages || [])
+        .filter((item) => item.id !== itemId)
+        .map((item, index) => ({ ...item, sortOrder: index })),
+    })
+  }
+
+  const updateSelectedTemplateChecklistItem = (
+    stageId: string,
+    itemId: string,
+    patch: Partial<TemplateChecklistItem>
+  ) => {
+    updateSelectedTemplateStage(stageId, {
+      subStages: (selectedTemplateStages.find((stage) => stage.id === stageId)?.subStages || []).map((item) =>
+        item.id === itemId ? { ...item, ...patch } : item
+      ),
+    })
+  }
+
+  const addSelectedTemplateChecklistItem = (stageId: string) => {
+    const stage = selectedTemplateStages.find((candidate) => candidate.id === stageId)
+    updateSelectedTemplateStage(stageId, {
+      subStages: [...(stage?.subStages || []), createTemplateChecklistItem(stage?.subStages?.length || 0)],
+    })
+  }
+
+  const removeSelectedTemplateChecklistItem = (stageId: string, itemId: string) => {
+    const stage = selectedTemplateStages.find((candidate) => candidate.id === stageId)
+    updateSelectedTemplateStage(stageId, {
+      subStages: (stage?.subStages || [])
+        .filter((item) => item.id !== itemId)
+        .map((item, index) => ({ ...item, sortOrder: index })),
     })
   }
 
@@ -291,6 +580,7 @@ export function NewProductForm({
     setTemplateDraftName('')
     setTemplateDraftDescription('')
     setTemplateStages([createDraftStage(0)])
+    setTemplateTelegramDrafts({})
     setTemplateError('')
     setShowTemplateBuilder(false)
   }
@@ -298,11 +588,16 @@ export function NewProductForm({
   const buildTemplateDraftPayload = () => {
     const normalizedName = templateDraftName.trim()
     const normalizedStages = templateStages
-      .map((stage) => ({
+      .map((stage, index) => ({
+        id: stage.id,
         stageName: stage.stageName.trim(),
         plannedDate: stage.plannedDate,
         durationDays: stage.durationDays ?? null,
         participatesInAutoshift: stage.participatesInAutoshift,
+        startTrigger: normalizeStageStartTrigger(stage.startTrigger, index),
+        startDelayDays: normalizeStageStartDelayDays(stage.startDelayDays),
+        startReferenceStageOrder: normalizeStageStartReferenceOrder(stage.startReferenceStageOrder),
+        subStages: normalizeTemplateChecklistItems(stage.subStages),
       }))
       .filter((stage) => stage.stageName)
 
@@ -340,7 +635,12 @@ export function NewProductForm({
             plannedDate: serializeDateOnly(stage.plannedDate),
             durationDays: stage.durationDays ?? null,
             participatesInAutoshift: stage.participatesInAutoshift,
+            startTrigger: stage.startTrigger,
+            startDelayDays: stage.startDelayDays,
+            startReferenceStageOrder: stage.startReferenceStageOrder,
+            subStages: normalizeTemplateChecklistItems(stage.subStages),
           })),
+          telegramNotificationSettings: buildTemplateTelegramSettingsPayload(normalizedStages, templateTelegramDrafts),
         }),
       })
 
@@ -352,6 +652,7 @@ export function NewProductForm({
 
       setTemplates((prev) => [data, ...prev])
       setSelectedTemplateStages(hydrateSelectedTemplateStages(Array.isArray(data?.stages) ? data.stages : []))
+      setSelectedTemplateTelegramDrafts(hydrateTemplateTelegramDrafts(Array.isArray(data?.stages) ? data.stages : []))
       setForm((prev) => ({ ...prev, productTemplateId: data.id }))
       resetTemplateBuilder()
       return data as ProductTemplateData
@@ -393,8 +694,9 @@ export function NewProductForm({
       setTemplates((prev) => prev.filter((template) => template.id !== templateToDelete.id))
       if (form.productTemplateId === templateToDelete.id) {
         setForm((prev) => ({ ...prev, productTemplateId: '' }))
-        setSelectedTemplateStages([])
-      }
+      setSelectedTemplateStages([])
+      setSelectedTemplateTelegramDrafts({})
+    }
       setTemplateSelectOpen(false)
       setTemplateToDelete(null)
       router.refresh()
@@ -410,12 +712,16 @@ export function NewProductForm({
 
     const normalizedName = selectedTemplateName.trim()
     const normalizedStages = selectedTemplateStages
-      .map((stage) => ({
+      .map((stage, index) => ({
         id: stage.id,
         stageName: stage.stageName.trim(),
         plannedDate: stage.plannedDate,
         durationDays: stage.durationDays ?? null,
         participatesInAutoshift: stage.participatesInAutoshift,
+        startTrigger: normalizeStageStartTrigger(stage.startTrigger, index),
+        startDelayDays: normalizeStageStartDelayDays(stage.startDelayDays),
+        startReferenceStageOrder: normalizeStageStartReferenceOrder(stage.startReferenceStageOrder),
+        subStages: normalizeTemplateChecklistItems(stage.subStages),
       }))
       .filter((stage) => stage.stageName)
 
@@ -445,7 +751,15 @@ export function NewProductForm({
             plannedDate: serializeDateOnly(stage.plannedDate),
             durationDays: stage.durationDays ?? null,
             participatesInAutoshift: stage.participatesInAutoshift,
+            startTrigger: stage.startTrigger,
+            startDelayDays: stage.startDelayDays,
+            startReferenceStageOrder: stage.startReferenceStageOrder,
+            subStages: normalizeTemplateChecklistItems(stage.subStages),
           })),
+          telegramNotificationSettings: buildTemplateTelegramSettingsPayload(
+            selectedTemplateStages,
+            selectedTemplateTelegramDrafts
+          ),
         }),
       })
 
@@ -463,6 +777,7 @@ export function NewProductForm({
       setSelectedTemplateStages(
         hydrateSelectedTemplateStages(Array.isArray(data?.stages) ? data.stages : [])
       )
+      setSelectedTemplateTelegramDrafts(hydrateTemplateTelegramDrafts(Array.isArray(data?.stages) ? data.stages : []))
       router.refresh()
     } catch (err: any) {
       setSelectedTemplateError(err.message || 'Не удалось обновить шаблон этапов')
@@ -514,6 +829,10 @@ export function NewProductForm({
             plannedDate: serializeDateOnly(stage.plannedDate),
             durationDays: stage.durationDays ?? null,
             participatesInAutoshift: stage.participatesInAutoshift,
+            startTrigger: stage.startTrigger,
+            startDelayDays: stage.startDelayDays,
+            startReferenceStageOrder: stage.startReferenceStageOrder,
+            subStages: normalizeTemplateChecklistItems(stage.subStages),
           })),
           responsibleId: form.responsibleId || null,
           country: form.country || null,
@@ -568,10 +887,582 @@ export function NewProductForm({
           plannedDate: serializeDateOnly(stage.plannedDate),
           durationDays: stage.durationDays ?? null,
           participatesInAutoshift: stage.participatesInAutoshift,
+          startTrigger: stage.startTrigger,
+          startDelayDays: stage.startDelayDays,
+          startReferenceStageOrder: stage.startReferenceStageOrder,
+          subStages: normalizeTemplateChecklistItems(stage.subStages),
         }))
       ),
     [selectedTemplateStages]
   )
+
+  const updateTemplateTelegramDraft = (
+    stageId: string,
+    eventType: TemplateTelegramEventType,
+    patch: Partial<TemplateTelegramDraft>
+  ) => {
+    setTemplateTelegramDrafts((prev) => ({
+      ...prev,
+      [getTemplateTelegramDraftKey(stageId, eventType)]: {
+        ...getTemplateTelegramDraft(prev, stageId, eventType),
+        ...patch,
+      },
+    }))
+  }
+
+  const updateSelectedTemplateTelegramDraft = (
+    stageId: string,
+    eventType: TemplateTelegramEventType,
+    patch: Partial<TemplateTelegramDraft>
+  ) => {
+    setSelectedTemplateTelegramDrafts((prev) => ({
+      ...prev,
+      [getTemplateTelegramDraftKey(stageId, eventType)]: {
+        ...getTemplateTelegramDraft(prev, stageId, eventType),
+        ...patch,
+      },
+    }))
+  }
+
+  const renderStageStartRuleControls = <T extends {
+    id: string
+    stageName: string
+    startTrigger?: StageStartTrigger
+    startDelayDays?: number | null
+    startReferenceStageOrder?: number | null
+  }>(
+    stage: T,
+    index: number,
+    stages: T[],
+    onChange: (stageId: string, patch: Partial<T>) => void
+  ) => {
+    const trigger = normalizeStageStartTrigger(stage.startTrigger, index)
+    const requiresReference = trigger === 'STAGE_STARTED' || trigger === 'STAGE_COMPLETED'
+    const referenceOrder = normalizeStageStartReferenceOrder(stage.startReferenceStageOrder)
+
+    return (
+      <details className="group rounded-[18px] bg-background/40">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-3 marker:hidden">
+          <span className="flex min-w-0 items-center gap-2 text-sm font-semibold text-foreground">
+            <Zap className="h-4 w-4 flex-shrink-0 text-primary" />
+            <span className="truncate">Дополнительно: автостарт</span>
+          </span>
+          <ChevronDown className="h-4 w-4 flex-shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+        </summary>
+        <div className="grid gap-3 px-3 pb-3 pt-1 sm:grid-cols-[minmax(0,1fr)_96px] xl:grid-cols-[minmax(0,1fr)_96px_minmax(0,1fr)]">
+          <label className="min-w-0 space-y-1 text-xs font-medium text-muted-foreground">
+            Условие запуска
+            <select
+              value={trigger}
+              onChange={(event) => {
+                const nextTrigger = event.target.value as StageStartTrigger
+                onChange(stage.id, {
+                  startTrigger: nextTrigger,
+                  startReferenceStageOrder:
+                    nextTrigger === 'STAGE_STARTED' || nextTrigger === 'STAGE_COMPLETED'
+                      ? referenceOrder ?? Math.max(0, index - 1)
+                      : null,
+                } as Partial<T>)
+              }}
+              className="input h-10 w-full min-w-0 py-1 text-sm"
+            >
+              {STAGE_START_TRIGGER_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="min-w-0 space-y-1 text-xs font-medium text-muted-foreground">
+            Через дней
+            <input
+              type="number"
+              min={0}
+              step={1}
+              value={normalizeStageStartDelayDays(stage.startDelayDays)}
+              onChange={(event) =>
+                onChange(stage.id, {
+                  startDelayDays: normalizeStageStartDelayDays(event.target.value),
+                } as Partial<T>)
+              }
+              className="input h-10 w-full min-w-0 py-1 text-sm"
+            />
+          </label>
+
+          <label className="min-w-0 space-y-1 text-xs font-medium text-muted-foreground sm:col-span-2 xl:col-span-1">
+            Опорный этап
+            <select
+              value={requiresReference ? referenceOrder ?? '' : ''}
+              onChange={(event) =>
+                onChange(stage.id, {
+                  startReferenceStageOrder: normalizeStageStartReferenceOrder(event.target.value),
+                } as Partial<T>)
+              }
+              disabled={!requiresReference}
+              className="input h-10 w-full min-w-0 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <option value="">{requiresReference ? 'Выберите этап' : 'Не требуется'}</option>
+              {stages.map((candidate, candidateIndex) => {
+                if (candidateIndex === index) return null
+
+                return (
+                  <option key={candidate.id} value={candidateIndex}>
+                    {candidateIndex + 1}. {candidate.stageName || 'Без названия'}
+                  </option>
+                )
+              })}
+            </select>
+          </label>
+        </div>
+      </details>
+    )
+  }
+
+  const renderTemplateChecklist = (
+    stageId: string,
+    items: TemplateChecklistItem[] = [],
+    onAdd: (stageId: string) => void,
+    onUpdate: (stageId: string, itemId: string, patch: Partial<TemplateChecklistItem>) => void,
+    onRemove: (stageId: string, itemId: string) => void
+  ) => (
+    <div className="space-y-3 rounded-[20px] bg-background/35 p-3 sm:p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <ListChecks className="h-4 w-4 text-primary" />
+            Подэтапы
+          </div>
+          <div className="mt-1 text-xs text-muted-foreground">
+            {items.length > 0 ? `${items.length} в шаблоне` : 'Добавьте пункты, которые нужно закрывать внутри этапа'}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => onAdd(stageId)}
+          className="btn-secondary h-9 rounded-[14px] px-3 text-xs"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Подэтап
+        </button>
+      </div>
+
+      {items.length === 0 ? (
+        <div className="rounded-[16px] bg-muted/35 px-4 py-3 text-sm text-muted-foreground">
+          Подэтапов пока нет
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {items.map((item, index) => {
+            const availableRecipients = telegramRecipients.filter((recipient) => recipient.type === item.telegramRecipientType)
+            const selectedRecipient = availableRecipients.find((recipient) => recipient.id === item.telegramRecipientId)
+            const telegramStatus = !item.notifyOnComplete
+              ? 'Выключено'
+              : selectedRecipient?.name || 'Нужен получатель'
+
+            return (
+              <div
+                key={item.id}
+                className="grid gap-3 rounded-[16px] bg-card/70 px-3 py-3 lg:grid-cols-[minmax(0,1fr)_minmax(150px,180px)_minmax(150px,180px)_44px]"
+              >
+                <label className="min-w-0 space-y-1 text-xs font-medium text-muted-foreground">
+                  Подэтап {index + 1}
+                  <input
+                    type="text"
+                    value={item.name}
+                    onChange={(event) => onUpdate(stageId, item.id, { name: event.target.value })}
+                    className="input h-10 w-full min-w-0 py-1 text-sm"
+                    placeholder="Название подэтапа"
+                  />
+                </label>
+
+                <label className="min-w-0 space-y-1 text-xs font-medium text-muted-foreground">
+                  Ответственный
+                  <select
+                    value={item.responsibleId || ''}
+                    onChange={(event) => onUpdate(stageId, item.id, { responsibleId: event.target.value || null })}
+                    className="input h-10 w-full min-w-0 py-1 text-sm"
+                  >
+                    <option value="">Не выбран</option>
+                    {users.map((user) => (
+                      <option key={user.id} value={user.id}>
+                        {user.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="min-w-0 space-y-1 text-xs font-medium text-muted-foreground">
+                  Telegram
+                  <span className="flex h-10 w-full min-w-0 items-center justify-between gap-3 rounded-[14px] border border-border/60 bg-background px-3 text-sm text-foreground">
+                    <span className="truncate">{telegramStatus}</span>
+                    <input
+                      type="checkbox"
+                      checked={item.notifyOnComplete}
+                      onChange={(event) => onUpdate(stageId, item.id, { notifyOnComplete: event.target.checked })}
+                      className="h-4 w-4 flex-shrink-0 rounded border-border text-primary focus:ring-ring"
+                    />
+                  </span>
+                </label>
+
+                <div className="flex items-end justify-end lg:justify-start">
+                  <button
+                    type="button"
+                    onClick={() => onRemove(stageId, item.id)}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-[14px] border border-red-100 text-red-500 transition hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-500/10"
+                    title="Удалить подэтап"
+                    aria-label={`Удалить подэтап ${index + 1}`}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+
+                <details className="group lg:col-span-4">
+                  <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-[14px] bg-primary/5 px-3 py-2 text-sm text-foreground transition hover:bg-primary/10 [&::-webkit-details-marker]:hidden">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <Bell className="h-4 w-4 flex-shrink-0 text-primary" />
+                      <span className="min-w-0">
+                        <span className="block truncate font-semibold">Telegram после завершения подэтапа</span>
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {item.notifyOnComplete ? telegramStatus : 'Уведомление выключено'}
+                        </span>
+                      </span>
+                    </span>
+                    <ChevronDown className="h-4 w-4 flex-shrink-0 text-muted-foreground transition group-open:rotate-180" />
+                  </summary>
+
+                  <div className="mt-3 rounded-[16px] bg-background/55 p-3">
+                    <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,150px)_minmax(0,1fr)_minmax(0,170px)]">
+                      <label className="min-w-0 space-y-1 text-xs font-medium text-muted-foreground">
+                        Тип
+                        <select
+                          value={item.telegramRecipientType}
+                          onChange={(event) =>
+                            onUpdate(stageId, item.id, {
+                              telegramRecipientType: event.target.value as 'user' | 'chat',
+                              telegramRecipientId: '',
+                            })
+                          }
+                          className="input h-10 w-full min-w-0 py-1 text-sm"
+                        >
+                          <option value="user">Личный Telegram</option>
+                          <option value="chat">Групповой чат</option>
+                        </select>
+                      </label>
+
+                      <label className="min-w-0 space-y-1 text-xs font-medium text-muted-foreground">
+                        Получатель
+                        <select
+                          value={item.telegramRecipientId}
+                          onChange={(event) => onUpdate(stageId, item.id, { telegramRecipientId: event.target.value })}
+                          disabled={availableRecipients.length === 0}
+                          className="input h-10 w-full min-w-0 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <option value="">Не выбран</option>
+                          {availableRecipients.map((recipient) => (
+                            <option key={recipient.id} value={recipient.id}>
+                              {recipient.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label className="min-w-0 space-y-1 text-xs font-medium text-muted-foreground">
+                        Сообщение
+                        <select
+                          value={item.telegramMessageTemplate}
+                          onChange={(event) => onUpdate(stageId, item.id, { telegramMessageTemplate: event.target.value })}
+                          className="input h-10 w-full min-w-0 py-1 text-sm"
+                        >
+                          <option value="substage_completed_simple">Стандартное</option>
+                          <option value="custom">Свой текст</option>
+                        </select>
+                      </label>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                      <span className="badge status-chip-neutral px-2 py-1">
+                        {telegramRecipientsLoading ? 'Получатели загружаются' : `${availableRecipients.length} доступно`}
+                      </span>
+                      {selectedRecipient && (
+                        <span className="badge status-chip-info px-2 py-1">Выбран: {selectedRecipient.name}</span>
+                      )}
+                      {item.notifyOnComplete && !item.telegramRecipientId && (
+                        <span className="badge status-chip-danger px-2 py-1">Выберите получателя</span>
+                      )}
+                    </div>
+
+                    {item.telegramMessageTemplate === 'custom' && (
+                      <label className="mt-3 block min-w-0 space-y-1 text-xs font-medium text-muted-foreground">
+                        Свой текст
+                        <textarea
+                          value={item.telegramCustomMessage}
+                          onChange={(event) =>
+                            onUpdate(stageId, item.id, {
+                              telegramCustomMessage: event.target.value,
+                              telegramMessageTemplate: 'custom',
+                            })
+                          }
+                          className="input min-h-[92px] w-full resize-y rounded-[16px] py-2 text-sm"
+                          placeholder="Подэтап закрыт: {substage_name}\nПродукт: {product_name}"
+                        />
+                      </label>
+                    )}
+                  </div>
+                </details>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+
+  function renderTemplateStageTelegramSettings(
+    stage: { id: string; stageName: string },
+    drafts: Record<string, TemplateTelegramDraft>,
+    onChange: (stageId: string, eventType: TemplateTelegramEventType, patch: Partial<TemplateTelegramDraft>) => void
+  ) {
+    return (
+      <div className="grid min-w-0 gap-3 xl:grid-cols-2">
+        {TEMPLATE_TELEGRAM_EVENTS.map((eventOption) => {
+          const draft = getTemplateTelegramDraft(drafts, stage.id, eventOption.value)
+          const recipients = telegramRecipients.filter((recipient) => recipient.type === draft.recipientType)
+          const selectedRecipient = recipients.find((recipient) => recipient.id === draft.recipientId)
+          const isStartEvent = eventOption.value === 'stage_started'
+          const Icon = isStartEvent ? Zap : Bell
+          const title = isStartEvent ? 'Telegram о начале этапа' : 'Telegram после завершения этапа'
+          const helper = isStartEvent
+            ? `Сработает, когда этап «${stage.stageName || 'Без названия'}» будет запущен.`
+            : `Сработает, когда этап «${stage.stageName || 'Без названия'}» будет закрыт.`
+
+          return (
+            <div key={eventOption.value} className="min-w-0 rounded-[20px] bg-background/40 p-3 sm:p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <Icon className="h-4 w-4 text-primary" />
+                    {title}
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">{helper}</p>
+                </div>
+                <label className="inline-flex h-9 flex-shrink-0 items-center gap-2 rounded-[14px] border border-border/70 bg-card px-3 text-sm font-medium text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={draft.isEnabled}
+                    onChange={(event) => onChange(stage.id, eventOption.value, { isEnabled: event.target.checked })}
+                    className="h-4 w-4 rounded border-border text-primary focus:ring-ring"
+                  />
+                  Отправлять
+                </label>
+              </div>
+
+              {draft.isEnabled && (
+                <>
+                  {telegramRecipients.length === 0 && !telegramRecipientsLoading && (
+                    <div className="mt-3 rounded-[16px] border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-200">
+                      Получателей пока нет. Добавьте «Мой Telegram» в настройках уведомлений продукта, затем выберите его в шаблоне.
+                    </div>
+                  )}
+
+                  <div className="mt-3 grid min-w-0 gap-3 md:grid-cols-[minmax(0,150px)_minmax(0,1fr)_minmax(0,150px)] xl:grid-cols-1">
+                    <label className="min-w-0 space-y-1 text-xs font-medium text-muted-foreground">
+                      Тип
+                      <select
+                        value={draft.recipientType}
+                        onChange={(event) => onChange(stage.id, eventOption.value, { recipientType: event.target.value as 'user' | 'chat', recipientId: '' })}
+                        className="input h-10 w-full min-w-0 py-1 text-sm"
+                      >
+                        <option value="user">Личный Telegram</option>
+                        <option value="chat">Групповой чат</option>
+                      </select>
+                    </label>
+
+                    <label className="min-w-0 space-y-1 text-xs font-medium text-muted-foreground">
+                      Получатель
+                      <select
+                        value={draft.recipientId}
+                        onChange={(event) => onChange(stage.id, eventOption.value, { recipientId: event.target.value })}
+                        disabled={recipients.length === 0}
+                        className="input h-10 w-full min-w-0 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <option value="">Не выбран</option>
+                        {recipients.map((recipient) => (
+                          <option key={recipient.id} value={recipient.id}>
+                            {recipient.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label className="min-w-0 space-y-1 text-xs font-medium text-muted-foreground">
+                      Сообщение
+                      <select
+                        value={draft.messageTemplate}
+                        onChange={(event) => onChange(stage.id, eventOption.value, { messageTemplate: event.target.value })}
+                        className="input h-10 w-full min-w-0 py-1 text-sm"
+                      >
+                        <option value={eventOption.defaultTemplate}>Стандартное</option>
+                        <option value="custom">Свой текст</option>
+                      </select>
+                    </label>
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                    <span className="badge status-chip-neutral px-2 py-1">
+                      {telegramRecipientsLoading ? 'Получатели загружаются' : `${recipients.length} доступно`}
+                    </span>
+                    {selectedRecipient && (
+                      <span className="badge status-chip-info px-2 py-1">Выбран: {selectedRecipient.name}</span>
+                    )}
+                    {!draft.recipientId && (
+                      <span className="badge status-chip-danger px-2 py-1">Выберите получателя</span>
+                    )}
+                  </div>
+
+                  {draft.messageTemplate === 'custom' && (
+                    <label className="mt-3 block min-w-0 space-y-1 text-xs font-medium text-muted-foreground">
+                      Свой текст уведомления
+                      <textarea
+                        value={draft.customMessage}
+                        onChange={(event) => onChange(stage.id, eventOption.value, { customMessage: event.target.value, messageTemplate: 'custom' })}
+                        className="input min-h-[96px] w-full resize-y rounded-[16px] py-2 text-sm"
+                        placeholder={`${eventOption.label}: {stage_name}\nПродукт: {product_name}`}
+                      />
+                    </label>
+                  )}
+                </>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
+  function renderTemplateStageCard<T extends TemplateStageCardLike>(params: {
+    stage: T
+    index: number
+    stages: T[]
+    onUpdate: (stageId: string, patch: Partial<T>) => void
+    onRemove?: (stageId: string) => void
+    onAddSubStage: (stageId: string) => void
+    onUpdateSubStage: (stageId: string, itemId: string, patch: Partial<TemplateChecklistItem>) => void
+    onRemoveSubStage: (stageId: string, itemId: string) => void
+    telegramDrafts: Record<string, TemplateTelegramDraft>
+    onTelegramChange: (stageId: string, eventType: TemplateTelegramEventType, patch: Partial<TemplateTelegramDraft>) => void
+  }) {
+    const { stage, index, stages, onUpdate, onRemove, onAddSubStage, onUpdateSubStage, onRemoveSubStage, telegramDrafts, onTelegramChange } = params
+    const subStages = stage.subStages || []
+    const durationValue = stage.durationDays ?? stage.effectiveDurationDays ?? 1
+
+    return (
+      <div className="rounded-[24px] border border-border/55 bg-muted/45 p-4 shadow-sm">
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[16px] bg-primary text-sm font-semibold text-primary-foreground">
+              {index + 1}
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-foreground">
+                {stage.stageName.trim() || `Этап ${index + 1}`}
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {subStages.length > 0
+                  ? `${subStages.length} подэтапов · Telegram настраивается ниже`
+                  : 'Добавьте название этапа и подэтапы, если они нужны'}
+              </p>
+            </div>
+          </div>
+
+          {onRemove && (
+            <button
+              type="button"
+              onClick={() => onRemove(stage.id)}
+              className="inline-flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[14px] border border-red-100 text-red-500 transition hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-500/10"
+              title="Удалить этап"
+              aria-label={`Удалить этап ${index + 1}`}
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+
+        <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,190px)_minmax(0,130px)_minmax(0,150px)]">
+          <label className="min-w-0 space-y-1 text-xs font-medium text-muted-foreground">
+            Название этапа
+            <input
+              type="text"
+              value={stage.stageName}
+              onChange={(event) => onUpdate(stage.id, { stageName: event.target.value } as Partial<T>)}
+              className="input h-11 w-full min-w-0 py-1 text-sm"
+              list="stage-suggestions"
+              placeholder="Например: Поиск поставщика"
+            />
+          </label>
+
+          <label className="min-w-0 space-y-1 text-xs font-medium text-muted-foreground">
+            Дата этапа
+            <DatePicker
+              value={stage.plannedDate}
+              onChange={(date) => onUpdate(stage.id, { plannedDate: date } as Partial<T>)}
+              inputClassName="h-11 w-full text-sm"
+              panelClassName="w-[320px]"
+              placeholder="Без даты"
+            />
+          </label>
+
+          <label className="min-w-0 space-y-1 text-xs font-medium text-muted-foreground">
+            Дней
+            <input
+              type="number"
+              min={1}
+              step={1}
+              value={durationValue}
+              onChange={(event) =>
+                onUpdate(stage.id, {
+                  durationDays: event.target.value ? Math.max(1, Number(event.target.value)) : null,
+                } as Partial<T>)
+              }
+              className="input h-11 w-full min-w-0 py-1 text-sm"
+              placeholder="1"
+            />
+          </label>
+
+          <label className="min-w-0 space-y-1 text-xs font-medium text-muted-foreground">
+            Автосдвиг
+            <span className="flex h-11 w-full min-w-0 items-center justify-between gap-3 rounded-[16px] border border-border/70 bg-card px-3 text-sm text-foreground">
+              <span className="truncate">{stage.participatesInAutoshift ? 'Включён' : 'Выключен'}</span>
+              <input
+                type="checkbox"
+                checked={stage.participatesInAutoshift}
+                onChange={(event) => onUpdate(stage.id, { participatesInAutoshift: event.target.checked } as Partial<T>)}
+                className="h-4 w-4 flex-shrink-0 rounded border-border text-primary focus:ring-ring"
+              />
+            </span>
+          </label>
+        </div>
+
+        <div className="mt-4">
+          {renderTemplateChecklist(
+            stage.id,
+            subStages,
+            onAddSubStage,
+            onUpdateSubStage,
+            onRemoveSubStage
+          )}
+        </div>
+
+        <div className="mt-4">
+          {renderTemplateStageTelegramSettings(stage, telegramDrafts, onTelegramChange)}
+        </div>
+
+        <div className="mt-4">
+          {renderStageStartRuleControls(stage, index, stages, onUpdate)}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -584,14 +1475,14 @@ export function NewProductForm({
       <input type="hidden" name="notes" value={form.notes} />
       <input type="hidden" name="productTemplateId" value={form.productTemplateId} />
       <input type="hidden" name="templateStagesOverride" value={serializedTemplateStageOverrides} />
-      <div className="card p-6 space-y-5">
+      <div className="space-y-5 rounded-[28px] bg-card/30 p-4 sm:p-5">
         {error && (
           <div className="rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-red-700 dark:text-red-300">
             {error}
           </div>
         )}
 
-        <div className="space-y-4 rounded-xl border border-border/70 bg-muted/55 p-4">
+        <div className="space-y-4 rounded-[24px] bg-muted/35 p-4">
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 font-semibold text-foreground">
@@ -719,8 +1610,8 @@ export function NewProductForm({
           </div>
 
           {selectedTemplate && (
-            <div className="rounded-xl border border-border/70 bg-card p-4">
-              <div className="flex items-center justify-between gap-3 mb-3">
+            <div className="space-y-4 rounded-[22px] bg-background/30 p-3 sm:p-4">
+              <div className="mb-3 flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
                 <div className="min-w-0 flex-1 space-y-3">
                   <div>
                     <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -747,7 +1638,7 @@ export function NewProductForm({
                     />
                   </div>
                 </div>
-                <div className="flex items-start gap-2">
+                <div className="flex flex-wrap items-start gap-2 xl:justify-end">
                   <div className="pt-2 text-xs text-muted-foreground">{selectedTemplateStages.length} этапов</div>
                   <button
                     type="button"
@@ -777,74 +1668,20 @@ export function NewProductForm({
                   {selectedTemplateError}
                 </div>
               )}
-              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+              <div className="space-y-3">
                 {selectedTemplateStages.map((stage, index) => (
-                  <div
-                    key={stage.id}
-                    className="grid gap-3 rounded-lg border border-border/60 px-3 py-3 md:grid-cols-[minmax(0,1fr)_220px_150px_120px]"
-                  >
-                    <div className="min-w-0">
-                      <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                        Этап {index + 1}
-                      </div>
-                      <input
-                        type="text"
-                        value={stage.stageName}
-                        onChange={(e) =>
-                          updateSelectedTemplateStage(stage.id, {
-                            stageName: e.target.value,
-                          })
-                        }
-                        className="input h-9 w-full text-sm"
-                        list="stage-suggestions"
-                        placeholder="Название этапа"
-                      />
-                    </div>
-                    <div>
-                      <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                        Дата этапа
-                      </div>
-                      <DatePicker
-                        value={stage.plannedDate}
-                        onChange={(date) => updateSelectedTemplateStage(stage.id, { plannedDate: date })}
-                        inputClassName="h-9 w-full text-xs"
-                        panelClassName="w-[320px]"
-                        placeholder="Без даты"
-                      />
-                    </div>
-                    <div>
-                      <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                        Количество дней
-                      </div>
-                      <input
-                        type="number"
-                        min={1}
-                        step={1}
-                        value={stage.durationDays ?? stage.effectiveDurationDays ?? 1}
-                        onChange={(e) =>
-                          updateSelectedTemplateStage(stage.id, {
-                            durationDays: e.target.value ? Math.max(1, Number(e.target.value)) : null,
-                            ...(e.target.value ? {} : { durationDays: null }),
-                          })
-                        }
-                        className="input h-9 w-full text-sm"
-                      />
-                    </div>
-                    <div className="flex items-end">
-                      <span className="flex h-9 w-full items-center justify-between rounded-lg border border-border/70 bg-card px-3 text-xs font-medium text-muted-foreground">
-                        <span>Автосдвиг</span>
-                        <input
-                          type="checkbox"
-                          checked={stage.participatesInAutoshift}
-                          onChange={(e) =>
-                            updateSelectedTemplateStage(stage.id, {
-                              participatesInAutoshift: e.target.checked,
-                            })
-                          }
-                          className="h-4 w-4 rounded border-border text-primary focus:ring-ring"
-                        />
-                      </span>
-                    </div>
+                  <div key={stage.id}>
+                    {renderTemplateStageCard({
+                      stage,
+                      index,
+                      stages: selectedTemplateStages,
+                      onUpdate: updateSelectedTemplateStage,
+                      onAddSubStage: addSelectedTemplateChecklistItem,
+                      onUpdateSubStage: updateSelectedTemplateChecklistItem,
+                      onRemoveSubStage: removeSelectedTemplateChecklistItem,
+                      telegramDrafts: selectedTemplateTelegramDrafts,
+                      onTelegramChange: updateSelectedTemplateTelegramDraft,
+                    })}
                   </div>
                 ))}
               </div>
@@ -852,7 +1689,7 @@ export function NewProductForm({
           )}
 
           {showTemplateBuilder && (
-            <div className="space-y-4 rounded-xl border border-primary/20 bg-card p-4">
+            <div className="space-y-4 rounded-[22px] bg-background/30 p-3 sm:p-4">
               <div>
                 <div className="text-sm font-semibold text-foreground">Новый шаблон этапов</div>
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -891,78 +1728,21 @@ export function NewProductForm({
                 </div>
               </div>
 
-              <div className="max-h-[min(52vh,34rem)] space-y-3 overflow-y-auto pr-2">
+              <div className="space-y-3">
                 {templateStages.map((stage, index) => (
-                  <div key={stage.id} className="grid gap-3 rounded-xl border border-border/70 bg-muted/55 p-3 md:grid-cols-[minmax(0,1fr)_220px_140px_180px_44px]">
-                    <div>
-                      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        Этап {index + 1}
-                      </label>
-                      <input
-                        type="text"
-                        value={stage.stageName}
-                        onChange={(e) => updateTemplateStage(stage.id, { stageName: e.target.value })}
-                        className="input w-full"
-                        list="stage-suggestions"
-                        placeholder="Название этапа"
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        Дата этапа
-                      </label>
-                      <DatePicker
-                        value={stage.plannedDate}
-                        onChange={(date) => updateTemplateStage(stage.id, { plannedDate: date })}
-                        inputClassName="h-11 text-sm"
-                        panelClassName="w-[320px]"
-                        placeholder="Необязательно"
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        Количество дней
-                      </label>
-                      <input
-                        type="number"
-                        min={1}
-                        step={1}
-                        value={stage.durationDays ?? stage.effectiveDurationDays ?? 1}
-                        onChange={(e) =>
-                          updateTemplateStage(stage.id, {
-                            durationDays: e.target.value ? Math.max(1, Number(e.target.value)) : null,
-                          })
-                        }
-                        className="input h-11 w-full"
-                        placeholder="1"
-                      />
-                    </div>
-                    <label className="flex items-end">
-                      <span className="w-full rounded-[18px] border border-border/70 bg-card px-3 py-3 text-sm text-muted-foreground">
-                        <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          Автосдвиг
-                        </span>
-                        <span className="flex items-center justify-between gap-3">
-                          <span>{stage.participatesInAutoshift ? 'Включён' : 'Выключен'}</span>
-                          <input
-                            type="checkbox"
-                            checked={stage.participatesInAutoshift}
-                            onChange={(e) => updateTemplateStage(stage.id, { participatesInAutoshift: e.target.checked })}
-                            className="h-4 w-4 rounded border-border text-primary focus:ring-ring"
-                          />
-                        </span>
-                      </span>
-                    </label>
-                    <div className="flex items-end">
-                      <button
-                        type="button"
-                        onClick={() => removeTemplateStage(stage.id)}
-                        className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-red-100 text-red-500 transition hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-500/10"
-                        title="Удалить этап"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+                  <div key={stage.id}>
+                    {renderTemplateStageCard({
+                      stage,
+                      index,
+                      stages: templateStages,
+                      onUpdate: updateTemplateStage,
+                      onRemove: removeTemplateStage,
+                      onAddSubStage: addTemplateChecklistItem,
+                      onUpdateSubStage: updateTemplateChecklistItem,
+                      onRemoveSubStage: removeTemplateChecklistItem,
+                      telegramDrafts: templateTelegramDrafts,
+                      onTelegramChange: updateTemplateTelegramDraft,
+                    })}
                   </div>
                 ))}
               </div>
@@ -1006,7 +1786,7 @@ export function NewProductForm({
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid gap-4 md:grid-cols-2">
           <div>
             <label className="mb-1.5 block text-sm font-medium text-foreground">Страна производства</label>
             <input
@@ -1029,7 +1809,7 @@ export function NewProductForm({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid gap-4 md:grid-cols-2">
           <div>
             <label className="mb-1.5 block text-sm font-medium text-foreground">Артикул (SKU)</label>
             <input

@@ -24,7 +24,7 @@ RUN npm run build
 
 # Production image
 FROM base AS runner
-RUN apk add --no-cache openssl
+RUN apk add --no-cache openssl postgresql-client
 WORKDIR /app
 
 ENV NODE_ENV production
@@ -37,9 +37,12 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/scripts/sync-access-overrides.js ./scripts/sync-access-overrides.js
+COPY --from=builder /app/scripts ./scripts
+COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
 
 RUN chown -R nextjs:nodejs /app
 
@@ -50,5 +53,6 @@ EXPOSE 3000
 ENV PORT 3000
 ENV HOSTNAME "0.0.0.0"
 
-# Run DB sync, apply targeted access grants, and start
-CMD ["sh", "-c", "npx prisma db push --accept-data-loss && node scripts/sync-access-overrides.js && node server.js"]
+# Baseline already-present schema changes, apply migrations, and start.
+# Data-writing prod commands (backup/templates/product rebuild/access overrides) are run manually after deploy.
+CMD ["sh", "-c", "node scripts/prod-migration-baseline.js && npx prisma migrate deploy && node server.js"]

@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { AnimatePresence, motion } from 'framer-motion'
 import { createPortal } from 'react-dom'
-import { ArrowLeft, CalendarDays, CheckCircle2, Circle, AlertTriangle, MessageCircle, Clock, History, Zap, ExternalLink, Edit2, Save, Pencil, ChevronUp, ChevronDown, X, Plus, Trash2, SendHorizontal, Archive, ArchiveRestore } from 'lucide-react'
+import { ArrowLeft, CalendarDays, CheckCircle2, Circle, AlertTriangle, MessageCircle, Clock, History, Zap, ExternalLink, Edit2, Save, Pencil, ChevronUp, ChevronDown, X, Plus, Trash2, SendHorizontal, Archive, ArchiveRestore, Bell, Settings } from 'lucide-react'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { FloatingContextMenu } from '@/components/ui/FloatingContextMenu'
 import { ProductRenameDialog } from '@/components/products/ProductRenameDialog'
@@ -39,6 +39,7 @@ const AUTOMATION_ACTIONS = [
 interface ProductCardClientProps {
   product: any
   users: Array<{ id: string; name: string; lastName?: string | null; avatar?: string | null }>
+  productTemplates?: any[]
   currentUser: { id: string; name: string; role: string }
 }
 
@@ -49,7 +50,28 @@ const TABS = [
   { id: 'automations', label: 'Автоматизации', icon: Zap },
 ]
 
-export function ProductCardClient({ product: initial, users, currentUser }: ProductCardClientProps) {
+const TELEGRAM_TEMPLATES = [
+  { id: 'stage_completed_simple', label: 'Завершение этапа' },
+  { id: 'substage_completed_simple', label: 'Завершение подэтапа' },
+  { id: 'custom', label: 'Свой текст' },
+]
+
+const STAGE_STATUS_LABELS: Record<string, string> = {
+  NOT_STARTED: 'Не начат',
+  IN_PROGRESS: 'Начат',
+  COMPLETED: 'Завершён',
+  SKIPPED: 'Пропущен',
+  BLOCKED: 'Заблокирован',
+}
+
+function getStageStatusStyle(status: string, isCompleted?: boolean) {
+  if (isCompleted || status === 'COMPLETED') return 'status-chip-success'
+  if (status === 'IN_PROGRESS') return 'status-chip-info'
+  if (status === 'BLOCKED') return 'status-chip-danger'
+  return 'status-chip-neutral'
+}
+
+export function ProductCardClient({ product: initial, users, productTemplates = [], currentUser }: ProductCardClientProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -70,6 +92,27 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
   const [newStageDate, setNewStageDate] = useState<Date | null>(null)
   const [newStageDurationDays, setNewStageDurationDays] = useState(1)
   const [newStageAutoshift, setNewStageAutoshift] = useState(true)
+  const [telegramRecipients, setTelegramRecipients] = useState<any[]>([])
+  const [telegramRecipientsLoading, setTelegramRecipientsLoading] = useState(false)
+  const [telegramDrafts, setTelegramDrafts] = useState<Record<string, any>>({})
+  const [notificationSavingKey, setNotificationSavingKey] = useState<string | null>(null)
+  const [notificationTestingKey, setNotificationTestingKey] = useState<string | null>(null)
+  const [telegramSettingsModal, setTelegramSettingsModal] = useState<{
+    stageId: string
+    subStageId: string | null
+  } | null>(null)
+  const [templateApplyId, setTemplateApplyId] = useState(initial.productTemplateId || '')
+  const [templateResetNotificationOverrides, setTemplateResetNotificationOverrides] = useState(false)
+  const [templateApplying, setTemplateApplying] = useState(false)
+  const [subStageDrafts, setSubStageDrafts] = useState<Record<string, string>>({})
+  const [subStageSavingKey, setSubStageSavingKey] = useState<string | null>(null)
+  const [newRecipientDraft, setNewRecipientDraft] = useState({
+    type: 'user',
+    name: '',
+    telegramId: '',
+    telegramUsername: '',
+    chatId: '',
+  })
 
   const [renamingStageId, setRenamingStageId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
@@ -111,6 +154,35 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
   const canArchiveProduct = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER', 'EMPLOYEE'].includes(currentUser?.role)
   const currentPriorityOption = getEditableProductPriorityOption(product.priority)
   const currentStatusOption = getEditableProductStatusOption(product.status)
+  const currentProductTemplate = productTemplates.find((template) => template.id === product.productTemplateId) || null
+  const hasTelegramNotificationOverrides = (product.stages || []).some((stage: any) => {
+    const stageHasOverride = (stage.telegramNotificationSettings || []).some((setting: any) => setting.isOverride)
+    const subStageHasOverride = (stage.subStages || []).some((subStage: any) =>
+      (subStage.telegramNotificationSettings || []).some((setting: any) => setting.isOverride)
+    )
+
+    return stageHasOverride || subStageHasOverride
+  })
+
+  useEffect(() => {
+    let cancelled = false
+    setTelegramRecipientsLoading(true)
+    fetch('/api/telegram/recipients')
+      .then((res) => res.ok ? res.json() : Promise.reject(new Error('Не удалось загрузить Telegram-получателей')))
+      .then((data) => {
+        if (!cancelled) setTelegramRecipients(Array.isArray(data?.recipients) ? data.recipients : [])
+      })
+      .catch(() => {
+        if (!cancelled) setTelegramRecipients([])
+      })
+      .finally(() => {
+        if (!cancelled) setTelegramRecipientsLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     if (!priorityMenuOpen) return
@@ -511,27 +583,6 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
     }
   }
 
-  const toggleStageComplete = async (stage: any) => {
-    const newCompleted = !stage.isCompleted
-    const res = await fetch('/api/stages', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        stageId: stage.id,
-        updates: {
-          isCompleted: newCompleted,
-          status: newCompleted ? 'COMPLETED' : 'NOT_STARTED',
-          actualDate: newCompleted ? new Date().toISOString() : null,
-        },
-      }),
-    })
-    const { stage: updated } = await res.json()
-    setProduct((p: any) => ({
-      ...p,
-      stages: p.stages.map((s: any) => s.id === stage.id ? { ...s, ...updated } : s),
-    }))
-  }
-
   const getStageCellStyle = (stage: any) => {
     if (stage.isCompleted) return 'text-emerald-700 bg-emerald-50'
     if (stage.dateValue) {
@@ -782,6 +833,460 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
     }
   }
 
+  const mergeNotificationSetting = (items: any[] | undefined, nextSetting: any) => {
+    const existingItems = Array.isArray(items) ? items : []
+    return [
+      nextSetting,
+      ...existingItems.filter((item) => item.id !== nextSetting.id && item.eventType !== nextSetting.eventType),
+    ]
+  }
+
+  const updateStageSubStages = (stageId: string, subStages: any[]) => {
+    setProduct((prev: any) => ({
+      ...prev,
+      stages: prev.stages.map((stage: any) => (
+        stage.id === stageId ? { ...stage, subStages } : stage
+      )),
+    }))
+  }
+
+  const mergeStagePatch = (stageId: string, patch: Record<string, any>) => {
+    setProduct((prev: any) => ({
+      ...prev,
+      stages: prev.stages.map((stage: any) => (
+        stage.id === stageId
+          ? {
+              ...stage,
+              ...patch,
+              subStages: patch.subStages || stage.subStages,
+            }
+          : stage
+      )),
+    }))
+  }
+
+  const getNotificationKey = (stageId: string, subStageId?: string | null) =>
+    subStageId ? `substage:${subStageId}` : `stage:${stageId}`
+
+  const getNotificationSetting = (stage: any, subStage?: any) => {
+    const eventType = subStage ? 'substage_completed' : 'stage_completed'
+    const settings = subStage?.telegramNotificationSettings || stage.telegramNotificationSettings || []
+    return settings.find((setting: any) => setting.eventType === eventType) || null
+  }
+
+  const getTelegramTemplatesForTarget = (subStage?: any) => {
+    const fallbackTemplate = subStage ? 'substage_completed_simple' : 'stage_completed_simple'
+    return TELEGRAM_TEMPLATES.filter((template) => template.id === fallbackTemplate || template.id === 'custom')
+  }
+
+  const getNotificationDraft = (stage: any, subStage?: any) => {
+    const eventType = subStage ? 'substage_completed' : 'stage_completed'
+    const key = getNotificationKey(stage.id, subStage?.id)
+    const setting = getNotificationSetting(stage, subStage)
+    return {
+      isEnabled: setting ? setting.isEnabled : true,
+      eventType,
+      recipientType: setting?.recipientType || 'user',
+      recipientId: setting?.recipientId || '',
+      messageTemplate: setting?.messageTemplate || (subStage ? 'substage_completed_simple' : 'stage_completed_simple'),
+      customMessage: setting?.customMessage || '',
+      ...telegramDrafts[key],
+    }
+  }
+
+  const getNotificationStatusMeta = (stage: any, subStage?: any) => {
+    const setting = getNotificationSetting(stage, subStage)
+    if (setting?.lastError) {
+      return { label: 'Ошибка', chipClass: 'status-chip-danger', iconClass: 'text-red-500' }
+    }
+    if (setting?.sentAt) {
+      return { label: 'Отправлено', chipClass: 'status-chip-success', iconClass: 'text-emerald-500' }
+    }
+    if (setting?.isEnabled) {
+      return { label: 'Включено', chipClass: 'status-chip-info', iconClass: 'text-sky-500' }
+    }
+    return { label: 'Не настроено', chipClass: 'status-chip-neutral', iconClass: 'text-muted-foreground' }
+  }
+
+  const getTelegramErrorText = (error?: string | null) => {
+    if (!error) return null
+    if (/chat not found/i.test(error)) {
+      return 'Telegram не нашёл чат. Откройте бота, нажмите Start и повторите тест.'
+    }
+    if (/bot was blocked/i.test(error)) {
+      return 'Бот заблокирован у получателя. Разблокируйте бота и повторите тест.'
+    }
+    if (/TELEGRAM_BOT_TOKEN/i.test(error)) {
+      return 'TELEGRAM_BOT_TOKEN не задан для сервера.'
+    }
+    return error
+  }
+
+  const getStageNotificationSummary = (stage: any) => {
+    const targets = [
+      { subStage: null },
+      ...(Array.isArray(stage.subStages) ? stage.subStages : []).map((subStage: any) => ({ subStage })),
+    ]
+    const settings = targets.map((target) => getNotificationSetting(stage, target.subStage))
+    return {
+      total: targets.length,
+      enabled: settings.filter((setting) => setting?.isEnabled).length,
+      errors: settings.filter((setting) => setting?.lastError).length,
+      sent: settings.filter((setting) => setting?.sentAt).length,
+    }
+  }
+
+  const getTelegramMessagePreview = (stage: any, subStage?: any) => {
+    const draft = getNotificationDraft(stage, subStage)
+    const defaultMessage = subStage
+      ? 'Подэтап закрыт\n\nПроект: {product_name}\nЭтап: {stage_name}\nПодэтап: {substage_name}\nОтветственный: {responsible_user}\nДата закрытия: {end_date}'
+      : 'Этап завершён\n\nПроект: {product_name}\nЭтап: {stage_name}\nВыполнено подэтапов: {completed_substages} / {total_substages}\nДата завершения: {end_date}'
+    const rawMessage = draft.messageTemplate === 'custom'
+      ? draft.customMessage.trim() || 'Ваш текст уведомления появится здесь'
+      : defaultMessage
+    const responsibleName = product.responsible
+      ? [product.responsible.name, product.responsible.lastName].filter(Boolean).join(' ')
+      : 'не указано'
+
+    return rawMessage
+      .replaceAll('{product_name}', product.name || 'не указано')
+      .replaceAll('{stage_name}', stage.stageName || 'не указано')
+      .replaceAll('{substage_name}', subStage?.name || 'не указано')
+      .replaceAll('{responsible_user}', responsibleName || 'не указано')
+      .replaceAll('{start_date}', formatDate(subStage?.startDate || stage.startDate || stage.dateValue) || 'не указано')
+      .replaceAll('{end_date}', formatDate(subStage?.endDate || stage.endDate || stage.dateEnd) || 'не указано')
+      .replaceAll('{status}', STAGE_STATUS_LABELS[subStage?.status || stage.status] || subStage?.status || stage.status || 'не указано')
+      .replaceAll('{description}', subStage?.description || stage.description || stage.comment || 'не указано')
+      .replaceAll('{completed_substages}', String((stage.subStages || []).filter((item: any) => item.status === 'COMPLETED').length))
+      .replaceAll('{total_substages}', String((stage.subStages || []).length))
+  }
+
+  const openTelegramSettingsModal = (stage: any, subStage?: any) => {
+    setTelegramSettingsModal({
+      stageId: stage.id,
+      subStageId: subStage?.id || null,
+    })
+  }
+
+  const setTelegramSettingsTarget = (subStageId: string | null) => {
+    setTelegramSettingsModal((prev) => prev ? { ...prev, subStageId } : prev)
+  }
+
+  const setTelegramDraftValue = (stageId: string, subStageId: string | null, patch: Record<string, any>) => {
+    const key = getNotificationKey(stageId, subStageId)
+    setTelegramDrafts((prev) => ({
+      ...prev,
+      [key]: {
+        ...(prev[key] || {}),
+        ...patch,
+      },
+    }))
+  }
+
+  const handleCreateTelegramRecipient = async () => {
+    const name = newRecipientDraft.name.trim()
+    const telegramId = newRecipientDraft.telegramId.trim()
+    const chatId = newRecipientDraft.chatId.trim()
+    if (!name) {
+      alert('Укажите имя Telegram-получателя')
+      return
+    }
+    if (newRecipientDraft.type === 'chat' && !chatId && !telegramId) {
+      alert('Для Telegram-чата укажите chat_id')
+      return
+    }
+    if (newRecipientDraft.type === 'user' && !telegramId && !chatId) {
+      alert('Для Telegram-пользователя укажите Telegram ID')
+      return
+    }
+
+    try {
+      const res = await fetch('/api/telegram/recipients', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newRecipientDraft),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        throw new Error(data?.error || 'Не удалось добавить Telegram-получателя')
+      }
+
+      setTelegramRecipients((prev) => [...prev, data.recipient].sort((a, b) => a.name.localeCompare(b.name, 'ru')))
+      if (telegramSettingsModal) {
+        setTelegramDraftValue(telegramSettingsModal.stageId, telegramSettingsModal.subStageId, {
+          recipientType: data.recipient.type,
+          recipientId: data.recipient.id,
+        })
+      }
+      setNewRecipientDraft({
+        type: 'user',
+        name: '',
+        telegramId: '',
+        telegramUsername: '',
+        chatId: '',
+      })
+    } catch (error: any) {
+      alert(error.message || 'Не удалось добавить Telegram-получателя')
+    }
+  }
+
+  const handleSaveTelegramNotification = async (stage: any, subStage?: any) => {
+    const key = getNotificationKey(stage.id, subStage?.id)
+    const setting = getNotificationSetting(stage, subStage)
+    const draft = getNotificationDraft(stage, subStage)
+    const currentTelegramSettingsModal = telegramSettingsModal
+    const templateOptions = getTelegramTemplatesForTarget(subStage)
+    const messageTemplate = templateOptions.some((template) => template.id === draft.messageTemplate)
+      ? draft.messageTemplate
+      : templateOptions[0]?.id || 'custom'
+    const nextIsEnabled = Boolean(draft.isEnabled)
+
+    if (nextIsEnabled && !draft.recipientId) {
+      alert('Выберите Telegram-получателя перед сохранением')
+      return
+    }
+
+    setNotificationSavingKey(key)
+    try {
+      const res = await fetch('/api/telegram/notification-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: setting?.id,
+          productId: product.id,
+          stageId: stage.id,
+          subStageId: subStage?.id || null,
+          eventType: draft.eventType,
+          recipientType: draft.recipientType,
+          recipientId: draft.recipientId || null,
+          messageTemplate,
+          customMessage: draft.customMessage,
+          isEnabled: nextIsEnabled,
+        }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        throw new Error(data?.error || 'Не удалось сохранить Telegram-уведомление')
+      }
+
+      setProduct((prev: any) => ({
+        ...prev,
+        stages: prev.stages.map((item: any) => {
+          if (item.id !== stage.id) return item
+          if (!subStage) {
+            return {
+              ...item,
+              telegramNotificationSettings: mergeNotificationSetting(item.telegramNotificationSettings, data.setting),
+            }
+          }
+
+          return {
+            ...item,
+            subStages: (item.subStages || []).map((candidate: any) => (
+              candidate.id === subStage.id
+                ? {
+                    ...candidate,
+                    telegramNotificationSettings: mergeNotificationSetting(candidate.telegramNotificationSettings, data.setting),
+                  }
+                : candidate
+            )),
+          }
+        }),
+      }))
+      setTelegramDrafts((prev) => {
+        const next = { ...prev }
+        delete next[key]
+        return next
+      })
+      if (
+        currentTelegramSettingsModal &&
+        currentTelegramSettingsModal.stageId === stage.id &&
+        (currentTelegramSettingsModal.subStageId || null) === (subStage?.id || null)
+      ) {
+        setTelegramSettingsModal(null)
+      }
+    } catch (error: any) {
+      alert(error.message || 'Не удалось сохранить Telegram-уведомление')
+    } finally {
+      setNotificationSavingKey(null)
+    }
+  }
+
+  const handleSendTelegramTest = async (stage: any, subStage?: any) => {
+    const key = getNotificationKey(stage.id, subStage?.id)
+    const setting = getNotificationSetting(stage, subStage)
+    const draft = getNotificationDraft(stage, subStage)
+    const preview = getTelegramMessagePreview(stage, subStage)
+
+    if (!draft.recipientId) {
+      alert('Выберите Telegram-получателя для теста')
+      return
+    }
+
+    setNotificationTestingKey(key)
+    try {
+      const res = await fetch('/api/telegram/test-message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipientId: draft.recipientId,
+          settingId: setting?.id || null,
+          message: preview,
+        }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        throw new Error(data?.error || 'Не удалось отправить тестовое сообщение')
+      }
+
+      if (data?.setting) {
+        setProduct((prev: any) => ({
+          ...prev,
+          stages: prev.stages.map((item: any) => {
+            if (item.id !== stage.id) return item
+            if (!subStage) {
+              return {
+                ...item,
+                telegramNotificationSettings: mergeNotificationSetting(item.telegramNotificationSettings, data.setting),
+              }
+            }
+
+            return {
+              ...item,
+              subStages: (item.subStages || []).map((candidate: any) => (
+                candidate.id === subStage.id
+                  ? {
+                      ...candidate,
+                      telegramNotificationSettings: mergeNotificationSetting(candidate.telegramNotificationSettings, data.setting),
+                    }
+                  : candidate
+              )),
+            }
+          }),
+        }))
+      }
+
+      alert('Тестовое сообщение отправлено в Telegram')
+    } catch (error: any) {
+      alert(error.message || 'Не удалось отправить тестовое сообщение')
+    } finally {
+      setNotificationTestingKey(null)
+    }
+  }
+
+  const handleApplyProductTemplate = async () => {
+    if (!templateApplyId) {
+      alert('Выберите шаблон')
+      return
+    }
+
+    setTemplateApplying(true)
+    try {
+      const res = await fetch(`/api/products/${encodeURIComponent(product.id)}/template`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productTemplateId: templateApplyId,
+          resetNotificationOverrides: templateResetNotificationOverrides,
+        }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        throw new Error(data?.error || 'Не удалось применить шаблон')
+      }
+
+      setProduct((prev: any) => ({
+        ...prev,
+        ...(data.product || {}),
+        stages: Array.isArray(data.stages) ? data.stages : prev.stages,
+      }))
+      setTemplateResetNotificationOverrides(false)
+      router.refresh()
+    } catch (error: any) {
+      alert(error.message || 'Не удалось применить шаблон')
+    } finally {
+      setTemplateApplying(false)
+    }
+  }
+
+  const handleAddSubStage = async (stage: any) => {
+    const key = `add:${stage.id}`
+    const name = (subStageDrafts[key] || '').trim()
+    if (!name) return
+    setSubStageSavingKey(key)
+    try {
+      const res = await fetch('/api/substages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stageId: stage.id, name }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        throw new Error(data?.error || 'Не удалось добавить подэтап')
+      }
+
+      updateStageSubStages(stage.id, data.subStages || [])
+      setSubStageDrafts((prev) => ({ ...prev, [key]: '' }))
+    } catch (error: any) {
+      alert(error.message || 'Не удалось добавить подэтап')
+    } finally {
+      setSubStageSavingKey(null)
+    }
+  }
+
+  const handleToggleSubStageComplete = async (stage: any, subStage: any) => {
+    const key = `complete:${subStage.id}`
+    const nextCompleted = subStage.status !== 'COMPLETED'
+    setSubStageSavingKey(key)
+    try {
+      const res = await fetch('/api/substages', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subStageId: subStage.id,
+          updates: {
+            status: nextCompleted ? 'COMPLETED' : 'IN_PROGRESS',
+            ...(nextCompleted ? { endDate: new Date().toISOString() } : { endDate: null }),
+          },
+        }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        throw new Error(data?.error || 'Не удалось обновить подэтап')
+      }
+
+      if (data.stage) {
+        mergeStagePatch(stage.id, data.stage)
+      } else {
+        updateStageSubStages(stage.id, data.subStages || [])
+      }
+    } catch (error: any) {
+      alert(error.message || 'Не удалось обновить подэтап')
+    } finally {
+      setSubStageSavingKey(null)
+    }
+  }
+
+  const handleDeleteSubStage = async (stage: any, subStage: any) => {
+    const key = `delete:${subStage.id}`
+    setSubStageSavingKey(key)
+    try {
+      const res = await fetch(`/api/substages?subStageId=${encodeURIComponent(subStage.id)}`, {
+        method: 'DELETE',
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        throw new Error(data?.error || 'Не удалось удалить подэтап')
+      }
+
+      updateStageSubStages(stage.id, data.subStages || [])
+    } catch (error: any) {
+      alert(error.message || 'Не удалось удалить подэтап')
+    } finally {
+      setSubStageSavingKey(null)
+    }
+  }
+
   const handleArchiveProduct = async () => {
     setConfirmArchiveProductOpen(true)
   }
@@ -854,6 +1359,713 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
         </span>
       )
     })
+
+  const renderTelegramRecipientManager = () => (
+    <details className="group rounded-[20px] border border-border/70 bg-card/80">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 marker:hidden">
+        <span className="flex min-w-0 items-center gap-2">
+          <Bell className="h-4 w-4 flex-shrink-0 text-primary" />
+          <span className="truncate text-sm font-semibold text-foreground">Получатели</span>
+        </span>
+        <span className="flex flex-shrink-0 items-center gap-2 text-xs text-muted-foreground">
+          {telegramRecipientsLoading ? 'Загрузка...' : `${telegramRecipients.length} шт.`}
+          <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
+        </span>
+      </summary>
+
+      <div className="border-t border-border/70 px-4 pb-4 pt-3">
+        {telegramRecipients.length > 0 && (
+          <div className="mb-3 flex flex-wrap gap-2">
+            {telegramRecipients.slice(0, 6).map((recipient) => (
+              <span key={recipient.id} className="badge status-chip-neutral max-w-full px-2 py-1 text-xs">
+                {recipient.name}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {canEdit && (
+          <div className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="min-w-0 space-y-1 text-xs font-medium text-muted-foreground">
+                Тип
+                <select
+                  value={newRecipientDraft.type}
+                  onChange={(e) => setNewRecipientDraft((prev) => ({ ...prev, type: e.target.value }))}
+                  className="input h-10 w-full py-1 text-sm"
+                >
+                  <option value="user">Личный Telegram</option>
+                  <option value="chat">Групповой чат</option>
+                </select>
+              </label>
+
+              <label className="min-w-0 space-y-1 text-xs font-medium text-muted-foreground">
+                Название
+                <input
+                  value={newRecipientDraft.name}
+                  onChange={(e) => setNewRecipientDraft((prev) => ({ ...prev, name: e.target.value }))}
+                  className="input h-10 w-full py-1 text-sm"
+                  placeholder={newRecipientDraft.type === 'chat' ? 'Чат запуска' : 'Мой Telegram'}
+                />
+              </label>
+            </div>
+
+            <label className="block min-w-0 space-y-1 text-xs font-medium text-muted-foreground">
+              {newRecipientDraft.type === 'chat' ? 'chat_id группы' : 'Telegram ID'}
+              <input
+                value={newRecipientDraft.type === 'chat' ? newRecipientDraft.chatId : newRecipientDraft.telegramId}
+                onChange={(e) => setNewRecipientDraft((prev) => (
+                  prev.type === 'chat'
+                    ? { ...prev, chatId: e.target.value }
+                    : { ...prev, telegramId: e.target.value }
+                ))}
+                className="input h-10 w-full py-1 text-sm"
+                placeholder={newRecipientDraft.type === 'chat' ? '-1001234567890' : '6778090342'}
+              />
+            </label>
+
+            <button
+              type="button"
+              onClick={handleCreateTelegramRecipient}
+              className="btn-secondary h-10 w-full justify-center rounded-[16px] px-3 py-1 text-sm"
+            >
+              <Plus className="h-4 w-4" />
+              Добавить получателя
+            </button>
+          </div>
+        )}
+      </div>
+    </details>
+  )
+
+  const renderTelegramSettingsModal = () => {
+    if (!telegramSettingsModal || typeof document === 'undefined') return null
+
+    const stage = product.stages.find((item: any) => item.id === telegramSettingsModal.stageId)
+    if (!stage) return null
+
+    const subStages = Array.isArray(stage.subStages) ? stage.subStages : []
+    const targets = [
+      {
+        key: getNotificationKey(stage.id, null),
+        subStage: null,
+        number: '1',
+        title: 'Этап завершён',
+        description: 'После завершения',
+      },
+      ...subStages.map((subStage: any, index: number) => ({
+        key: getNotificationKey(stage.id, subStage.id),
+        subStage,
+        number: `1.${index + 1}`,
+        title: `Подэтап завершён`,
+        description: subStage.name,
+      })),
+    ]
+    const activeTarget = targets.find((target) => (target.subStage?.id || null) === telegramSettingsModal.subStageId) || targets[0]
+    const activeSubStage = activeTarget.subStage
+    const key = getNotificationKey(stage.id, activeSubStage?.id)
+    const setting = getNotificationSetting(stage, activeSubStage)
+    const draft = getNotificationDraft(stage, activeSubStage)
+    const recipients = telegramRecipients.filter((recipient) => recipient.type === draft.recipientType)
+    const templateOptions = getTelegramTemplatesForTarget(activeSubStage)
+    const selectedTemplate = templateOptions.some((template) => template.id === draft.messageTemplate)
+      ? draft.messageTemplate
+      : templateOptions[0]?.id || 'custom'
+    const statusMeta = getNotificationStatusMeta(stage, activeSubStage)
+    const preview = getTelegramMessagePreview(stage, activeSubStage)
+    const selectedRecipient = telegramRecipients.find((recipient) => recipient.id === draft.recipientId)
+    const isSavingNotification = notificationSavingKey === key
+    const isTestingNotification = notificationTestingKey === key
+    const saveDisabled = isSavingNotification || (draft.isEnabled && !draft.recipientId)
+    const isCustomMessage = selectedTemplate === 'custom'
+    const targetKindLabel = activeSubStage ? 'Завершение подэтапа' : 'Завершение этапа'
+
+    return createPortal(
+      <motion.div
+        className="modal-backdrop flex items-end justify-center px-4 pb-4 pt-8 sm:items-center"
+        onClick={() => setTelegramSettingsModal(null)}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.18 }}
+      >
+        <motion.div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Настройки Telegram после завершения"
+          className="flex h-[min(760px,calc(100vh-40px))] w-full max-w-[1180px] flex-col overflow-hidden rounded-[28px] border border-border/80 bg-card shadow-modal"
+          onClick={(e) => e.stopPropagation()}
+          initial={{ opacity: 0, y: 18, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 12, scale: 0.98 }}
+          transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <div className="flex-shrink-0 border-b border-border/70 px-5 py-4 sm:px-6">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-start gap-3">
+                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[18px] bg-primary/10 text-primary">
+                  <Bell className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-lg font-semibold text-foreground">Telegram после завершения</h3>
+                  <p className="mt-0.5 truncate text-sm text-muted-foreground">{stage.stageName}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setTelegramSettingsModal(null)}
+                className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                aria-label="Закрыть настройки Telegram"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="grid min-h-0 flex-1 overflow-hidden lg:grid-cols-[292px_minmax(0,1fr)]">
+            <aside className="min-h-0 overflow-y-auto border-b border-border/70 bg-muted/35 p-4 sm:p-5 lg:border-b-0 lg:border-r">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-foreground">Что уведомлять</p>
+                <span className={cn('badge flex-shrink-0 px-2 py-1 text-xs', statusMeta.chipClass)}>{statusMeta.label}</span>
+              </div>
+              <div className="space-y-2">
+                {targets.map((target) => {
+                  const targetStatus = getNotificationStatusMeta(stage, target.subStage)
+                  const targetActive = target.key === activeTarget.key
+                  return (
+                    <button
+                      key={target.key}
+                      type="button"
+                      onClick={() => setTelegramSettingsTarget(target.subStage?.id || null)}
+                      className={cn(
+                        'grid w-full grid-cols-[3.25rem_minmax(0,1fr)_1.25rem] items-center gap-3 rounded-[18px] border p-3 text-left transition-colors',
+                        targetActive
+                          ? 'border-primary/45 bg-primary/10'
+                          : 'border-border/70 bg-card/80 hover:bg-accent'
+                      )}
+                    >
+                      <span className={cn(
+                        'flex h-8 w-10 flex-shrink-0 items-center justify-center rounded-[14px] text-xs font-semibold',
+                        targetActive ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                      )}>
+                        {target.number}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold text-foreground">
+                          {target.subStage ? target.description : target.title}
+                        </span>
+                        <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                          {target.subStage ? target.title : target.description}
+                        </span>
+                      </span>
+                      {targetStatus.label !== 'Не настроено' && (
+                        <CheckCircle2 className={cn('mt-1 h-4 w-4 flex-shrink-0', targetStatus.iconClass)} />
+                      )}
+                      {targetStatus.label === 'Не настроено' && (
+                        <span aria-hidden className="h-4 w-4" />
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            </aside>
+
+            <section className="grid min-h-0 gap-4 overflow-hidden p-4 sm:p-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+              <div className="min-h-0 space-y-4 overflow-y-auto pr-1">
+                <div className="rounded-[22px] border border-border/70 bg-muted/45 p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-foreground">{targetKindLabel}</p>
+                      <p className="mt-1 truncate text-xs text-muted-foreground">
+                        {activeSubStage ? activeSubStage.name : 'После того как этап станет завершённым'}
+                      </p>
+                    </div>
+                    <label className="inline-flex flex-shrink-0 items-center gap-2 text-sm font-medium text-foreground">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(draft.isEnabled)}
+                        onChange={(e) => setTelegramDraftValue(stage.id, activeSubStage?.id || null, { isEnabled: e.target.checked })}
+                        className="h-4 w-4 rounded border-border text-primary focus:ring-ring"
+                        disabled={!canEdit}
+                      />
+                      Отправлять
+                    </label>
+                  </div>
+                  {setting?.lastError && (
+                    <div className="mt-3 rounded-[16px] border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs text-red-700 dark:text-red-300">
+                      {getTelegramErrorText(setting.lastError)}
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-[22px] border border-border/70 bg-card p-4">
+                  <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <Bell className="h-4 w-4 text-primary" />
+                    Получатель
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="min-w-0 space-y-1 text-xs font-medium text-muted-foreground">
+                      Тип
+                      <select
+                        value={draft.recipientType}
+                        onChange={(e) => setTelegramDraftValue(stage.id, activeSubStage?.id || null, { recipientType: e.target.value, recipientId: '' })}
+                        className="input h-11 w-full min-w-0 py-1 text-sm"
+                        disabled={!canEdit}
+                      >
+                        <option value="user">Личный Telegram</option>
+                        <option value="chat">Групповой чат</option>
+                      </select>
+                    </label>
+                    <label className="min-w-0 space-y-1 text-xs font-medium text-muted-foreground">
+                      Получатель
+                      <select
+                        value={draft.recipientId}
+                        onChange={(e) => setTelegramDraftValue(stage.id, activeSubStage?.id || null, { recipientId: e.target.value })}
+                        className="input h-11 w-full min-w-0 py-1 text-sm"
+                        disabled={!canEdit || recipients.length === 0}
+                      >
+                        <option value="">Не выбран</option>
+                        {recipients.map((recipient) => (
+                          <option key={recipient.id} value={recipient.id}>
+                            {recipient.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                  {draft.isEnabled && !draft.recipientId && (
+                    <div className="mt-3 rounded-[16px] border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+                      Выберите получателя, чтобы включить уведомление.
+                    </div>
+                  )}
+                  {selectedRecipient && (
+                    <p className="mt-3 truncate text-xs text-muted-foreground">
+                      Сейчас выбран: <span className="font-medium text-foreground">{selectedRecipient.name}</span>
+                    </p>
+                  )}
+                </div>
+
+                <div className="rounded-[22px] border border-border/70 bg-card p-4">
+                  <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <Settings className="h-4 w-4 text-primary" />
+                    Сообщение
+                  </div>
+                  <label className="block min-w-0 space-y-1 text-xs font-medium text-muted-foreground">
+                    Формат
+                    <select
+                      value={selectedTemplate}
+                      onChange={(e) => setTelegramDraftValue(stage.id, activeSubStage?.id || null, { messageTemplate: e.target.value })}
+                      className="input h-11 w-full min-w-0 py-1 text-sm"
+                      disabled={!canEdit}
+                    >
+                      {templateOptions.map((template) => (
+                        <option key={template.id} value={template.id}>{template.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                  {isCustomMessage && (
+                    <label className="mt-3 block min-w-0 space-y-1 text-xs font-medium text-muted-foreground">
+                      Свой текст
+                      <textarea
+                        value={draft.customMessage}
+                        onChange={(e) => setTelegramDraftValue(stage.id, activeSubStage?.id || null, { customMessage: e.target.value, messageTemplate: 'custom' })}
+                        className="input min-h-[112px] w-full rounded-[18px] py-2 text-sm"
+                        placeholder={activeSubStage
+                          ? 'Например: Подэтап {substage_name} закрыт по продукту {product_name}'
+                          : 'Например: Этап {stage_name} завершён по продукту {product_name}'}
+                        disabled={!canEdit}
+                      />
+                    </label>
+                  )}
+                </div>
+
+                {renderTelegramRecipientManager()}
+              </div>
+
+              <div className="flex min-h-0 flex-col rounded-[22px] border border-border/70 bg-background/75 p-4">
+                <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <SendHorizontal className="h-4 w-4 text-primary" />
+                  Превью
+                </div>
+                <pre className="min-h-0 flex-1 whitespace-pre-wrap overflow-y-auto rounded-[18px] bg-muted/70 p-3 text-sm leading-6 text-foreground">{preview}</pre>
+                <button
+                  type="button"
+                  onClick={() => handleSendTelegramTest(stage, activeSubStage)}
+                  disabled={!draft.recipientId || isTestingNotification || !canEdit}
+                  className="btn-secondary mt-3 h-11 w-full flex-shrink-0 justify-center rounded-[16px] px-3 py-1 text-sm"
+                >
+                  <SendHorizontal className="h-4 w-4" />
+                  {isTestingNotification ? 'Отправляем...' : 'Отправить тест'}
+                </button>
+              </div>
+            </section>
+          </div>
+
+          <div className="flex flex-shrink-0 flex-col-reverse gap-3 border-t border-border/70 bg-card px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <button
+              type="button"
+              onClick={() => setTelegramSettingsModal(null)}
+              className="btn-secondary w-full justify-center sm:w-auto"
+            >
+              Закрыть
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleSaveTelegramNotification(stage, activeSubStage)}
+              disabled={saveDisabled || !canEdit}
+              className="btn-primary w-full justify-center text-sm sm:w-auto"
+            >
+              <Save className="h-4 w-4" />
+              {isSavingNotification ? 'Сохраняем...' : 'Сохранить'}
+            </button>
+          </div>
+        </motion.div>
+      </motion.div>,
+      document.body
+    )
+  }
+
+  const renderTemplateNotificationPanel = () => {
+    if (!canEdit || productTemplates.length === 0) return null
+
+    return (
+      <div className="rounded-[24px] border border-border/70 bg-muted/60 p-4">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm font-semibold text-foreground">Шаблон продукта</p>
+              {currentProductTemplate ? (
+                <span className="badge status-chip-info px-2.5 py-1 text-xs">Используется шаблон</span>
+              ) : (
+                <span className="badge status-chip-neutral px-2.5 py-1 text-xs">Без шаблона</span>
+              )}
+              {hasTelegramNotificationOverrides && (
+                <span className="badge status-chip-warning px-2.5 py-1 text-xs">Есть индивидуальные TG</span>
+              )}
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {currentProductTemplate
+                ? `Сейчас применён: ${currentProductTemplate.name}`
+                : 'Выберите шаблон, чтобы подтянуть этапы и Telegram-уведомления.'}
+            </p>
+          </div>
+
+          <div className="grid w-full gap-3 md:grid-cols-[minmax(0,1fr)_auto_auto] xl:w-auto xl:min-w-[620px]">
+            <label className="min-w-0">
+              <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Шаблон
+              </span>
+              <select
+                value={templateApplyId}
+                onChange={(event) => setTemplateApplyId(event.target.value)}
+                className="input h-10 w-full text-sm"
+              >
+                <option value="">Выберите шаблон</option>
+                {productTemplates.map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="flex items-end">
+              <span className="flex h-10 items-center gap-2 rounded-lg border border-border/70 bg-card px-3 text-xs text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={templateResetNotificationOverrides}
+                  onChange={(event) => setTemplateResetNotificationOverrides(event.target.checked)}
+                  className="h-4 w-4 rounded border-border text-primary focus:ring-ring"
+                />
+                Использовать TG из шаблона
+              </span>
+            </label>
+
+            <button
+              type="button"
+              onClick={handleApplyProductTemplate}
+              disabled={templateApplying || !templateApplyId}
+              className="btn-primary h-10 justify-center px-4 text-sm"
+            >
+              {templateApplying ? 'Применяем...' : 'Применить'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const renderStageCard = (stage: any, idx: number) => {
+    const isEditing = editingStageId === stage.id
+    const cellStyle = getStageCellStyle(stage)
+    const subStages = Array.isArray(stage.subStages) ? stage.subStages : []
+    const addSubStageKey = `add:${stage.id}`
+    const telegramSummary = getStageNotificationSummary(stage)
+
+    return (
+      <div
+        key={stage.id}
+        onContextMenu={(e) => handleStageContextMenu(e, stage)}
+        className={cn(
+          'space-y-3 rounded-[24px] p-3 transition-all',
+          stage.isCompleted
+            ? 'bg-emerald-500/10'
+            : stage.status === 'IN_PROGRESS'
+              ? 'bg-sky-500/10'
+              : 'bg-muted/70 hover:bg-accent/70'
+        )}
+      >
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+          <div className="flex w-full min-w-0 items-start gap-3 lg:items-center">
+            <div className="flex-shrink-0" title="Этап закрывается автоматически после выполнения чек-листа">
+              {stage.isCompleted
+                ? <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                : <Circle className="h-5 w-5 text-muted-foreground/40" />
+              }
+            </div>
+
+            <div className="w-6 flex-shrink-0 pt-0.5 text-center text-xs text-muted-foreground lg:pt-0">{idx + 1}</div>
+
+            <div className="min-w-0 flex-1">
+              {renamingStageId === stage.id ? (
+                <input
+                  type="text"
+                  value={renameValue}
+                  onChange={(e) => setRenameValue(e.target.value)}
+                  className="input w-full py-1 text-sm"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleRenameStage(stage.id)
+                    if (e.key === 'Escape') setRenamingStageId(null)
+                  }}
+                  onBlur={() => handleRenameStage(stage.id)}
+                />
+              ) : (
+                <p className={cn('text-sm font-medium', stage.isCompleted ? 'line-through text-muted-foreground' : 'text-foreground')}>
+                  {stage.stageName}
+                  {stage.isCritical && <span className="ml-1.5 text-xs font-semibold text-red-500 dark:text-red-300">КРИТИЧНЫЙ</span>}
+                  {stage.participatesInAutoshift === false && (
+                    <span className="ml-1.5 text-xs font-semibold text-muted-foreground">АВТОСДВИГ ВЫКЛ.</span>
+                  )}
+                </p>
+              )}
+              {stage.comment && !isEditing && renamingStageId !== stage.id && (
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">{stage.comment}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex w-full flex-col gap-2 lg:w-auto lg:flex-row lg:items-center lg:justify-end">
+            <span className={cn('badge justify-center px-2.5 py-1 text-xs', getStageStatusStyle(stage.status, stage.isCompleted))}>
+              {STAGE_STATUS_LABELS[stage.status] || stage.status}
+            </span>
+            {telegramSummary.errors > 0 ? (
+              <span className="badge status-chip-danger justify-center px-2.5 py-1 text-xs">TG ошибка</span>
+            ) : telegramSummary.enabled > 0 ? (
+              <span className="badge status-chip-info justify-center px-2.5 py-1 text-xs">
+                TG {telegramSummary.enabled}/{telegramSummary.total}
+              </span>
+            ) : null}
+            <div className="flex-shrink-0">
+              {isEditing ? (
+                <DatePicker
+                  value={stageEditValues[stage.id]?.dateValue ?? (stage.dateValue ? new Date(stage.dateValue) : null)}
+                  onChange={(nextDate) => setStageEditValues((prev) => ({
+                    ...prev,
+                    [stage.id]: { ...prev[stage.id], dateValue: nextDate }
+                  }))}
+                  onCommit={(nextDate) =>
+                    updateStage(stage.id, {
+                      ...(stageEditValues[stage.id] ?? {}),
+                      dateValue: nextDate,
+                    })
+                  }
+                  onCancel={() => setEditingStageId(null)}
+                  inputClassName="h-10 w-full text-xs sm:w-48"
+                  panelClassName="w-[min(22rem,calc(100vw-24px))]"
+                />
+              ) : (
+                <div className={cn('rounded-[16px] px-2.5 py-1.5 text-xs font-medium', cellStyle)}>
+                  {stage.dateValue ? formatDate(stage.dateValue) : stage.dateRaw || '—'}
+                </div>
+              )}
+            </div>
+
+            {isEditing ? (
+              <label className="flex w-full flex-shrink-0 items-center gap-2 text-xs text-muted-foreground sm:w-28">
+                <span className="sr-only">Количество дней</span>
+                <input
+                  type="number"
+                  min={1}
+                  value={stageEditValues[stage.id]?.durationDays ?? getStageDurationValue(stage)}
+                  onChange={(e) => setStageEditValues((prev) => ({
+                    ...prev,
+                    [stage.id]: {
+                      ...prev[stage.id],
+                      durationDays: Math.max(1, Number(e.target.value) || 1),
+                    },
+                  }))}
+                  className="input h-10 w-full text-xs"
+                  aria-label="Количество дней этапа"
+                />
+              </label>
+            ) : (
+              Boolean(stage.durationDays ?? stage.stageTemplate?.durationDays) && (
+                <div className="w-full flex-shrink-0 text-left text-xs text-muted-foreground sm:w-16 sm:text-center">
+                  {formatDurationDays(stage.durationDays ?? stage.stageTemplate?.durationDays ?? null)}
+                </div>
+              )
+            )}
+
+            {canEdit && (
+              <div className="flex flex-shrink-0 items-center justify-end gap-1">
+                {isEditing ? (
+                  <>
+                    <button onClick={() => updateStage(stage.id)} disabled={saving} className="btn-primary px-2 py-1 text-xs">
+                      <Save className="h-3 w-3" />
+                    </button>
+                    <button onClick={() => setEditingStageId(null)} className="btn-secondary px-2 py-1 text-xs">
+                      Отмена
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => openTelegramSettingsModal(stage)}
+                      className="inline-flex h-11 w-11 items-center justify-center rounded-[16px] border border-border/70 bg-background/80 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      title="Настроить Telegram после завершения"
+                      aria-label="Настроить Telegram после завершения этапа"
+                    >
+                      <Settings className="h-5 w-5" />
+                    </button>
+                    <button
+                      onClick={() => beginStageEdit(stage)}
+                      className="rounded-lg p-1.5 text-muted-foreground/60 transition-colors hover:bg-accent hover:text-foreground"
+                      title="Изменить дату и дни"
+                    >
+                      <Edit2 className="h-3.5 w-3.5" />
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="border-l border-border/80 pl-3">
+          <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              Подэтапы
+              <span className="text-xs font-medium text-muted-foreground">{subStages.length}</span>
+            </div>
+            {canEdit && (
+              <div className="flex gap-2">
+                <input
+                  value={subStageDrafts[addSubStageKey] || ''}
+                  onChange={(e) => setSubStageDrafts((prev) => ({ ...prev, [addSubStageKey]: e.target.value }))}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleAddSubStage(stage)
+                  }}
+                  className="input h-10 min-w-0 py-1 text-xs sm:w-64"
+                  placeholder="Название подэтапа"
+                />
+                <button
+                  onClick={() => handleAddSubStage(stage)}
+                  disabled={subStageSavingKey === addSubStageKey || !(subStageDrafts[addSubStageKey] || '').trim()}
+                  className="btn-secondary h-10 rounded-[16px] px-3 py-1 text-xs"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {subStages.length === 0 ? (
+            <div className="rounded-[18px] border border-dashed border-border/70 px-3 py-4 text-center text-xs text-muted-foreground">
+              Подэтапов пока нет
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {subStages.map((subStage: any, subIndex: number) => (
+	                <div key={subStage.id} className="rounded-[18px] bg-background/55 p-3">
+	                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+	                    <div className="flex min-w-0 gap-3">
+	                      {canEdit ? (
+	                        <button
+	                          type="button"
+	                          onClick={() => handleToggleSubStageComplete(stage, subStage)}
+	                          disabled={subStageSavingKey === `complete:${subStage.id}`}
+	                          className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+	                          title={subStage.status === 'COMPLETED' ? 'Вернуть подэтап в работу' : 'Закрыть подэтап'}
+	                          aria-label={subStage.status === 'COMPLETED' ? 'Вернуть подэтап в работу' : 'Закрыть подэтап'}
+	                        >
+	                          {subStage.status === 'COMPLETED'
+	                            ? <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+	                            : <Circle className="h-5 w-5" />
+	                          }
+	                        </button>
+	                      ) : (
+	                        <div className="mt-0.5 h-5 w-5 shrink-0">
+	                          {subStage.status === 'COMPLETED'
+	                            ? <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+	                            : <Circle className="h-5 w-5 text-muted-foreground/50" />
+	                          }
+	                        </div>
+	                      )}
+	                    <div className="min-w-0">
+	                      <div className="flex flex-wrap items-center gap-2">
+	                        <span className="text-xs text-muted-foreground">{idx + 1}.{subIndex + 1}</span>
+	                        <p className={cn('text-sm font-medium', subStage.status === 'COMPLETED' ? 'text-muted-foreground line-through' : 'text-foreground')}>{subStage.name}</p>
+                        <span className={cn('badge px-2 py-1 text-xs', getStageStatusStyle(subStage.status))}>
+                          {STAGE_STATUS_LABELS[subStage.status] || subStage.status}
+                        </span>
+                        {(() => {
+                          const subStageStatus = getNotificationStatusMeta(stage, subStage)
+                          const showTelegramStatus = subStageStatus.label !== 'Не настроено'
+                          return showTelegramStatus ? (
+                            <span className={cn('badge px-2 py-1 text-xs', subStageStatus.chipClass)}>
+                              TG {subStageStatus.label}
+                            </span>
+                          ) : null
+                        })()}
+                      </div>
+	                      {subStage.description && (
+	                        <p className="mt-1 text-xs text-muted-foreground">{subStage.description}</p>
+	                      )}
+	                    </div>
+	                    </div>
+	                    {canEdit && (
+	                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          type="button"
+                          onClick={() => openTelegramSettingsModal(stage, subStage)}
+                          className="inline-flex h-10 w-10 items-center justify-center rounded-[14px] border border-border/70 bg-background/80 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                          title="Настроить Telegram после завершения подэтапа"
+                          aria-label="Настроить Telegram после завершения подэтапа"
+                        >
+                          <Settings className="h-5 w-5" />
+                        </button>
+	                        <button
+                          onClick={() => handleDeleteSubStage(stage, subStage)}
+                          disabled={subStageSavingKey === `delete:${subStage.id}`}
+                          className="rounded-lg p-1.5 text-red-500/70 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10"
+                          title="Удалить подэтап"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-5 animate-fade-in">
@@ -1199,146 +2411,10 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
                           Отмена
                         </button>
                       </div>
-                    )}
-                    {product.stages.map((stage: any, idx: number) => {
-                      const isEditing = editingStageId === stage.id
-                      const cellStyle = getStageCellStyle(stage)
-
-                      return (
-                        <div
-                          key={stage.id}
-                          onContextMenu={(e) => handleStageContextMenu(e, stage)}
-                          className={cn(
-                            'flex flex-col gap-3 rounded-[24px] p-3 transition-all sm:flex-row sm:items-center',
-                            stage.isCompleted ? 'bg-emerald-500/10' : 'bg-muted/70 hover:bg-accent/70'
-                          )}
-                        >
-                          <div className="flex w-full items-start gap-3 sm:w-auto sm:items-center">
-                          {canEdit ? (
-                            <button onClick={() => toggleStageComplete(stage)} className="flex-shrink-0">
-                              {stage.isCompleted
-                                ? <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                                : <Circle className="h-5 w-5 text-muted-foreground/60 hover:text-muted-foreground" />
-                              }
-                            </button>
-                          ) : (
-                            <div className="flex-shrink-0">
-                              {stage.isCompleted
-                                ? <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                                : <Circle className="h-5 w-5 text-muted-foreground/40" />
-                              }
-                            </div>
-                          )}
-
-                          <div className="w-6 flex-shrink-0 pt-0.5 text-center text-xs text-muted-foreground sm:pt-0">{idx + 1}</div>
-
-                          <div className="min-w-0 flex-1">
-                            {renamingStageId === stage.id ? (
-                              <input
-                                type="text"
-                                value={renameValue}
-                                onChange={(e) => setRenameValue(e.target.value)}
-                                className="input w-full py-1 text-sm"
-                                autoFocus
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') handleRenameStage(stage.id)
-                                  if (e.key === 'Escape') setRenamingStageId(null)
-                                }}
-                                onBlur={() => handleRenameStage(stage.id)}
-                              />
-                            ) : (
-                              <p className={cn('text-sm font-medium', stage.isCompleted ? 'line-through text-muted-foreground' : 'text-foreground')}>
-                                {stage.stageName}
-                                {stage.isCritical && <span className="ml-1.5 text-xs font-semibold text-red-500 dark:text-red-300">КРИТИЧНЫЙ</span>}
-                                {stage.participatesInAutoshift === false && (
-                                  <span className="ml-1.5 text-xs font-semibold text-muted-foreground">АВТОСДВИГ ВЫКЛ.</span>
-                                )}
-                              </p>
-                            )}
-                            {stage.comment && !isEditing && renamingStageId !== stage.id && (
-                              <p className="mt-0.5 truncate text-xs text-muted-foreground">{stage.comment}</p>
-                            )}
-                          </div>
-                          </div>
-
-                          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
-                          <div className="flex-shrink-0">
-                            {isEditing ? (
-                              <DatePicker
-                                value={stageEditValues[stage.id]?.dateValue ?? (stage.dateValue ? new Date(stage.dateValue) : null)}
-                                onChange={(nextDate) => setStageEditValues((prev) => ({
-                                  ...prev,
-                                  [stage.id]: { ...prev[stage.id], dateValue: nextDate }
-                                }))}
-                                onCommit={(nextDate) =>
-                                  updateStage(stage.id, {
-                                    ...(stageEditValues[stage.id] ?? {}),
-                                    dateValue: nextDate,
-                                  })
-                                }
-                                onCancel={() => setEditingStageId(null)}
-                                inputClassName="h-10 w-full text-xs sm:w-48"
-                                panelClassName="w-[min(22rem,calc(100vw-24px))]"
-                              />
-                            ) : (
-                              <div className={cn('rounded-[16px] px-2.5 py-1.5 text-xs font-medium', cellStyle)}>
-                                {stage.dateValue ? formatDate(stage.dateValue) : stage.dateRaw || '—'}
-                              </div>
-                            )}
-                          </div>
-
-                          {isEditing ? (
-                            <label className="flex w-full flex-shrink-0 items-center gap-2 text-xs text-muted-foreground sm:w-28">
-                              <span className="sr-only">Количество дней</span>
-                              <input
-                                type="number"
-                                min={1}
-                                value={stageEditValues[stage.id]?.durationDays ?? getStageDurationValue(stage)}
-                                onChange={(e) => setStageEditValues((prev) => ({
-                                  ...prev,
-                                  [stage.id]: {
-                                    ...prev[stage.id],
-                                    durationDays: Math.max(1, Number(e.target.value) || 1),
-                                  },
-                                }))}
-                                className="input h-10 w-full text-xs"
-                                aria-label="Количество дней этапа"
-                              />
-                            </label>
-                          ) : (
-                            Boolean(stage.durationDays ?? stage.stageTemplate?.durationDays) && (
-                              <div className="w-full flex-shrink-0 text-left text-xs text-muted-foreground sm:w-16 sm:text-center">
-                                {formatDurationDays(stage.durationDays ?? stage.stageTemplate?.durationDays ?? null)}
-                              </div>
-                            )
-                          )}
-
-                          {canEdit && (
-                            <div className="flex flex-shrink-0 items-center justify-end gap-1">
-                              {isEditing ? (
-                                <>
-                                  <button onClick={() => updateStage(stage.id)} disabled={saving} className="btn-primary px-2 py-1 text-xs">
-                                    <Save className="h-3 w-3" />
-                                  </button>
-                                  <button onClick={() => setEditingStageId(null)} className="btn-secondary px-2 py-1 text-xs">
-                                    Отмена
-                                  </button>
-                                </>
-                              ) : (
-                                <button
-                                  onClick={() => beginStageEdit(stage)}
-                                  className="rounded-lg p-1.5 text-muted-foreground/60 transition-colors hover:bg-accent hover:text-foreground"
-                                >
-                                  <Edit2 className="h-3.5 w-3.5" />
-                                </button>
-                              )}
-                            </div>
-                          )}
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
+	                    )}
+	                    {renderTemplateNotificationPanel()}
+	                    {product.stages.map((stage: any, idx: number) => renderStageCard(stage, idx))}
+	                  </div>
                 )}
 
                 {tab === 'comments' && (
@@ -1554,6 +2630,8 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
         </div>
       </div>
 
+      {renderTelegramSettingsModal()}
+
       {/* Stage Context Menu */}
       {stageMenu && (() => {
         const stage = product.stages.find((s: any) => s.id === stageMenu.stageId)
@@ -1578,6 +2656,16 @@ export function ProductCardClient({ product: initial, users, currentUser }: Prod
             >
               <CalendarDays className="w-3.5 h-3.5 text-muted-foreground" />
               Изменить дату и дни
+            </button>
+            <button
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-popover-foreground hover:bg-accent"
+              onClick={() => {
+                openTelegramSettingsModal(stage)
+                closeStageMenu()
+              }}
+            >
+              <Settings className="w-3.5 h-3.5 text-muted-foreground" />
+              Telegram-уведомления
             </button>
             <button
               className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-popover-foreground hover:bg-accent"

@@ -7,15 +7,24 @@ import { getCachedAssignableUsers, getCachedProductTemplates, getCachedStageSugg
 import {
   supportsProductTemplateStageAutoshiftColumn,
   supportsProductTemplateStageDurationDaysColumn,
+  supportsProductTemplateStageStartRulesColumns,
+  supportsProductTemplateSubStagesTable,
 } from '@/lib/schema-compat'
 import { canManageProducts, canViewAllProducts, getVisibleProductWhere } from '@/lib/product-access'
 import { getFinalDateFromStages } from '@/lib/product-derived-fields'
 
 async function getProductsWorkspaceData(viewer: { id?: string | null; role?: string | null }, archived = false) {
   await recalculateAllRisksIfNeeded()
-  const [hasTemplateStageDurationDaysColumn, hasTemplateStageAutoshiftColumn] = await Promise.all([
+  const [
+    hasTemplateStageDurationDaysColumn,
+    hasTemplateStageAutoshiftColumn,
+    hasTemplateStageStartRulesColumns,
+    hasTemplateSubStagesTable,
+  ] = await Promise.all([
     supportsProductTemplateStageDurationDaysColumn(),
     supportsProductTemplateStageAutoshiftColumn(),
+    supportsProductTemplateStageStartRulesColumns(),
+    supportsProductTemplateSubStagesTable(),
   ])
   const visibleProductsWhere = getVisibleProductWhere(viewer, { isArchived: archived })
 
@@ -68,7 +77,12 @@ async function getProductsWorkspaceData(viewer: { id?: string | null; role?: str
     }),
     getCachedAssignableUsers(),
     getCachedStageTemplates(),
-    getCachedProductTemplates(hasTemplateStageDurationDaysColumn, hasTemplateStageAutoshiftColumn),
+    getCachedProductTemplates(
+      hasTemplateStageDurationDaysColumn,
+      hasTemplateStageAutoshiftColumn,
+      hasTemplateStageStartRulesColumns,
+      hasTemplateSubStagesTable
+    ),
     getCachedStageSuggestions(),
   ])
 
@@ -86,6 +100,8 @@ async function getProductsWorkspaceData(viewer: { id?: string | null; role?: str
     stageSuggestions,
     hasTemplateStageDurationDaysColumn,
     hasTemplateStageAutoshiftColumn,
+    hasTemplateStageStartRulesColumns,
+    hasTemplateSubStagesTable,
   }
 }
 
@@ -133,6 +149,13 @@ export default async function ProductsPage({
           durationDays: data.hasTemplateStageDurationDaysColumn ? (stage as any).durationDays ?? null : null,
           stageTemplateDurationDays: stage.stageTemplate.durationDays ?? null,
           participatesInAutoshift: data.hasTemplateStageAutoshiftColumn ? (stage as any).participatesInAutoshift ?? true : true,
+          startTrigger: data.hasTemplateStageStartRulesColumns ? (stage as any).startTrigger : undefined,
+          startDelayDays: data.hasTemplateStageStartRulesColumns ? (stage as any).startDelayDays ?? 0 : 0,
+          startReferenceStageOrder: data.hasTemplateStageStartRulesColumns
+            ? (stage as any).startReferenceStageOrder ?? null
+            : null,
+          subStages: data.hasTemplateSubStagesTable ? (stage as any).subStages ?? [] : [],
+          telegramNotificationSettings: (stage as any).telegramNotificationSettings ?? [],
         })),
       })) as any}
       stageSuggestions={data.stageSuggestions}

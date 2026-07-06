@@ -54,6 +54,22 @@ export async function supportsProductTemplateStageAutoshiftColumn() {
   return hasDbColumn('product_template_stages', 'participatesInAutoshift')
 }
 
+export async function supportsProductTemplateStageStartRulesColumns() {
+  return hasDbColumn('product_template_stages', 'startTrigger')
+}
+
+export async function supportsProductStageStartRulesColumns() {
+  return hasDbColumn('product_stages', 'startTrigger')
+}
+
+export async function supportsProductTemplateSubStagesTable() {
+  return hasDbColumn('product_template_substages', 'productTemplateStageId')
+}
+
+export async function supportsProductSubStageResponsibleColumn() {
+  return hasDbColumn('product_substages', 'responsibleId')
+}
+
 export async function supportsProductTemplateReferenceColumn() {
   return hasDbColumn('products', 'productTemplateId')
 }

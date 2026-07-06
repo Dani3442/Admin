@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Filter, LayoutList, Plus, Search, Table2, UserRound, X } from 'lucide-react'
+import { Filter, Globe2, LayoutList, Plus, Search, Table2, UserRound, X } from 'lucide-react'
 import { FilterSelect } from '@/components/ui/FilterSelect'
 import {
   UNASSIGNED_RESPONSIBLE_FILTER,
@@ -32,6 +32,7 @@ const TableViewClient = dynamic(
 )
 
 type ProductsLayoutMode = 'list' | 'table'
+type ProductsCountryScope = 'china' | 'russia'
 
 interface StageTemplateView {
   id: string
@@ -85,6 +86,10 @@ interface ProductsWorkspaceProps {
 const layoutOptions: Array<{ value: ProductsLayoutMode; label: string; icon: typeof LayoutList }> = [
   { value: 'list', label: 'Список', icon: LayoutList },
   { value: 'table', label: 'Таблица', icon: Table2 },
+]
+const countryScopeOptions: Array<{ value: ProductsCountryScope; label: string; filterValue: string }> = [
+  { value: 'china', label: 'Китай', filterValue: 'Китай' },
+  { value: 'russia', label: 'Россия', filterValue: 'Россия' },
 ]
 
 const ALL_STATUSES = ['PLANNED', 'IN_PROGRESS', 'AT_RISK', 'DELAYED', 'COMPLETED', 'CANCELLED'] as const
@@ -160,6 +165,54 @@ function getLayoutFromSearchParams(searchParams: Pick<URLSearchParams, 'get'>): 
   return searchParams.get('layout') === 'table' ? 'table' : 'list'
 }
 
+function getCountryScopeFromSearchParams(searchParams: Pick<URLSearchParams, 'get'>): ProductsCountryScope {
+  const country = (searchParams.get('country') || '').trim().toLowerCase()
+  if (country.includes('рос') || country === 'рф' || country.includes('russia')) return 'russia'
+  return 'china'
+}
+
+function getCountryFilterFromScope(scope: ProductsCountryScope) {
+  return countryScopeOptions.find((option) => option.value === scope)?.filterValue || 'Китай'
+}
+
+function CountryScopeSwitcher({
+  countryScope,
+  onChange,
+}: {
+  countryScope: ProductsCountryScope
+  onChange: (nextScope: ProductsCountryScope) => void
+}) {
+  return (
+    <div className="inline-flex w-full flex-wrap items-center gap-1 rounded-[24px] border border-border/70 bg-card/90 p-1.5 sm:w-auto sm:flex-nowrap sm:rounded-full">
+      {countryScopeOptions.map((option) => {
+        const active = countryScope === option.value
+
+        return (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => onChange(option.value)}
+            className={cn(
+              'relative inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-[18px] px-4 py-2.5 text-sm font-medium transition-colors sm:min-w-[118px] sm:flex-none sm:rounded-full',
+              active ? 'text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            {active && (
+              <motion.span
+                layoutId="products-country-pill"
+                className="absolute inset-0 rounded-full bg-primary shadow-card"
+                transition={{ type: 'spring', stiffness: 420, damping: 38, mass: 0.9 }}
+              />
+            )}
+            <Globe2 className="relative z-10 h-4 w-4" />
+            <span className="relative z-10">{option.label}</span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 function resolveInitialResponsibleFilter({
   archiveMode,
   canViewAllProducts,
@@ -220,7 +273,8 @@ export function ProductsWorkspace({
     })
   )
   const [priorityFilter, setPriorityFilter] = useState(searchParams.get('priority') || '')
-  const [countryFilter, setCountryFilter] = useState(searchParams.get('country') || '')
+  const [countryScope, setCountryScope] = useState<ProductsCountryScope>(() => getCountryScopeFromSearchParams(searchParams))
+  const countryFilter = getCountryFilterFromScope(countryScope)
   const [quickView, setQuickView] = useState<ProductQuickView>((searchParams.get('view') as ProductQuickView) || 'all')
   const [sortField, setSortField] = useState<ProductListSortField>((searchParams.get('sort') as ProductListSortField) || 'manual')
   const [sortDirection, setSortDirection] = useState<ProductListSortDirection>(searchParams.get('dir') === 'desc' ? 'desc' : 'asc')
@@ -312,6 +366,7 @@ export function ProductsWorkspace({
   }
 
   const layoutSwitcher: ReactNode = <LayoutSwitcher layout={layout} onChange={updateLayout} />
+  const countrySwitcher: ReactNode = <CountryScopeSwitcher countryScope={countryScope} onChange={setCountryScope} />
   const filters = useMemo<ProductListFilters>(() => ({
     search,
     status: statusFilter,
@@ -325,7 +380,6 @@ export function ProductsWorkspace({
       statusFilter ||
       responsibleFilter ||
       priorityFilter ||
-      countryFilter.trim() ||
       quickView !== 'all'
   )
 
@@ -340,7 +394,7 @@ export function ProductsWorkspace({
     if (statusFilter) params.set('status', statusFilter)
     if (responsibleFilter) params.set('responsible', responsibleFilter)
     if (priorityFilter) params.set('priority', priorityFilter)
-    if (countryFilter.trim()) params.set('country', countryFilter.trim())
+    params.set('country', countryFilter)
     if (quickView !== 'all') params.set('view', quickView)
     if (sortField !== 'manual') params.set('sort', sortField)
     if (sortField !== 'manual' && sortDirection !== 'asc') params.set('dir', sortDirection)
@@ -355,7 +409,6 @@ export function ProductsWorkspace({
     setStatusFilter('')
     setResponsibleFilter(archiveMode || canViewAllProducts ? '' : currentUser.id)
     setPriorityFilter('')
-    setCountryFilter('')
     setQuickView('all')
     setSortField('manual')
     setSortDirection('asc')
@@ -464,7 +517,7 @@ export function ProductsWorkspace({
                 transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
                 className="overflow-hidden"
               >
-                <div className="surface-subtle grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4">
+                <div className="surface-subtle grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-3">
                   <label className="space-y-1.5">
                     <span className="label mb-0">Статус</span>
                     <FilterSelect value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} placeholder="Все статусы" />
@@ -485,23 +538,16 @@ export function ProductsWorkspace({
                     />
                   </label>
 
-                  <label className="space-y-1.5">
-                    <span className="label mb-0">Страна</span>
-                    <input
-                      value={countryFilter}
-                      onChange={(event) => setCountryFilter(event.target.value)}
-                      className="input"
-                      placeholder="Например, Китай"
-                    />
-                  </label>
-
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
 
           <div className="flex flex-col gap-3 pt-1 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-            <div className="w-full sm:w-auto">{layoutSwitcher}</div>
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
+              {countrySwitcher}
+              {layoutSwitcher}
+            </div>
             {!archiveMode && (
               <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
                 {canCreateProducts && (

@@ -13,6 +13,9 @@ async function main() {
   console.log('🌱 Starting seed...')
 
   // Clear existing data
+  await prisma.telegramNotificationSetting.deleteMany()
+  await prisma.telegramRecipient.deleteMany()
+  await prisma.productSubStage.deleteMany()
   await prisma.changeHistory.deleteMany()
   await prisma.comment.deleteMany()
   await prisma.automation.deleteMany()
@@ -119,6 +122,49 @@ async function main() {
     'Катя / Кирилл': users[2].id,
     'Аделя/Катя': users[1].id,
   }
+
+  await prisma.user.update({
+    where: { id: users[0].id },
+    data: {
+      telegramId: '111111111',
+      telegramUsername: 'lana_product',
+      telegramChatId: '111111111',
+      telegramConnectionStatus: 'CONNECTED',
+      telegramConnectedAt: new Date(),
+    },
+  })
+
+  await prisma.user.update({
+    where: { id: admin.id },
+    data: {
+      telegramId: '222222222',
+      telegramUsername: 'admin_demo',
+      telegramChatId: '222222222',
+      telegramConnectionStatus: 'CONNECTED',
+      telegramConnectedAt: new Date(),
+    },
+  })
+
+  const telegramRecipients = await Promise.all([
+    prisma.telegramRecipient.create({
+      data: {
+        type: 'user',
+        name: 'Лана в Telegram',
+        telegramId: '111111111',
+        telegramUsername: 'lana_product',
+        chatId: '111111111',
+        userId: users[0].id,
+      },
+    }),
+    prisma.telegramRecipient.create({
+      data: {
+        type: 'chat',
+        name: 'Чат запуска продуктов',
+        chatId: '-1001234567890',
+        telegramUsername: 'product_launch_chat',
+      },
+    }),
+  ])
 
   console.log('✅ Users created')
 
@@ -382,6 +428,50 @@ async function main() {
   
   console.log(`✅ ${created} products created`)
 
+  const demoStage = await prisma.productStage.findFirst({
+    where: { isCompleted: false },
+    orderBy: [{ createdAt: 'asc' }],
+    select: { id: true, productId: true },
+  })
+
+  if (demoStage) {
+    const demoSubStage = await prisma.productSubStage.create({
+      data: {
+        stageId: demoStage.id,
+        name: 'Проверить Telegram-уведомление',
+        description: 'Демо-подэтап для локальной проверки отправки в чат',
+        status: StageStatus.NOT_STARTED,
+        sortOrder: 0,
+      },
+    })
+
+    await prisma.telegramNotificationSetting.createMany({
+      data: [
+        {
+          productId: demoStage.productId,
+          stageId: demoStage.id,
+          eventType: 'stage_completed',
+          recipientType: 'user',
+          recipientId: telegramRecipients[0].id,
+          messageTemplate: 'stage_completed_simple',
+          customMessage: null,
+          isEnabled: false,
+        },
+        {
+          productId: demoStage.productId,
+          stageId: demoStage.id,
+          subStageId: demoSubStage.id,
+          eventType: 'substage_completed',
+          recipientType: 'chat',
+          recipientId: telegramRecipients[1].id,
+          messageTemplate: 'substage_completed_simple',
+          customMessage: null,
+          isEnabled: false,
+        },
+      ],
+    })
+  }
+
   // ========== DEFAULT AUTOMATIONS ==========
   await prisma.automation.createMany({
     data: [
@@ -431,6 +521,8 @@ async function main() {
   console.log(`  Stage templates: ${await prisma.stageTemplate.count()}`)
   console.log(`  Products: ${await prisma.product.count()}`)
   console.log(`  Product stages: ${await prisma.productStage.count()}`)
+  console.log(`  Product substages: ${await prisma.productSubStage.count()}`)
+  console.log(`  Telegram recipients: ${await prisma.telegramRecipient.count()}`)
   console.log(`  Automations: ${await prisma.automation.count()}`)
   
   console.log('\n🔑 Login credentials:')

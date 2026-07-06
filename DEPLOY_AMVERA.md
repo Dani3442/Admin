@@ -56,6 +56,7 @@ git push amvera main
 | `ADMIN_EMAIL` | `admin@company.com` | Email администратора |
 | `ADMIN_PASSWORD` | `Admin1234!` | Пароль (измените!) |
 | `ADMIN_NAME` | `Данила` | Имя администратора |
+| `TELEGRAM_BOT_TOKEN` | токен Telegram-бота | Нужен для отправки уведомлений из прода |
 
 `SUPABASE_SERVICE_ROLE_KEY` храните только на сервере и никогда не передавайте во фронтенд.
 
@@ -66,24 +67,36 @@ git push amvera main
 В amvera.yml уже настроен Dockerfile.
 После пуша Amvera автоматически:
 1. Соберёт Docker-образ
-2. Запустит `prisma migrate deploy` (миграции БД)
-3. Запустит приложение на порту 3000
+2. Проверит baseline для схемы, если раньше изменения были внесены через `db push`
+3. Применит Prisma migrations через `npx prisma migrate deploy`
+4. Запустит приложение на порту 3000
+
+Контейнер больше не запускает `prisma db push --accept-data-loss` и не запускает seed на продовой базе.
 
 ---
 
-## Шаг 5: Заполнить базу данных
+## Шаг 5: Безопасные prod-команды
 
-После первого деплоя выполните seed через Amvera Console:
+На проде нельзя запускать `npm run db:seed`: этот seed предназначен для локальной демо-базы и создаёт тестовые данные.
+
+После успешной сборки и запуска контейнера выполните команды через Amvera Console именно в таком порядке:
 
 ```bash
-# В консоли Amvera
-npm run db:seed
+npm run db:prod:backup
+npm run db:prod:access-overrides # опционально, если нужен текущий служебный override роли
+npm run db:prod:templates
+npm run db:prod:rebuild-products:dry
 ```
 
-Или локально, указав DATABASE_URL вашего Amvera PostgreSQL:
+Если dry-run показывает ожидаемые количества продуктов РФ/Китай и целевые количества этапов/подэтапов, примените:
+
 ```bash
-DATABASE_URL="postgresql://..." npm run db:seed
+npm run db:prod:rebuild-products
 ```
+
+`db:prod:backup` создаёт `pg_dump --format=custom` в `/app/data/backups` и проверяет файл через `pg_restore --list`.
+`db:prod:templates` синхронизирует только шаблоны РФ/Китай, Telegram-получателей и правила уведомлений.
+`db:prod:rebuild-products` не удаляет строки `products`, комментарии и историю; он заменяет только stage/substage-структуру продукта по актуальному шаблону.
 
 ---
 
@@ -125,7 +138,11 @@ npm run dev
 npm run dev          # Запустить в режиме разработки
 npm run build        # Собрать production-сборку
 npm run db:studio    # Открыть Prisma Studio (GUI для БД)
-npm run db:seed      # Заполнить БД тестовыми данными
+npm run db:seed      # Только локальная демо-база, не прод
+npm run db:prod:backup                # Безопасный prod-бэкап через pg_dump
+npm run db:prod:templates             # Синхронизация шаблонов РФ/Китай и Telegram
+npm run db:prod:rebuild-products:dry  # Отчёт без изменений
+npm run db:prod:rebuild-products      # Применение новых шаблонов к продуктам
 npx prisma generate  # Регенерировать Prisma клиент
 ```
 
@@ -147,7 +164,7 @@ change_history    → Лог всех изменений
 
 ## Данные из Excel
 
-При запуске `npm run db:seed`:
+При локальном запуске `npm run db:seed`:
 - Создаётся **150 продуктов** из вашего файла «Данил тайминг.xlsx»
 - Все **30 этапов** с датами и длительностями
 - Пользователи: Лана, Аделя, Катя, Кирилл

@@ -73,19 +73,27 @@ function isProductOverdue(product: Pick<ProductListItem, 'finalDate' | 'status'>
   return new Date(product.finalDate) < now
 }
 
+function normalizeCountryValue(value: string | null | undefined) {
+  const normalized = (value || '').trim().toLowerCase()
+  if (!normalized) return ''
+  if (normalized === 'рф' || normalized.includes('рос') || normalized.includes('russia')) return 'russia'
+  if (normalized.includes('китай') || normalized.includes('china')) return 'china'
+  return normalized
+}
+
 export function hasActiveProductFilters(filters: ProductListFilters) {
   return Boolean(
     filters.search ||
       filters.status ||
       filters.responsibleId ||
       filters.priority ||
-      filters.country.trim() ||
       filters.quickView !== 'all'
   )
 }
 
 export function filterProducts(products: ProductListItem[], filters: ProductListFilters, now = new Date()) {
   const countrySearch = filters.country.trim().toLowerCase()
+  const normalizedCountrySearch = normalizeCountryValue(filters.country)
 
   return products.filter((product) => {
     if (filters.search && !product.name.toLowerCase().includes(filters.search.toLowerCase())) return false
@@ -97,7 +105,16 @@ export function filterProducts(products: ProductListItem[], filters: ProductList
       product.responsible?.id !== filters.responsibleId
     ) return false
     if (filters.priority && product.priority !== filters.priority) return false
-    if (countrySearch && !(product.country || '').toLowerCase().includes(countrySearch)) return false
+    if (countrySearch) {
+      const normalizedProductCountry = normalizeCountryValue(product.country)
+      const rawProductCountry = (product.country || '').toLowerCase()
+      if (
+        normalizedProductCountry !== normalizedCountrySearch &&
+        !rawProductCountry.includes(countrySearch)
+      ) {
+        return false
+      }
+    }
 
     const overdue = isProductOverdue(product, now)
     const atRisk = product.status === 'AT_RISK' || product.riskScore >= 40

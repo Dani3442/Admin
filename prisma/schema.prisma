@@ -10,27 +10,33 @@ datasource db {
 // ========== USERS & AUTH ==========
 
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  name          String
-  lastName      String?
-  password      String
-  role          String    @default("EMPLOYEE")
-  avatar        String?
-  jobTitle      String?
-  department    String?
-  employeeType  String    @default("INTERNAL")
-  verificationStatus String @default("UNVERIFIED")
-  isActive      Boolean   @default(true)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                       String    @id @default(cuid())
+  email                    String    @unique
+  name                     String
+  lastName                 String?
+  password                 String
+  role                     String    @default("EMPLOYEE")
+  avatar                   String?
+  jobTitle                 String?
+  department               String?
+  employeeType             String    @default("INTERNAL")
+  verificationStatus       String    @default("UNVERIFIED")
+  telegramId               String?   @map("telegram_id")
+  telegramUsername         String?   @map("telegram_username")
+  telegramChatId           String?   @map("telegram_chat_id")
+  telegramConnectionStatus String    @default("DISCONNECTED") @map("telegram_connection_status")
+  telegramConnectedAt      DateTime? @map("telegram_connected_at")
+  isActive                 Boolean   @default(true)
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
 
-  assignedProducts  Product[]        @relation("ProductResponsible")
-  closedProducts    Product[]        @relation("ProductClosedBy")
-  archivedProducts  Product[]        @relation("ProductArchivedBy")
-  comments          Comment[]
-  stageAssignments  ProductStage[]   @relation("StageResponsible")
-  changeHistory     ChangeHistory[]
+  assignedProducts   Product[]           @relation("ProductResponsible")
+  closedProducts     Product[]           @relation("ProductClosedBy")
+  archivedProducts   Product[]           @relation("ProductArchivedBy")
+  comments           Comment[]
+  stageAssignments   ProductStage[]      @relation("StageResponsible")
+  telegramRecipients TelegramRecipient[]
+  changeHistory      ChangeHistory[]
 
   @@map("users")
 }
@@ -48,7 +54,7 @@ model StageTemplate {
   participatesInAutoshift Boolean  @default(true)
   createdAt               DateTime @default(now())
 
-  productStages ProductStage[]
+  productStages         ProductStage[]
   productTemplateStages ProductTemplateStage[]
 
   @@map("stage_templates")
@@ -57,124 +63,265 @@ model StageTemplate {
 // ========== PRODUCTS ==========
 
 model Product {
-  id              String    @id @default(cuid())
-  name            String
-  category        String?
-  sku             String?
-  country         String?
-  competitorUrl   String?
-  status          String    @default("PLANNED")
-  priority        String    @default("MEDIUM")
-  finalDate       DateTime?
-  responsibleId   String?
+  id                String    @id @default(cuid())
+  name              String
+  category          String?
+  sku               String?
+  country           String?
+  competitorUrl     String?
+  status            String    @default("PLANNED")
+  priority          String    @default("MEDIUM")
+  finalDate         DateTime?
+  responsibleId     String?
   productTemplateId String?
-  closedAt        DateTime?
-  closedById      String?
-  closureComment  String?
-  archivedAt      DateTime?
-  archivedById    String?
-  archiveReason   String?
-  riskScore       Int       @default(0)
-  progressPercent Int       @default(0)
-  notes           String?
-  sortOrder       Int       @default(0)
-  isPinned        Boolean   @default(false)
-  isFavorite      Boolean   @default(false)
-  isArchived      Boolean   @default(false)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  closedAt          DateTime?
+  closedById        String?
+  closureComment    String?
+  archivedAt        DateTime?
+  archivedById      String?
+  archiveReason     String?
+  riskScore         Int       @default(0)
+  progressPercent   Int       @default(0)
+  notes             String?
+  sortOrder         Int       @default(0)
+  isPinned          Boolean   @default(false)
+  isFavorite        Boolean   @default(false)
+  isArchived        Boolean   @default(false)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
-  responsible     User?             @relation("ProductResponsible", fields: [responsibleId], references: [id])
-  closedBy        User?             @relation("ProductClosedBy", fields: [closedById], references: [id])
-  archivedBy      User?             @relation("ProductArchivedBy", fields: [archivedById], references: [id])
-  productTemplate ProductTemplate?  @relation(fields: [productTemplateId], references: [id], onDelete: SetNull)
-  stages          ProductStage[]
-  comments        Comment[]
-  automations     Automation[]
-  changeHistory   ChangeHistory[]
+  responsible                  User?                         @relation("ProductResponsible", fields: [responsibleId], references: [id])
+  closedBy                     User?                         @relation("ProductClosedBy", fields: [closedById], references: [id])
+  archivedBy                   User?                         @relation("ProductArchivedBy", fields: [archivedById], references: [id])
+  productTemplate              ProductTemplate?              @relation(fields: [productTemplateId], references: [id], onDelete: SetNull)
+  stages                       ProductStage[]
+  comments                     Comment[]
+  automations                  Automation[]
+  telegramNotificationSettings TelegramNotificationSetting[]
+  changeHistory                ChangeHistory[]
 
   @@index([isArchived, isPinned, sortOrder])
   @@map("products")
 }
 
 model ProductTemplate {
-  id          String                @id @default(cuid())
+  id          String   @id @default(cuid())
   name        String
   description String?
-  createdAt   DateTime              @default(now())
-  updatedAt   DateTime              @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  stages   ProductTemplateStage[]
-  products Product[]
+  stages                       ProductTemplateStage[]
+  products                     Product[]
+  telegramNotificationSettings TelegramTemplateNotificationSetting[]
+  subStages                    ProductTemplateSubStage[]
 
   @@map("product_templates")
 }
 
 model ProductTemplateStage {
-  id                String          @id @default(cuid())
-  productTemplateId String
-  stageTemplateId   String
-  stageOrder        Int
-  stageName         String
-  plannedDate       DateTime?
-  durationDays      Int?
-  participatesInAutoshift Boolean   @default(true)
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+  id                       String    @id @default(cuid())
+  productTemplateId        String
+  stageTemplateId          String
+  stageOrder               Int
+  stageName                String
+  plannedDate              DateTime?
+  durationDays             Int?
+  participatesInAutoshift  Boolean   @default(true)
+  startTrigger             String    @default("PRODUCT_CREATED")
+  startDelayDays           Int       @default(0)
+  startReferenceStageOrder Int?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
 
   productTemplate ProductTemplate @relation(fields: [productTemplateId], references: [id], onDelete: Cascade)
   stageTemplate   StageTemplate   @relation(fields: [stageTemplateId], references: [id], onDelete: Cascade)
+
+  telegramNotificationSettings TelegramTemplateNotificationSetting[]
+  subStages                    ProductTemplateSubStage[]
 
   @@unique([productTemplateId, stageOrder])
   @@index([productTemplateId, stageOrder])
   @@map("product_template_stages")
 }
 
+model ProductTemplateSubStage {
+  id                      String   @id @default(cuid())
+  productTemplateStageId  String
+  name                    String
+  description             String?
+  responsibleId           String?
+  notifyOnStart           Boolean  @default(false)
+  notifyOnComplete        Boolean  @default(true)
+  telegramRecipientType   String?
+  telegramRecipientId     String?
+  telegramMessageTemplate String?
+  telegramCustomMessage   String?
+  sortOrder               Int      @map("order")
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  productTemplateStage ProductTemplateStage @relation(fields: [productTemplateStageId], references: [id], onDelete: Cascade)
+  ProductTemplate      ProductTemplate?     @relation(fields: [productTemplateId], references: [id])
+  productTemplateId    String?
+
+  @@index([productTemplateStageId, sortOrder])
+  @@index([productTemplateId])
+  @@index([telegramRecipientId])
+  @@map("product_template_substages")
+}
+
 // ========== PRODUCT STAGES ==========
 
 model ProductStage {
-  id                      String    @id @default(cuid())
-  productId               String
-  stageTemplateId         String
-  stageOrder              Int
-  stageName               String
-  dateValue               DateTime?
-  dateRaw                 String?
-  dateEnd                 DateTime?
-  durationDays            Int?
-  status                  String    @default("NOT_STARTED")
-  isCompleted             Boolean   @default(false)
-  isCritical              Boolean   @default(false)
-  participatesInAutoshift Boolean   @default(true)
-  affectsFinalDate        Boolean   @default(true)
-  responsibleId           String?
-  comment                 String?
-  priority                String    @default("MEDIUM")
-  plannedDate             DateTime?
-  actualDate              DateTime?
-  daysDeviation           Int?
-  createdAt               DateTime  @default(now())
-  updatedAt               DateTime  @updatedAt
+  id                       String    @id @default(cuid())
+  productId                String
+  stageTemplateId          String
+  stageOrder               Int
+  stageName                String
+  description              String?
+  dateValue                DateTime?
+  dateRaw                  String?
+  dateEnd                  DateTime?
+  durationDays             Int?
+  status                   String    @default("NOT_STARTED")
+  isCompleted              Boolean   @default(false)
+  isCritical               Boolean   @default(false)
+  participatesInAutoshift  Boolean   @default(true)
+  affectsFinalDate         Boolean   @default(true)
+  responsibleId            String?
+  comment                  String?
+  priority                 String    @default("MEDIUM")
+  startDate                DateTime?
+  endDate                  DateTime?
+  plannedDate              DateTime?
+  autoStartAt              DateTime?
+  startTrigger             String    @default("PRODUCT_CREATED")
+  startDelayDays           Int       @default(0)
+  startReferenceStageOrder Int?
+  actualDate               DateTime?
+  daysDeviation            Int?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
 
-  product       Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
-  stageTemplate StageTemplate @relation(fields: [stageTemplateId], references: [id])
-  responsible   User?         @relation("StageResponsible", fields: [responsibleId], references: [id])
-  comments      Comment[]
+  product                      Product                       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  stageTemplate                StageTemplate                 @relation(fields: [stageTemplateId], references: [id])
+  responsible                  User?                         @relation("StageResponsible", fields: [responsibleId], references: [id])
+  comments                     Comment[]
+  subStages                    ProductSubStage[]
+  telegramNotificationSettings TelegramNotificationSetting[]
 
   @@unique([productId, stageOrder])
   @@map("product_stages")
 }
 
+model ProductSubStage {
+  id            String    @id @default(cuid())
+  stageId       String
+  name          String
+  description   String?
+  responsibleId String?
+  status        String    @default("NOT_STARTED")
+  startDate     DateTime?
+  endDate       DateTime?
+  sortOrder     Int       @map("order")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  stage                        ProductStage                  @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  telegramNotificationSettings TelegramNotificationSetting[]
+
+  @@index([stageId, sortOrder])
+  @@map("product_substages")
+}
+
+model TelegramRecipient {
+  id               String   @id @default(cuid())
+  type             String
+  name             String
+  telegramId       String?  @map("telegram_id")
+  telegramUsername String?  @map("telegram_username")
+  chatId           String?  @map("chat_id")
+  userId           String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user                         User?                                 @relation(fields: [userId], references: [id], onDelete: SetNull)
+  notificationSettings         TelegramNotificationSetting[]
+  templateNotificationSettings TelegramTemplateNotificationSetting[]
+
+  @@index([type])
+  @@index([userId])
+  @@map("telegram_recipients")
+}
+
+model TelegramTemplateNotificationSetting {
+  id                     String   @id @default(cuid())
+  productTemplateId      String
+  productTemplateStageId String?
+  eventType              String
+  recipientType          String
+  recipientId            String?
+  messageTemplate        String?
+  customMessage          String?
+  isEnabled              Boolean  @default(false)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  productTemplate      ProductTemplate               @relation(fields: [productTemplateId], references: [id], onDelete: Cascade)
+  productTemplateStage ProductTemplateStage?         @relation(fields: [productTemplateStageId], references: [id], onDelete: Cascade)
+  recipient            TelegramRecipient?            @relation(fields: [recipientId], references: [id], onDelete: SetNull)
+  productSettings      TelegramNotificationSetting[]
+
+  @@unique([productTemplateId, productTemplateStageId, eventType])
+  @@index([productTemplateId, eventType])
+  @@index([productTemplateStageId, eventType])
+  @@index([recipientId])
+  @@map("telegram_template_notification_settings")
+}
+
+model TelegramNotificationSetting {
+  id                String    @id @default(cuid())
+  productId         String
+  stageId           String?
+  subStageId        String?
+  templateSettingId String?
+  isOverride        Boolean   @default(false)
+  eventType         String
+  recipientType     String
+  recipientId       String?
+  messageTemplate   String?
+  customMessage     String?
+  isEnabled         Boolean   @default(false)
+  sentAt            DateTime?
+  lastError         String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  product         Product                              @relation(fields: [productId], references: [id], onDelete: Cascade)
+  stage           ProductStage?                        @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  subStage        ProductSubStage?                     @relation(fields: [subStageId], references: [id], onDelete: Cascade)
+  templateSetting TelegramTemplateNotificationSetting? @relation(fields: [templateSettingId], references: [id], onDelete: SetNull)
+  recipient       TelegramRecipient?                   @relation(fields: [recipientId], references: [id], onDelete: SetNull)
+
+  @@index([productId, eventType])
+  @@index([stageId, eventType])
+  @@index([subStageId, eventType])
+  @@index([templateSettingId])
+  @@index([recipientId])
+  @@map("telegram_notification_settings")
+}
+
 // ========== COMMENTS ==========
 
 model Comment {
-  id             String    @id @default(cuid())
+  id             String   @id @default(cuid())
   content        String
   authorId       String
   productId      String
   productStageId String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   author       User          @relation(fields: [authorId], references: [id])
   product      Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -186,18 +333,18 @@ model Comment {
 // ========== AUTOMATIONS ==========
 
 model Automation {
-  id                  String    @id @default(cuid())
-  productId           String?
-  name                String
-  description         String?
-  isActive            Boolean   @default(true)
-  isTemplate          Boolean   @default(false)
-  triggerStageOrder   Int?
-  actionType          String
-  excludeStageOrders  String    @default("[]")
-  config              String    @default("{}")
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  id                 String   @id @default(cuid())
+  productId          String?
+  name               String
+  description        String?
+  isActive           Boolean  @default(true)
+  isTemplate         Boolean  @default(false)
+  triggerStageOrder  Int?
+  actionType         String
+  excludeStageOrders String   @default("[]")
+  config             String   @default("{}")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   product Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
 

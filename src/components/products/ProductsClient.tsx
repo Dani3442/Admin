@@ -1170,11 +1170,11 @@ export function ProductsClient({
 
       <div className="surface-panel hidden overflow-hidden lg:block">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="product-list-table w-full min-w-[1240px] table-fixed">
             <thead>
               <tr className="border-b border-border/70">
                 {archiveMode && selectionMode && (
-                  <th className="table-header w-10 text-center">
+                  <th className="table-header w-12 min-w-12 text-center">
                     <input
                       type="checkbox"
                       checked={allVisibleSelected}
@@ -1190,9 +1190,9 @@ export function ProductsClient({
                     />
                   </th>
                 )}
-                <th className="table-header w-12 text-center">#</th>
-                <th className="table-header w-14 text-center">Порядок</th>
-                <th className="table-header min-w-[280px]">Продукт</th>
+                <th className="table-header w-16 min-w-16 text-center">#</th>
+                <th className="table-header w-28 min-w-28 text-center">Порядок</th>
+                <th className="table-header w-[40%] min-w-[420px]">Продукт</th>
                 <th className="table-header w-24">Страна</th>
                 <th className="table-header w-32">Статус</th>
                 <th className="table-header w-28">Приоритет</th>
@@ -1233,7 +1233,7 @@ export function ProductsClient({
                   >
                     {archiveMode && selectionMode && (
                       <td
-                        className={cn('table-cell w-10 text-center', isDragging && 'bg-card')}
+                        className={cn('table-cell w-12 min-w-12 text-center', isDragging && 'bg-card')}
                         onClick={(event) => event.stopPropagation()}
                       >
                         <input
@@ -1245,12 +1245,12 @@ export function ProductsClient({
                         />
                       </td>
                     )}
-                    <td className={cn('table-cell text-center text-xs text-muted-foreground', isDragging && 'bg-card')}>
+                    <td className={cn('table-cell w-16 min-w-16 text-center text-xs text-muted-foreground', isDragging && 'bg-card')}>
                       <div className="flex items-center justify-center">
                         <span>{index + 1}</span>
                       </div>
                     </td>
-                    <td className={cn('table-cell relative text-center', isDragging && 'bg-card')} onClick={(event) => event.stopPropagation()}>
+                    <td className={cn('table-cell relative w-28 min-w-28 text-center', isDragging && 'bg-card')} onClick={(event) => event.stopPropagation()}>
                       <button
                         type="button"
                         onPointerDown={(event) => handlePointerDragStart(event, product.id)}
@@ -1267,15 +1267,15 @@ export function ProductsClient({
                         <GripVertical className="w-4 h-4" />
                       </button>
                     </td>
-                    <td className={cn('table-cell', isDragging && 'bg-card')}>
+                    <td className={cn('table-cell w-[40%] min-w-[420px]', isDragging && 'bg-card')}>
                       <div className="flex items-start gap-3">
                           <div className="mt-0.5 flex items-center gap-1">
                           <Pin className={cn('h-3.5 w-3.5', product.isPinned ? 'fill-muted text-foreground' : 'text-muted-foreground/60')} />
                           <Star className={cn('h-3.5 w-3.5', product.isFavorite ? 'fill-amber-200 text-amber-600 dark:fill-amber-500/20 dark:text-amber-300' : 'text-muted-foreground/60')} />
                         </div>
                         <div className="min-w-0">
-                          <div className="text-[19px] font-medium leading-[1.25] tracking-normal text-foreground transition-colors">
-                            {product.name.length > 70 ? `${product.name.slice(0, 70)}…` : product.name}
+                          <div className="whitespace-normal text-[18px] font-medium leading-[1.25] tracking-normal text-foreground transition-colors [overflow-wrap:anywhere]">
+                            {product.name}
                           </div>
                           <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[15px] leading-6 text-muted-foreground">
                             <span>{product._count.stages} этапов</span>

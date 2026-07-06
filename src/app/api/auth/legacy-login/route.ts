@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { migrateLegacyUserPassword } from '@/lib/supabase/admin-users'
+import { verifyLegacyLocalUserPassword } from '@/lib/supabase/admin-users'
 import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
 import { sanitizeEmailValue } from '@/lib/input-security'
+import { getLocalSessionCookieOptions, LOCAL_AUTH_COOKIE } from '@/lib/local-auth-session'
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null)
@@ -21,10 +22,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Missing credentials' }, { status: 400 })
   }
 
-  const result = await migrateLegacyUserPassword(email, password)
-  if (!result.migrated) {
+  const result = await verifyLegacyLocalUserPassword(email, password)
+  if (!result.authenticated) {
     return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
   }
 
-  return NextResponse.json({ migrated: true })
+  const response = NextResponse.json({ authenticated: true })
+  response.cookies.set(LOCAL_AUTH_COOKIE, result.userId, getLocalSessionCookieOptions())
+
+  return response
 }

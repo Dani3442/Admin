@@ -8,10 +8,30 @@ import { createProductTemplateStageCompat } from '@/lib/product-template-stage-c
 import {
   supportsProductTemplateStageAutoshiftColumn,
   supportsProductTemplateStageDurationDaysColumn,
+  supportsProductTemplateStageStartRulesColumns,
+  supportsProductTemplateSubStagesTable,
 } from '@/lib/schema-compat'
+import {
+  normalizeStageStartDelayDays,
+  normalizeStageStartReferenceOrder,
+  normalizeStageStartTrigger,
+} from '@/lib/stage-start-rules'
 import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
 import { sanitizeDeepStrings, sanitizeTextValue } from '@/lib/input-security'
 import { canManageProducts } from '@/lib/product-access'
+import {
+  deleteInheritedProductNotificationsForTemplate,
+  normalizeTemplateTelegramNotifications,
+  saveTemplateTelegramNotifications,
+  syncTemplateTelegramNotificationsToProducts,
+  templateTelegramNotificationInclude,
+} from '@/lib/template-telegram-notifications'
+import {
+  createProductTemplateSubStages,
+  normalizeTemplateSubStages,
+  templateSubStageSelect,
+  type TemplateSubStagePayload,
+} from '@/lib/template-substages'
 
 function normalizeStageName(name: string) {
   return sanitizeTextValue(name, { maxLength: 160 })
@@ -24,6 +44,10 @@ type TemplateStagePayload = {
   durationDays: number | null
   participatesInAutoshift: boolean
   stageTemplateDurationDays: number | null
+  startTrigger: string
+  startDelayDays: number
+  startReferenceStageOrder: number | null
+  subStages: TemplateSubStagePayload[]
 }
 
 export async function PATCH(
@@ -49,9 +73,11 @@ export async function PATCH(
   try {
     const { id } = await params
     const body = sanitizeDeepStrings(await req.json(), { preserveNewlines: true }) as any
-    const [hasDurationDaysColumn, hasAutoshiftColumn] = await Promise.all([
+    const [hasDurationDaysColumn, hasAutoshiftColumn, hasStartRulesColumns, hasTemplateSubStagesTable] = await Promise.all([
       supportsProductTemplateStageDurationDaysColumn(),
       supportsProductTemplateStageAutoshiftColumn(),
+      supportsProductTemplateStageStartRulesColumns(),
+      supportsProductTemplateSubStagesTable(),
     ])
     const templateName = sanitizeTextValue(body?.name, { maxLength: 160 })
     const description = sanitizeTextValue(body?.description, { preserveNewlines: true, maxLength: 1000 })
@@ -73,6 +99,10 @@ export async function PATCH(
               : null,
           participatesInAutoshift: stage?.participatesInAutoshift !== false,
           stageTemplateDurationDays: null,
+          startTrigger: normalizeStageStartTrigger(stage?.startTrigger, index),
+          startDelayDays: normalizeStageStartDelayDays(stage?.startDelayDays),
+          startReferenceStageOrder: normalizeStageStartReferenceOrder(stage?.startReferenceStageOrder),
+          subStages: normalizeTemplateSubStages(stage?.subStages),
           }))
         .filter((stage: { stageName: string }) => stage.stageName)
     const stages = fillMissingSequentialStageDates(preparedStages)
@@ -95,6 +125,11 @@ export async function PATCH(
         { status: 400 }
       )
     }
+
+    const notificationSettings = normalizeTemplateTelegramNotifications(
+      body?.telegramNotificationSettings,
+      stages.length
+    )
 
     const template = await prisma.$transaction(async (tx) => {
       const existing = await tx.productTemplate.findUnique({
@@ -125,6 +160,10 @@ export async function PATCH(
         plannedDate: Date | null
         durationDays: number | null
         participatesInAutoshift: boolean
+        startTrigger: string
+        startDelayDays: number
+        startReferenceStageOrder: number | null
+        subStages: TemplateSubStagePayload[]
       }> = []
 
       for (const stage of stages) {
@@ -161,6 +200,10 @@ export async function PATCH(
           plannedDate: stage.plannedDate,
           durationDays: stage.durationDays ?? null,
           participatesInAutoshift: stage.participatesInAutoshift,
+          startTrigger: normalizeStageStartTrigger(stage.startTrigger, stage.stageOrder),
+          startDelayDays: normalizeStageStartDelayDays(stage.startDelayDays),
+          startReferenceStageOrder: normalizeStageStartReferenceOrder(stage.startReferenceStageOrder),
+          subStages: stage.subStages,
         })
       }
 
@@ -172,12 +215,16 @@ export async function PATCH(
         },
       })
 
+      await deleteInheritedProductNotificationsForTemplate(tx as any, id)
+
       await tx.productTemplateStage.deleteMany({
         where: { productTemplateId: id },
       })
 
+      const createdTemplateStages = []
+
       for (const stage of resolvedStages) {
-        await createProductTemplateStageCompat(tx as any, {
+        const createdStage = await createProductTemplateStageCompat(tx as any, {
           productTemplateId: id,
           stageTemplateId: stage.stageTemplateId,
           stageOrder: stage.stageOrder,
@@ -185,8 +232,24 @@ export async function PATCH(
           plannedDate: stage.plannedDate,
           durationDays: stage.durationDays,
           participatesInAutoshift: stage.participatesInAutoshift,
+          startTrigger: stage.startTrigger,
+          startDelayDays: stage.startDelayDays,
+          startReferenceStageOrder: stage.startReferenceStageOrder,
         })
+        createdTemplateStages.push(createdStage)
+        if (hasTemplateSubStagesTable && stage.subStages.length > 0) {
+          await createProductTemplateSubStages(tx as any, createdStage.id, stage.subStages)
+        }
       }
+
+      await saveTemplateTelegramNotifications(
+        tx as any,
+        id,
+        createdTemplateStages,
+        notificationSettings
+      )
+
+      await syncTemplateTelegramNotificationsToProducts(tx as any, id)
 
       return tx.productTemplate.findUniqueOrThrow({
         where: { id },
@@ -206,11 +269,30 @@ export async function PATCH(
               plannedDate: true,
               ...(hasDurationDaysColumn ? { durationDays: true } : {}),
               ...(hasAutoshiftColumn ? { participatesInAutoshift: true } : {}),
+              ...(hasStartRulesColumns
+                ? {
+                    startTrigger: true,
+                    startDelayDays: true,
+                    startReferenceStageOrder: true,
+                  }
+                : {}),
               stageTemplate: {
                 select: {
                   durationDays: true,
                 },
               },
+              telegramNotificationSettings: {
+                orderBy: { createdAt: 'desc' },
+                include: templateTelegramNotificationInclude,
+              },
+              ...(hasTemplateSubStagesTable
+                ? {
+                    subStages: {
+                      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+                      select: templateSubStageSelect,
+                    },
+                  }
+                : {}),
             },
           },
         },
@@ -232,6 +314,11 @@ export async function PATCH(
         durationDays: hasDurationDaysColumn ? (stage as any).durationDays ?? null : null,
         stageTemplateDurationDays: stage.stageTemplate.durationDays ?? null,
         participatesInAutoshift: hasAutoshiftColumn ? (stage as any).participatesInAutoshift ?? true : true,
+        startTrigger: normalizeStageStartTrigger((stage as any).startTrigger, stage.stageOrder),
+        startDelayDays: normalizeStageStartDelayDays((stage as any).startDelayDays),
+        startReferenceStageOrder: normalizeStageStartReferenceOrder((stage as any).startReferenceStageOrder),
+        subStages: hasTemplateSubStagesTable ? (stage as any).subStages ?? [] : [],
+        telegramNotificationSettings: stage.telegramNotificationSettings,
       })),
     })
   } catch (error) {

@@ -6,6 +6,9 @@ export type VerificationStatus = 'UNVERIFIED' | 'PENDING' | 'VERIFIED'
 export type ProductStatus = 'PLANNED' | 'IN_PROGRESS' | 'AT_RISK' | 'DELAYED' | 'COMPLETED' | 'CANCELLED'
 export type Priority = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW'
 export type StageStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' | 'SKIPPED' | 'BLOCKED'
+export type TelegramRecipientType = 'user' | 'chat' | 'responsible'
+export type TelegramEventType = 'substage_completed' | 'stage_completed' | 'stage_started'
+export type StageStartTrigger = 'PRODUCT_CREATED' | 'PREVIOUS_STAGE_COMPLETED' | 'STAGE_STARTED' | 'STAGE_COMPLETED'
 export type AutomationActionType =
   | 'SHIFT_ALL_FOLLOWING'
   | 'SHIFT_FINAL_DATE_ONLY'
@@ -89,6 +92,7 @@ export interface ProductStageWithTemplate {
   stageTemplateId: string
   stageOrder: number
   stageName: string
+  description?: string | null
   dateValue: Date | null
   dateRaw: string | null
   dateEnd: Date | null
@@ -101,7 +105,13 @@ export interface ProductStageWithTemplate {
   responsibleId: string | null
   comment: string | null
   priority: Priority
+  startDate?: Date | null
+  endDate?: Date | null
   plannedDate: Date | null
+  autoStartAt?: Date | null
+  startTrigger?: StageStartTrigger
+  startDelayDays?: number
+  startReferenceStageOrder?: number | null
   actualDate: Date | null
   daysDeviation: number | null
   createdAt: Date
@@ -111,6 +121,79 @@ export interface ProductStageWithTemplate {
     durationText: string | null; durationDays: number | null; isCritical: boolean
   }
   responsible?: { id: string; name: string } | null
+  subStages?: ProductSubStageData[]
+  telegramNotificationSettings?: TelegramNotificationSettingData[]
+}
+
+export interface ProductSubStageData {
+  id: string
+  stageId: string
+  name: string
+  description: string | null
+  responsibleId?: string | null
+  status: StageStatus
+  startDate: Date | null
+  endDate: Date | null
+  sortOrder: number
+  createdAt: Date
+  updatedAt: Date
+  telegramNotificationSettings?: TelegramNotificationSettingData[]
+}
+
+export interface ProductTemplateSubStageData {
+  id: string
+  productTemplateStageId?: string
+  name: string
+  description: string | null
+  responsibleId: string | null
+  notifyOnStart: boolean
+  notifyOnComplete: boolean
+  telegramRecipientType?: TelegramRecipientType | null
+  telegramRecipientId?: string | null
+  telegramMessageTemplate?: string | null
+  telegramCustomMessage?: string | null
+  sortOrder: number
+}
+
+export interface TelegramRecipientData {
+  id: string
+  type: TelegramRecipientType
+  name: string
+  telegramId: string | null
+  telegramUsername: string | null
+  chatId: string | null
+  userId?: string | null
+}
+
+export interface TelegramNotificationSettingData {
+  id: string
+  productId: string
+  stageId: string | null
+  subStageId: string | null
+  templateSettingId?: string | null
+  isOverride?: boolean
+  eventType: TelegramEventType
+  recipientType: TelegramRecipientType
+  recipientId: string | null
+  messageTemplate: string | null
+  customMessage: string | null
+  isEnabled: boolean
+  sentAt: Date | null
+  lastError: string | null
+  recipient?: TelegramRecipientData | null
+}
+
+export interface TelegramTemplateNotificationSettingData {
+  id: string
+  productTemplateId: string
+  productTemplateStageId: string | null
+  eventType: TelegramEventType
+  recipientType: TelegramRecipientType
+  recipientId: string | null
+  messageTemplate: string | null
+  customMessage: string | null
+  isEnabled: boolean
+  recipient?: TelegramRecipientData | null
 }
 
 export interface StageTemplateData {
@@ -128,6 +211,11 @@ export interface ProductTemplateStageData {
   durationDays: number | null
   stageTemplateDurationDays?: number | null
   participatesInAutoshift: boolean
+  startTrigger?: StageStartTrigger
+  startDelayDays?: number
+  startReferenceStageOrder?: number | null
+  subStages?: ProductTemplateSubStageData[]
+  telegramNotificationSettings?: TelegramTemplateNotificationSettingData[]
 }
 
 export interface ProductTemplateData {

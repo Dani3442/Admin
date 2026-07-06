@@ -1,5 +1,7 @@
 import { prisma } from './prisma'
 import { createClient as createServerSupabaseClient } from './supabase/server'
+import { cookies } from 'next/headers'
+import { LOCAL_AUTH_COOKIE, normalizeLocalSessionUserId } from './local-auth-session'
 
 function normalizeSessionAvatar(avatar: string | null | undefined) {
   if (!avatar) return null
@@ -34,28 +36,44 @@ export type AppSession = {
 } | null
 
 export async function auth(): Promise<AppSession> {
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user: supabaseUser },
-  } = await supabase.auth.getUser()
+  let email: string | null = null
 
-  const email = supabaseUser?.email?.trim().toLowerCase()
-  if (!email) {
-    return null
+  try {
+    const supabase = await createServerSupabaseClient()
+    const {
+      data: { user: supabaseUser },
+    } = await supabase.auth.getUser()
+
+    email = supabaseUser?.email?.trim().toLowerCase() || null
+  } catch {
+    email = null
   }
 
-  const user = await prisma.user.findUnique({
-    where: { email },
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      lastName: true,
-      role: true,
-      avatar: true,
-      isActive: true,
-    },
-  })
+  const userSelect = {
+    id: true,
+    email: true,
+    name: true,
+    lastName: true,
+    role: true,
+    avatar: true,
+    isActive: true,
+  }
+
+  const user = email
+    ? await prisma.user.findUnique({
+        where: { email },
+        select: userSelect,
+      })
+    : await (async () => {
+        const cookieStore = await cookies()
+        const localUserId = normalizeLocalSessionUserId(cookieStore.get(LOCAL_AUTH_COOKIE)?.value)
+        if (!localUserId) return null
+
+        return prisma.user.findUnique({
+          where: { id: localUserId },
+          select: userSelect,
+        })
+      })()
 
   if (!user || !user.isActive) {
     return null

@@ -12,6 +12,13 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate deploy",
     "db:seed": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/seed.ts",
+    "db:seed:rf-template": "node scripts/seed-rf-template.js",
+    "db:prod:backup": "node scripts/prod-backup.js",
+    "db:prod:baseline-migrations": "node scripts/prod-migration-baseline.js",
+    "db:prod:access-overrides": "node scripts/sync-access-overrides.js",
+    "db:prod:templates": "node scripts/seed-rf-template.js",
+    "db:prod:rebuild-products:dry": "node scripts/prod-rebuild-product-templates.js",
+    "db:prod:rebuild-products": "node scripts/prod-rebuild-product-templates.js --apply",
     "db:studio": "prisma studio",
     "setup": "npm run db:generate && npm run db:push && npm run db:seed"
   },

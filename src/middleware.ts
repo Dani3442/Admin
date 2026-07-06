@@ -1,13 +1,15 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
+import { LOCAL_AUTH_COOKIE, normalizeLocalSessionUserId } from '@/lib/local-auth-session'
 
 export default async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
   const { response, user } = await updateSession(req)
-  const isAuthenticated = Boolean(user)
+  const localUserId = normalizeLocalSessionUserId(req.cookies.get(LOCAL_AUTH_COOKIE)?.value)
+  const isAuthenticated = Boolean(user || localUserId)
 
   if (pathname.startsWith('/login') || pathname.startsWith('/api/auth')) {
-    if (pathname.startsWith('/login') && isAuthenticated) {
+    if (pathname.startsWith('/login') && user) {
       return NextResponse.redirect(new URL('/dashboard', req.url))
     }
 

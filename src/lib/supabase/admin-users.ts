@@ -173,3 +173,41 @@ export async function migrateLegacyUserPassword(email: string, password: string)
 
   return { migrated: true as const }
 }
+
+export async function verifyLegacyLocalUserPassword(email: string, password: string) {
+  const normalizedEmail = sanitizeEmailValue(email)
+  const localUser = await prisma.user.findUnique({
+    where: { email: normalizedEmail },
+    select: {
+      id: true,
+      email: true,
+      password: true,
+      isActive: true,
+    },
+  })
+
+  if (!localUser || !localUser.isActive) {
+    return { authenticated: false as const, reason: 'not_found' as const }
+  }
+
+  const candidatePassword = String(password)
+  const { isValid, needsRehash } = await verifyLocalPassword(localUser.password, candidatePassword)
+  if (!isValid) {
+    return { authenticated: false as const, reason: 'invalid_password' as const }
+  }
+
+  if (needsRehash) {
+    await prisma.user.update({
+      where: { id: localUser.id },
+      data: {
+        password: await bcrypt.hash(candidatePassword, 12),
+      },
+    })
+  }
+
+  return {
+    authenticated: true as const,
+    userId: localUser.id,
+    email: localUser.email,
+  }
+}

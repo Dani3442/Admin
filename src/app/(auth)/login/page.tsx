@@ -3,12 +3,10 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Package, Eye, EyeOff, Loader2 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
 import { ThemeToggle } from '@/components/theme/ThemeToggle'
 
 export default function LoginPage() {
   const router = useRouter()
-  const [supabase] = useState(() => createClient())
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -22,13 +20,8 @@ export default function LoginPage() {
 
     const normalizedEmail = email.trim().toLowerCase()
 
-    let signInResult = await supabase.auth.signInWithPassword({
-      email: normalizedEmail,
-      password,
-    })
-
-    if (signInResult.error) {
-      const fallbackResponse = await fetch('/api/auth/legacy-login', {
+    try {
+      const response = await fetch('/api/auth/legacy-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -37,20 +30,17 @@ export default function LoginPage() {
         }),
       })
 
-      if (fallbackResponse.ok) {
-        signInResult = await supabase.auth.signInWithPassword({
-          email: normalizedEmail,
-          password,
-        })
+      if (!response.ok) {
+        setError('Неверный email или пароль')
+        setLoading(false)
+        return
       }
-    }
 
-    if (signInResult.error) {
-      setError('Неверный email или пароль')
-      setLoading(false)
-    } else {
       router.refresh()
       router.push('/dashboard')
+    } catch {
+      setError('Не удалось подключиться к локальному серверу')
+      setLoading(false)
     }
   }
 

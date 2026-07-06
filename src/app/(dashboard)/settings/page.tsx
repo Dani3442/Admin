@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { getRoleLabel } from '@/lib/utils'
 import { prisma } from '@/lib/prisma'
 import { UserAvatar } from '@/components/users/UserAvatar'
+import { ChevronRight, Zap } from 'lucide-react'
 
 export default async function SettingsPage() {
   const session = await auth()
@@ -35,6 +36,22 @@ export default async function SettingsPage() {
         </div>
       </div>
 
+      <Link
+        href="/automations"
+        className="card flex items-center justify-between gap-4 transition hover:-translate-y-0.5 hover:shadow-card-hover"
+      >
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[18px] bg-primary/10 text-primary">
+            <Zap className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold text-foreground">Автоматизации</h2>
+            <p className="mt-0.5 text-sm text-muted-foreground">{automationTemplatesCount} шаблонов</p>
+          </div>
+        </div>
+        <ChevronRight className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
+      </Link>
+
       <div className="card">
         <h2 className="mb-4 text-sm font-semibold text-foreground">Система</h2>
         <div className="space-y-3 text-sm text-foreground">
@@ -62,7 +79,7 @@ export default async function SettingsPage() {
         <div className="space-y-2 text-sm text-muted-foreground">
           <p>• Для смены пароля обратитесь к администратору</p>
           <p>• Импорт данных из Excel сейчас доступен только через API, UI для импорта ещё не добавлен</p>
-          <p>• Настройка автоматизаций — раздел «Автоматизации»</p>
+          <p>• Настройка автоматизаций — карточка «Автоматизации» на этой странице</p>
           <p>• Управление пользователями — раздел «Пользователи» (только для Admin/Директор)</p>
         </div>
       </div>

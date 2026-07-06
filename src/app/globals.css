@@ -25,6 +25,7 @@
     --ring: 221 83% 53%;
     --shadow-color: 221 39% 16%;
     --surface-glow: 214 100% 97%;
+    --background-mid: 214 100% 98%;
 
     --sidebar: 220 38% 12%;
     --sidebar-hover: 220 32% 18%;
@@ -67,6 +68,7 @@
     --ring: 217 91% 61%;
     --shadow-color: 220 52% 3%;
     --surface-glow: 223 44% 14%;
+    --background-mid: 222 37% 11%;
 
     --sidebar: 224 38% 8%;
     --sidebar-hover: 223 24% 14%;
@@ -109,8 +111,10 @@
     margin: 0;
     min-height: 100%;
     background:
-      radial-gradient(circle at top left, hsl(var(--surface-glow) / 0.95), transparent 40%),
-      linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--background)) 100%);
+      radial-gradient(circle at 12% -10%, hsl(var(--primary) / 0.18), transparent 34%),
+      radial-gradient(circle at 82% 0%, hsl(197 92% 72% / 0.14), transparent 32%),
+      linear-gradient(135deg, hsl(var(--background)) 0%, hsl(var(--background-mid)) 46%, hsl(var(--background)) 100%);
+    background-attachment: fixed;
     color: hsl(var(--foreground));
     overflow-x: hidden;
     transition:
@@ -237,6 +241,12 @@
     word-break: normal;
   }
 
+  .product-list-table .table-header {
+    white-space: nowrap;
+    overflow-wrap: normal;
+    word-break: normal;
+  }
+
   .surface-panel {
     @apply rounded-[32px] border border-border/80 bg-card text-card-foreground shadow-card;
   }
@@ -273,6 +283,24 @@
   .floating-island {
     @apply rounded-[28px] border border-border/80 text-popover-foreground shadow-modal backdrop-blur-2xl;
     background-color: hsl(var(--popover) / 0.82);
+  }
+
+  .admin-top-island {
+    background:
+      linear-gradient(135deg, hsl(var(--popover) / 0.94), hsl(var(--card) / 0.82)),
+      radial-gradient(circle at 18% 0%, hsl(var(--primary) / 0.12), transparent 42%);
+    box-shadow:
+      0 28px 70px -46px hsl(var(--primary) / 0.58),
+      0 18px 48px -32px hsl(var(--shadow-color) / 0.42) !important;
+  }
+
+  .dark .admin-top-island {
+    background:
+      linear-gradient(135deg, hsl(224 24% 13% / 0.94), hsl(224 24% 11% / 0.86)),
+      radial-gradient(circle at 18% 0%, hsl(var(--primary) / 0.18), transparent 46%);
+    box-shadow:
+      0 28px 80px -48px hsl(var(--primary) / 0.5),
+      0 18px 48px -32px hsl(220 52% 3% / 0.85) !important;
   }
 
   .modal-backdrop {
@@ -315,10 +343,8 @@
   }
 
   .bg-grid-surface {
-    background-image:
-      linear-gradient(to right, hsl(var(--border) / 0.18) 1px, transparent 1px),
-      linear-gradient(to bottom, hsl(var(--border) / 0.18) 1px, transparent 1px);
-    background-size: 20px 20px;
+    background-image: none;
+    background-size: auto;
   }
 
   .text-balance {
@@ -465,6 +491,60 @@
     box-shadow:
       0 32px 80px -44px hsl(var(--shadow-color) / 0.78),
       0 18px 38px -30px hsl(var(--shadow-color) / 0.4) !important;
+  }
+
+  :where(
+    [class~='border'],
+    [class*='border-'],
+    [class*='divide-'],
+    button,
+    input,
+    select,
+    textarea,
+    hr,
+    .card,
+    .card-hover,
+    .surface-panel,
+    .surface-subtle,
+    .floating-island,
+    .toolbar-button,
+    .input,
+    .btn-secondary,
+    .btn-danger,
+    .table-header,
+    .stage-cell,
+    .status-chip-neutral,
+    .status-chip-info,
+    .status-chip-success,
+    .status-chip-warning,
+    .status-chip-danger
+  ):not(input[type='checkbox']):not(input[type='radio']) {
+    border-color: transparent !important;
+  }
+
+  :where([class*='divide-'] > :not([hidden]) ~ :not([hidden])) {
+    border-color: transparent !important;
+  }
+
+  :where(
+    [class*='shadow-[inset'],
+    [class~='ring'],
+    [class~='ring-1'],
+    [class~='ring-2'],
+    [class~='ring-4'],
+    [class~='ring-8'],
+    [class*='ring-border'],
+    [class*='ring-primary/']
+  ) {
+    box-shadow: none !important;
+  }
+
+  :where(input, select, textarea):not(input[type='checkbox']):not(input[type='radio']):focus,
+  :where(input, select, textarea):not(input[type='checkbox']):not(input[type='radio']):focus-visible {
+    border-color: transparent !important;
+    box-shadow: none !important;
+    outline: none !important;
+    background-color: hsl(var(--accent) / 0.5) !important;
   }
 }
 

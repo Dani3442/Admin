@@ -229,7 +229,7 @@ export function TableViewClient({
 
   // Column resize state
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
-    const widths: Record<string, number> = { __product: 208, __progress: 96 }
+    const widths: Record<string, number> = { __product: 320, __progress: 96 }
     initialStages.forEach((s) => { widths[s.id] = 130 })
     return widths
   })
@@ -271,7 +271,7 @@ export function TableViewClient({
     const handleMouseMove = (ev: MouseEvent) => {
       if (!resizingRef.current) return
       const diff = ev.clientX - resizingRef.current.startX
-      const newWidth = Math.max(60, resizingRef.current.startWidth + diff)
+      const newWidth = Math.max(resizingRef.current.colId === '__product' ? 180 : 60, resizingRef.current.startWidth + diff)
       setColumnWidths((prev) => ({ ...prev, [resizingRef.current!.colId]: newWidth }))
     }
 
@@ -1107,7 +1107,7 @@ export function TableViewClient({
               <tr>
                 <th
                   className="sticky left-0 z-20 h-auto whitespace-normal border-b border-r border-border/70 bg-muted px-4 py-3 align-middle text-left text-[15px] font-medium leading-6 text-muted-foreground [overflow-wrap:anywhere] relative"
-                  style={{ width: columnWidths.__product, minWidth: 120 }}
+                  style={{ width: columnWidths.__product, minWidth: 180 }}
                 >
                   Продукт
                   <div
@@ -1200,10 +1200,10 @@ export function TableViewClient({
                     {/* Product Name */}
                     <td
                       className={cn('sticky left-0 z-10 border-r border-border/60 px-3 py-2', stickyProductCellBackgroundClass)}
-                      style={{ width: columnWidths.__product, minWidth: 120, maxWidth: columnWidths.__product }}
+                      style={{ width: columnWidths.__product, minWidth: 180, maxWidth: columnWidths.__product }}
                     >
                       <Link href={buildProductHref(product.id, currentRoute)} className="block">
-                        <div className="truncate text-[17px] font-medium leading-[1.2] text-foreground transition-colors hover:text-primary" title={product.name}>
+                        <div className="whitespace-normal text-[16px] font-medium leading-[1.22] text-foreground transition-colors hover:text-primary [overflow-wrap:anywhere]" title={product.name}>
                           {product.name}
                         </div>
                         <div className="flex items-center gap-2 mt-0.5">
