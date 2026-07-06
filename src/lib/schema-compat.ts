@@ -66,6 +66,10 @@ export async function supportsProductTemplateSubStagesTable() {
   return hasDbColumn('product_template_substages', 'productTemplateStageId')
 }
 
+export async function supportsTemplateTelegramNotificationSettingsTable() {
+  return hasDbColumn('telegram_template_notification_settings', 'id')
+}
+
 export async function supportsProductSubStageResponsibleColumn() {
   return hasDbColumn('product_substages', 'responsibleId')
 }

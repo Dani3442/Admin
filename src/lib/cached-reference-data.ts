@@ -58,7 +58,8 @@ export async function getCachedProductTemplates(
   hasDurationDaysColumn: boolean,
   hasAutoshiftColumn: boolean,
   hasStartRulesColumns = true,
-  hasTemplateSubStagesTable = true
+  hasTemplateSubStagesTable = true,
+  hasTemplateTelegramSettingsTable = true
 ) {
   return prisma.productTemplate.findMany({
     select: {
@@ -89,10 +90,14 @@ export async function getCachedProductTemplates(
               durationDays: true,
             },
           },
-          telegramNotificationSettings: {
-            orderBy: { createdAt: 'desc' },
-            include: { recipient: true },
-          },
+          ...(hasTemplateTelegramSettingsTable
+            ? {
+                telegramNotificationSettings: {
+                  orderBy: { createdAt: 'desc' },
+                  include: { recipient: true },
+                },
+              }
+            : {}),
           ...(hasTemplateSubStagesTable
             ? {
                 subStages: {

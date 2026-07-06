@@ -9,6 +9,7 @@ import {
   supportsProductTemplateStageDurationDaysColumn,
   supportsProductTemplateStageStartRulesColumns,
   supportsProductTemplateSubStagesTable,
+  supportsTemplateTelegramNotificationSettingsTable,
 } from '@/lib/schema-compat'
 import { getCachedProductTemplates } from '@/lib/cached-reference-data'
 import { getVisibleProductWhere } from '@/lib/product-access'
@@ -174,11 +175,13 @@ export default async function ProductPage({
     hasTemplateStageAutoshiftColumn,
     hasTemplateStageStartRulesColumns,
     hasTemplateSubStagesTable,
+    hasTemplateTelegramSettingsTable,
   ] = await Promise.all([
     supportsProductTemplateStageDurationDaysColumn(),
     supportsProductTemplateStageAutoshiftColumn(),
     supportsProductTemplateStageStartRulesColumns(),
     supportsProductTemplateSubStagesTable(),
+    supportsTemplateTelegramNotificationSettingsTable(),
   ])
 
   if (viewer?.id) {
@@ -192,7 +195,8 @@ export default async function ProductPage({
       hasTemplateStageDurationDaysColumn,
       hasTemplateStageAutoshiftColumn,
       hasTemplateStageStartRulesColumns,
-      hasTemplateSubStagesTable
+      hasTemplateSubStagesTable,
+      hasTemplateTelegramSettingsTable
     ),
   ])
 

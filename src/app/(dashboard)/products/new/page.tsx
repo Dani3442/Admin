@@ -7,6 +7,7 @@ import {
   supportsProductTemplateStageDurationDaysColumn,
   supportsProductTemplateStageStartRulesColumns,
   supportsProductTemplateSubStagesTable,
+  supportsTemplateTelegramNotificationSettingsTable,
 } from '@/lib/schema-compat'
 import { canManageProducts } from '@/lib/product-access'
 
@@ -23,11 +24,13 @@ async function getCreateProductData() {
     hasProductTemplateStageAutoshiftColumn,
     hasProductTemplateStageStartRulesColumns,
     hasProductTemplateSubStagesTable,
+    hasTemplateTelegramSettingsTable,
   ] = await Promise.all([
     supportsProductTemplateStageDurationDaysColumn(),
     supportsProductTemplateStageAutoshiftColumn(),
     supportsProductTemplateStageStartRulesColumns(),
     supportsProductTemplateSubStagesTable(),
+    supportsTemplateTelegramNotificationSettingsTable(),
   ])
 
   const [users, productTemplates, stageSuggestions] = await Promise.all([
@@ -36,7 +39,8 @@ async function getCreateProductData() {
       hasProductTemplateStageDurationDaysColumn,
       hasProductTemplateStageAutoshiftColumn,
       hasProductTemplateStageStartRulesColumns,
-      hasProductTemplateSubStagesTable
+      hasProductTemplateSubStagesTable,
+      hasTemplateTelegramSettingsTable
     ),
     getCachedStageSuggestions(),
   ])

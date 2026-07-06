@@ -9,6 +9,7 @@ import {
   supportsProductTemplateStageDurationDaysColumn,
   supportsProductTemplateStageStartRulesColumns,
   supportsProductTemplateSubStagesTable,
+  supportsTemplateTelegramNotificationSettingsTable,
 } from '@/lib/schema-compat'
 import { canManageProducts, canViewAllProducts, getVisibleProductWhere } from '@/lib/product-access'
 import { getFinalDateFromStages } from '@/lib/product-derived-fields'
@@ -20,11 +21,13 @@ async function getProductsWorkspaceData(viewer: { id?: string | null; role?: str
     hasTemplateStageAutoshiftColumn,
     hasTemplateStageStartRulesColumns,
     hasTemplateSubStagesTable,
+    hasTemplateTelegramSettingsTable,
   ] = await Promise.all([
     supportsProductTemplateStageDurationDaysColumn(),
     supportsProductTemplateStageAutoshiftColumn(),
     supportsProductTemplateStageStartRulesColumns(),
     supportsProductTemplateSubStagesTable(),
+    supportsTemplateTelegramNotificationSettingsTable(),
   ])
   const visibleProductsWhere = getVisibleProductWhere(viewer, { isArchived: archived })
 
@@ -81,7 +84,8 @@ async function getProductsWorkspaceData(viewer: { id?: string | null; role?: str
       hasTemplateStageDurationDaysColumn,
       hasTemplateStageAutoshiftColumn,
       hasTemplateStageStartRulesColumns,
-      hasTemplateSubStagesTable
+      hasTemplateSubStagesTable,
+      hasTemplateTelegramSettingsTable
     ),
     getCachedStageSuggestions(),
   ])
@@ -102,6 +106,7 @@ async function getProductsWorkspaceData(viewer: { id?: string | null; role?: str
     hasTemplateStageAutoshiftColumn,
     hasTemplateStageStartRulesColumns,
     hasTemplateSubStagesTable,
+    hasTemplateTelegramSettingsTable,
   }
 }
 
