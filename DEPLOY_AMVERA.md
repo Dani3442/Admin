@@ -146,6 +146,17 @@ npm run db:prod:rebuild-products      # Применение новых шабл
 npx prisma generate  # Регенерировать Prisma клиент
 ```
 
+## Аварийный сброс пароля
+
+Если пользователь не может войти, а письмо Supabase ведёт на некорректную ссылку, сбросьте пароль напрямую в локальной таблице `users` и Supabase Auth:
+
+```bash
+RESET_EMAIL="user@example.com" RESET_PASSWORD="new-secure-password" npm run auth:reset-password
+```
+
+Команда не удаляет данные и не трогает продукты. Она обновляет bcrypt-пароль в `users`, активирует пользователя и при наличии `SUPABASE_SERVICE_ROLE_KEY` создаёт/обновляет пользователя Supabase с тем же паролем.
+Если Supabase service key невалиден или не задан, локальный пароль всё равно будет обновлён; в логах появится предупреждение по Supabase.
+
 ---
 
 ## Структура базы данных
