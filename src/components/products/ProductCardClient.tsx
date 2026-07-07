@@ -583,6 +583,41 @@ export function ProductCardClient({ product: initial, users, productTemplates = 
     }
   }
 
+  const handleCompleteStage = async (stage: any) => {
+    if (stage.isCompleted || stage.status === 'COMPLETED') return
+
+    setSaving(true)
+    try {
+      const res = await fetch('/api/stages', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          stageId: stage.id,
+          updates: { status: 'COMPLETED' },
+          applyAutomations: false,
+        }),
+      })
+      const data = await res.json().catch(() => null)
+
+      if (!res.ok) {
+        throw new Error(data?.error || 'Не удалось закрыть этап')
+      }
+
+      setProduct((prev: any) => ({
+        ...prev,
+        stages: data?.stages || prev.stages,
+        finalDate: data?.product?.finalDate ?? prev.finalDate,
+        progressPercent: data?.product?.progressPercent ?? prev.progressPercent,
+        riskScore: data?.product?.riskScore ?? prev.riskScore,
+        status: data?.product?.status ?? prev.status,
+      }))
+    } catch (error: any) {
+      alert(error.message || 'Не удалось закрыть этап')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const getStageCellStyle = (stage: any) => {
     if (stage.isCompleted) return 'text-emerald-700 bg-emerald-50'
     if (stage.dateValue) {
@@ -1817,12 +1852,28 @@ export function ProductCardClient({ product: initial, users, productTemplates = 
       >
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
           <div className="flex w-full min-w-0 items-start gap-3 lg:items-center">
-            <div className="flex-shrink-0" title="Этап закрывается автоматически после выполнения чек-листа">
-              {stage.isCompleted
-                ? <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                : <Circle className="h-5 w-5 text-muted-foreground/40" />
-              }
-            </div>
+            {canEdit ? (
+              <button
+                type="button"
+                onClick={() => handleCompleteStage(stage)}
+                disabled={saving || stage.isCompleted || stage.status === 'COMPLETED'}
+                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground disabled:cursor-default disabled:opacity-100"
+                title={stage.isCompleted || stage.status === 'COMPLETED' ? 'Этап закрыт' : 'Закрыть этап'}
+                aria-label={stage.isCompleted || stage.status === 'COMPLETED' ? 'Этап закрыт' : 'Закрыть этап'}
+              >
+                {stage.isCompleted || stage.status === 'COMPLETED'
+                  ? <CheckCircle2 className="h-6 w-6 text-emerald-500" />
+                  : <Circle className="h-6 w-6" />
+                }
+              </button>
+            ) : (
+              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center" title="Статус этапа">
+                {stage.isCompleted || stage.status === 'COMPLETED'
+                  ? <CheckCircle2 className="h-6 w-6 text-emerald-500" />
+                  : <Circle className="h-6 w-6 text-muted-foreground/40" />
+                }
+              </div>
+            )}
 
             <div className="w-6 flex-shrink-0 pt-0.5 text-center text-xs text-muted-foreground lg:pt-0">{idx + 1}</div>
 

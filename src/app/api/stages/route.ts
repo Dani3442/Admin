@@ -15,6 +15,7 @@ import { createProductStageCompat } from '@/lib/product-stage-compat'
 import { consumeRateLimit, getClientIpFromHeaders } from '@/lib/rate-limit'
 import { sanitizeDeepStrings, sanitizeTextValue } from '@/lib/input-security'
 import { applySequentialStageDateOverride, normalizeDurationDays } from '@/lib/stage-schedule'
+import { completeStageWorkflow } from '@/lib/stage-workflow'
 
 function areSameDate(left: Date | null, right: Date | null) {
   if (!left && !right) return true
@@ -530,10 +531,47 @@ export async function PATCH(req: NextRequest) {
 
   const safeUpdates = getSafeStageUpdates(updates || {})
   if (safeUpdates.status === 'COMPLETED') {
-    return NextResponse.json(
-      { error: 'Этап закрывается автоматически после выполнения всех подэтапов' },
-      { status: 400 }
-    )
+    await completeStageWorkflow({
+      productId: targetStage.productId,
+      stageId: targetStage.id,
+    })
+
+    const updatedProduct = await prisma.product.findUnique({
+      where: { id: targetStage.productId },
+      select: {
+        id: true,
+        finalDate: true,
+        progressPercent: true,
+        riskScore: true,
+        status: true,
+      },
+    })
+
+    const stages = await prisma.productStage.findMany({
+      where: { productId: targetStage.productId },
+      orderBy: { stageOrder: 'asc' },
+      select: stageResponseSelect,
+    })
+    const updatedStage = stages.find((stage) => (stage as any).id === targetStage.id)
+
+    revalidatePath('/products')
+    revalidatePath('/table')
+    revalidatePath('/dashboard')
+    revalidatePath('/timeline')
+    revalidatePath('/archive')
+    revalidatePath(`/products/${targetStage.productId}`)
+
+    return NextResponse.json({
+      stage: updatedStage ? {
+        ...updatedStage,
+        participatesInAutoshift: hasAutoshiftColumn ? (updatedStage as any).participatesInAutoshift ?? true : true,
+      } : null,
+      stages: stages.map((stage) => ({
+        ...stage,
+        participatesInAutoshift: hasAutoshiftColumn ? (stage as any).participatesInAutoshift ?? true : true,
+      })),
+      product: updatedProduct,
+    })
   }
 
   if (!hasDurationDaysColumn) {

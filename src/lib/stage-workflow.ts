@@ -252,3 +252,46 @@ export async function completeStageIfAllSubStagesDone(input: {
 
   return true
 }
+
+export async function completeStageWorkflow(input: {
+  productId: string
+  stageId: string
+}) {
+  const stage = await prisma.productStage.findUnique({
+    where: { id: input.stageId },
+    select: {
+      id: true,
+      productId: true,
+      status: true,
+      isCompleted: true,
+      product: { select: { isArchived: true } },
+    },
+  })
+
+  if (!stage || stage.productId !== input.productId || stage.product.isArchived) return false
+  if (stage.isCompleted || stage.status === 'COMPLETED') return false
+
+  await prisma.productStage.update({
+    where: { id: stage.id },
+    data: {
+      status: 'COMPLETED',
+      isCompleted: true,
+      endDate: new Date(),
+      actualDate: new Date(),
+    },
+    select: { id: true },
+  })
+
+  await dispatchTelegramNotifications({
+    productId: input.productId,
+    stageId: stage.id,
+    eventType: 'stage_completed',
+  })
+
+  await recalculateProductDerivedFields(input.productId)
+  await recalculateProductRisk(input.productId)
+  await scheduleStageAutoStartDates(input.productId)
+  await processDueStageStartsForProduct(input.productId)
+
+  return true
+}
