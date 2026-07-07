@@ -110,6 +110,10 @@ function findTemplateForCountry(productTemplates: any[], country: string) {
   return candidates[0]?.template || null
 }
 
+function normalizeTelegramRecipientType(value: string | null | undefined) {
+  return value === 'chat' ? 'chat' : 'user'
+}
+
 export function ProductCardClient({ product: initial, users, productTemplates = [], currentUser }: ProductCardClientProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -1073,6 +1077,57 @@ export function ProductCardClient({ product: initial, users, productTemplates = 
     }
   }
 
+  const getResponsibleTelegramRecipientId = (stage: any, subStage?: any) => {
+    const responsibleId = subStage?.responsibleId || stage?.responsibleId || product.responsibleId
+    const responsibleUser =
+      users.find((user) => user.id === responsibleId) ||
+      (product.responsibleId === responsibleId ? product.responsible : null)
+
+    const byLinkedUser = responsibleId
+      ? telegramRecipients.find((recipient) => recipient.type === 'user' && recipient.userId === responsibleId)
+      : null
+    if (byLinkedUser) return byLinkedUser.id
+
+    const responsibleName = [responsibleUser?.name, responsibleUser?.lastName]
+      .filter(Boolean)
+      .join(' ')
+      .trim()
+      .toLowerCase()
+    const firstName = String(responsibleUser?.name || '').trim().toLowerCase()
+
+    if (!responsibleName && !firstName) return ''
+
+    const byName = telegramRecipients.find((recipient) => {
+      if (recipient.type !== 'user') return false
+      const recipientName = String(recipient.name || '').trim().toLowerCase()
+      return (
+        recipientName === responsibleName ||
+        (firstName && recipientName === firstName) ||
+        (firstName && recipientName.includes(firstName))
+      )
+    })
+
+    return byName?.id || ''
+  }
+
+  const getResolvedNotificationRecipient = (stage: any, subStage?: any) => {
+    const draft = getNotificationDraft(stage, subStage)
+    const recipientType = normalizeTelegramRecipientType(draft.recipientType)
+    const fallbackRecipientId =
+      draft.recipientType === 'responsible'
+        ? getResponsibleTelegramRecipientId(stage, subStage)
+        : ''
+    const recipientId = draft.recipientId || fallbackRecipientId
+    const recipientExists = telegramRecipients.some(
+      (recipient) => recipient.type === recipientType && recipient.id === recipientId
+    )
+
+    return {
+      recipientType,
+      recipientId: recipientExists ? recipientId : '',
+    }
+  }
+
   const getNotificationStatusMeta = (stage: any, subStage?: any) => {
     const setting = getNotificationSetting(stage, subStage)
     if (setting?.lastError) {
@@ -1219,8 +1274,9 @@ export function ProductCardClient({ product: initial, users, productTemplates = 
       ? draft.messageTemplate
       : templateOptions[0]?.id || 'custom'
     const nextIsEnabled = Boolean(draft.isEnabled)
+    const resolvedRecipient = getResolvedNotificationRecipient(stage, subStage)
 
-    if (nextIsEnabled && !draft.recipientId) {
+    if (nextIsEnabled && !resolvedRecipient.recipientId) {
       alert('Выберите Telegram-получателя перед сохранением')
       return
     }
@@ -1236,8 +1292,8 @@ export function ProductCardClient({ product: initial, users, productTemplates = 
           stageId: stage.id,
           subStageId: subStage?.id || null,
           eventType: draft.eventType,
-          recipientType: draft.recipientType,
-          recipientId: draft.recipientId || null,
+          recipientType: resolvedRecipient.recipientType,
+          recipientId: resolvedRecipient.recipientId || null,
           messageTemplate,
           customMessage: draft.customMessage,
           isEnabled: nextIsEnabled,
@@ -1295,9 +1351,10 @@ export function ProductCardClient({ product: initial, users, productTemplates = 
     const key = getNotificationKey(stage.id, subStage?.id)
     const setting = getNotificationSetting(stage, subStage)
     const draft = getNotificationDraft(stage, subStage)
+    const resolvedRecipient = getResolvedNotificationRecipient(stage, subStage)
     const preview = getTelegramMessagePreview(stage, subStage)
 
-    if (!draft.recipientId) {
+    if (!resolvedRecipient.recipientId) {
       alert('Выберите Telegram-получателя для теста')
       return
     }
@@ -1308,7 +1365,7 @@ export function ProductCardClient({ product: initial, users, productTemplates = 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          recipientId: draft.recipientId,
+          recipientId: resolvedRecipient.recipientId,
           settingId: setting?.id || null,
           message: preview,
         }),
@@ -1645,17 +1702,18 @@ export function ProductCardClient({ product: initial, users, productTemplates = 
     const key = getNotificationKey(stage.id, activeSubStage?.id)
     const setting = getNotificationSetting(stage, activeSubStage)
     const draft = getNotificationDraft(stage, activeSubStage)
-    const recipients = telegramRecipients.filter((recipient) => recipient.type === draft.recipientType)
+    const resolvedRecipient = getResolvedNotificationRecipient(stage, activeSubStage)
+    const recipients = telegramRecipients.filter((recipient) => recipient.type === resolvedRecipient.recipientType)
     const templateOptions = getTelegramTemplatesForTarget(activeSubStage)
     const selectedTemplate = templateOptions.some((template) => template.id === draft.messageTemplate)
       ? draft.messageTemplate
       : templateOptions[0]?.id || 'custom'
     const statusMeta = getNotificationStatusMeta(stage, activeSubStage)
     const preview = getTelegramMessagePreview(stage, activeSubStage)
-    const selectedRecipient = telegramRecipients.find((recipient) => recipient.id === draft.recipientId)
+    const selectedRecipient = telegramRecipients.find((recipient) => recipient.id === resolvedRecipient.recipientId)
     const isSavingNotification = notificationSavingKey === key
     const isTestingNotification = notificationTestingKey === key
-    const saveDisabled = isSavingNotification || (draft.isEnabled && !draft.recipientId)
+    const saveDisabled = isSavingNotification || (draft.isEnabled && !resolvedRecipient.recipientId)
     const isCustomMessage = selectedTemplate === 'custom'
     const targetKindLabel = activeSubStage ? 'Завершение подэтапа' : 'Завершение этапа'
 
@@ -1785,7 +1843,7 @@ export function ProductCardClient({ product: initial, users, productTemplates = 
                     <label className="min-w-0 space-y-1 text-xs font-medium text-muted-foreground">
                       Тип
                       <select
-                        value={draft.recipientType}
+                        value={resolvedRecipient.recipientType}
                         onChange={(e) => setTelegramDraftValue(stage.id, activeSubStage?.id || null, { recipientType: e.target.value, recipientId: '' })}
                         className="input h-11 w-full min-w-0 py-1 text-sm"
                         disabled={!canEdit}
@@ -1797,7 +1855,7 @@ export function ProductCardClient({ product: initial, users, productTemplates = 
                     <label className="min-w-0 space-y-1 text-xs font-medium text-muted-foreground">
                       Получатель
                       <select
-                        value={draft.recipientId}
+                        value={resolvedRecipient.recipientId}
                         onChange={(e) => setTelegramDraftValue(stage.id, activeSubStage?.id || null, { recipientId: e.target.value })}
                         className="input h-11 w-full min-w-0 py-1 text-sm"
                         disabled={!canEdit || recipients.length === 0}
@@ -1811,9 +1869,11 @@ export function ProductCardClient({ product: initial, users, productTemplates = 
                       </select>
                     </label>
                   </div>
-                  {draft.isEnabled && !draft.recipientId && (
+                  {draft.isEnabled && !resolvedRecipient.recipientId && (
                     <div className="mt-3 rounded-[16px] border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
-                      Выберите получателя, чтобы включить уведомление.
+                      {recipients.length === 0
+                        ? 'Для выбранного типа пока нет получателей.'
+                        : 'Выберите получателя, чтобы включить уведомление.'}
                     </div>
                   )}
                   {selectedRecipient && (
@@ -1869,7 +1929,7 @@ export function ProductCardClient({ product: initial, users, productTemplates = 
                 <button
                   type="button"
                   onClick={() => handleSendTelegramTest(stage, activeSubStage)}
-                  disabled={!draft.recipientId || isTestingNotification || !canEdit}
+                  disabled={!resolvedRecipient.recipientId || isTestingNotification || !canEdit}
                   className="btn-secondary mt-3 h-11 w-full flex-shrink-0 justify-center rounded-[16px] px-3 py-1 text-sm"
                 >
                   <SendHorizontal className="h-4 w-4" />
