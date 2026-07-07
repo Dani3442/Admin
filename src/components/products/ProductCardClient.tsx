@@ -191,7 +191,9 @@ export function ProductCardClient({ product: initial, users, productTemplates = 
     height: 320,
   })
 
-  const canEdit = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUser?.role) && !product.isArchived
+  const canEditStages = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUser?.role)
+  const canEdit = canEditStages && !product.isArchived
+  const canToggleStageCompletion = canEditStages && (!product.isArchived || product.status === 'COMPLETED')
   const canComment = Boolean(currentUser?.id) && !product.isArchived
   const canArchiveProduct = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER', 'EMPLOYEE'].includes(currentUser?.role)
   const currentPriorityOption = getEditableProductPriorityOption(product.priority)
@@ -711,6 +713,8 @@ export function ProductCardClient({ product: initial, users, productTemplates = 
   }
 
   const handleToggleStageComplete = async (stage: any) => {
+    if (!canToggleStageCompletion) return
+
     const isCompleted = stage.isCompleted || stage.status === 'COMPLETED'
     const nextStatus = isCompleted ? (stage.startDate ? 'IN_PROGRESS' : 'NOT_STARTED') : 'COMPLETED'
 
@@ -1992,7 +1996,7 @@ export function ProductCardClient({ product: initial, users, productTemplates = 
       >
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
           <div className="flex w-full min-w-0 items-start gap-3 lg:items-center">
-            {canEdit ? (
+            {canToggleStageCompletion ? (
               <button
                 type="button"
                 onClick={() => handleToggleStageComplete(stage)}

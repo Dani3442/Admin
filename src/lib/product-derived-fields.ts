@@ -1,5 +1,8 @@
 import { prisma } from './prisma'
 
+const AUTO_COMPLETED_COMMENT = 'Автоматически завершено после закрытия всех этапов'
+const AUTO_ARCHIVED_REASON = 'Автоматически отправлено в архив после завершения всех этапов'
+
 type DerivedStage = {
   stageOrder: number
   isCompleted: boolean
@@ -59,10 +62,13 @@ export async function recalculateProductDerivedFields(productId: string) {
   const isFullyCompleted =
     product.stages.length > 0 &&
     product.stages.every((stage) => stage.isCompleted)
-  const shouldReopenActiveCompletedProduct =
+  const wasAutomaticallyClosed =
+    product.closureComment === AUTO_COMPLETED_COMMENT ||
+    product.archiveReason === AUTO_ARCHIVED_REASON
+  const shouldReopenCompletedProduct =
     !isFullyCompleted &&
-    !product.isArchived &&
-    product.status === 'COMPLETED'
+    product.status === 'COMPLETED' &&
+    (!product.isArchived || wasAutomaticallyClosed)
 
   const lifecycleUpdates = isFullyCompleted
     ? {
@@ -71,16 +77,23 @@ export async function recalculateProductDerivedFields(productId: string) {
         closedAt: product.closedAt ?? new Date(),
         closureComment:
           product.closureComment ??
-          'Автоматически завершено после закрытия всех этапов',
+          AUTO_COMPLETED_COMMENT,
         archivedAt: product.archivedAt ?? new Date(),
         archiveReason:
           product.archiveReason ??
-          'Автоматически отправлено в архив после завершения всех этапов',
+          AUTO_ARCHIVED_REASON,
         riskScore: 0,
       }
-    : shouldReopenActiveCompletedProduct
+    : shouldReopenCompletedProduct
       ? {
           status: 'IN_PROGRESS',
+          isArchived: false,
+          closedAt: null,
+          closedById: null,
+          closureComment: null,
+          archivedAt: null,
+          archivedById: null,
+          archiveReason: null,
         }
     : {}
 

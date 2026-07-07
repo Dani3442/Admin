@@ -31,6 +31,7 @@ const STAGE_UPDATE_FIELDS = new Set([
   'dateEnd',
   'durationDays',
   'status',
+  'isCompleted',
   'isCritical',
   'participatesInAutoshift',
   'affectsFinalDate',
