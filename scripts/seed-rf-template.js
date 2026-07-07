@@ -82,7 +82,7 @@ const RF_STAGES = [
     startTrigger: 'PREVIOUS_STAGE_COMPLETED',
     subStages: [
       { name: 'Выбор поставщика', recipientKey: 'responsibleKatya' },
-      { name: 'Докад рев', recipientKey: 'responsible' },
+      { name: 'Заказ реф', recipientKey: 'responsible' },
       { name: 'Варка', recipientKey: 'responsible' },
       { name: 'Доставка', recipientKey: 'responsible' },
       { name: 'Тестирование', responsibleName: 'Катя', recipientKey: 'katya' },
@@ -108,17 +108,17 @@ const RF_STAGES = [
     startReferenceStageOrder: 3,
     subStages: [
       { name: 'Финальный состав', description: '1 день', recipientKey: 'responsible' },
-      { name: 'Докад партии - н/о', description: '3 дня', recipientKey: 'responsible' },
+      { name: 'Заказ партии - П/О', description: '3 дня', recipientKey: 'responsible' },
       {
-        name: 'Докад тары - оплата',
+        name: 'Заказ тары - оплата',
         description: '5 дней. Пометка на карте: субтитры создавал.',
         recipientKey: 'responsibleAccountant',
       },
       { name: 'ТЗ дизайнеру составить', description: '1 день', recipientKey: 'responsible' },
       { name: 'ТЗ согласовать', description: '1 день', recipientKey: 'responsibleKatya' },
-      { name: 'Дедлайн сделать', description: '5 дней', responsibleName: 'Белла', recipientKey: 'bella' },
+      { name: 'Дизайн сделать', description: '5 дней', responsibleName: 'Белла', recipientKey: 'bella' },
       { name: 'Заказать упаковку', description: '5 дней. Этикетка, коробка.', recipientKey: 'responsible' },
-      { name: 'Заказать ручки', description: '1 день', recipientKey: 'responsible' },
+      { name: 'Заказать рушки', description: '1 день', recipientKey: 'responsible' },
       { name: 'Подать доки ДС', description: '1 день', responsibleName: 'Аделя', recipientKey: 'adel' },
       { name: 'Завести карточку в каталоге', description: '1 день', responsibleName: 'Аделя', recipientKey: 'adel' },
       { name: 'Сделать визуал', recipientKey: 'ivanResponsible' },
@@ -167,7 +167,7 @@ const RF_STAGES = [
     startDelayDays: 23,
     subStages: [
       { name: 'Оплата вторых 50%', recipientKey: 'responsibleAccountant' },
-      { name: 'Чек, этикетка, коробка, ручки', recipientKey: 'responsible' },
+      { name: 'Чек, этикетка, коробка, рушки', recipientKey: 'responsible' },
       { name: 'Организация доставки' },
     ],
   },
@@ -186,7 +186,7 @@ const RF_STAGES = [
       { name: 'Доп. упаковка', recipientKey: 'warehouse' },
       { name: 'Этикировка', recipientKey: 'warehouse' },
       { name: 'Оповещение продаж', recipientKey: 'responsible' },
-      { name: 'Инвойс в общий чат', responsibleName: 'Катя', recipientKey: 'katya' },
+      { name: 'Анонс в общий чат', responsibleName: 'Катя', recipientKey: 'katya' },
     ],
   },
 ]
@@ -315,7 +315,7 @@ const CHINA_STAGE_SEEDS = [
     startTrigger: 'STAGE_STARTED',
     startReferenceStageOrder: 9,
     subStages: [
-      { name: 'Подключить ДС в карточку 43', description: 'Оля + Аделя + пр.', responsibleName: 'Аделя', recipientKey: 'adel' },
+      { name: 'Подкрепить ДС в карточку ЧЗ', description: 'Оля + Аделя + пр.', responsibleName: 'Аделя', recipientKey: 'adel' },
     ],
   },
   {
@@ -368,7 +368,7 @@ const CHINA_STAGE_SEEDS = [
     ],
     subStages: [
       { name: 'Внести продукты в каталог для продаж', description: '1 рабочий день', recipientKey: 'responsible' },
-      { name: 'Сделать руками макет', description: '3 рабочих дня. Пр + Белла.', recipientKey: 'responsible' },
+      { name: 'Сделать макет рушки', description: '3 рабочих дня. Пр + Белла.', recipientKey: 'responsible' },
       { name: 'Оповестить продажников о новинках', description: '1 день', recipientKey: 'responsible' },
     ],
   },
@@ -388,7 +388,7 @@ const CHINA_STAGE_SEEDS = [
     durationDays: 30,
     startTrigger: 'PREVIOUS_STAGE_COMPLETED',
     subStages: [
-      { name: 'Отдать в печать', description: '1 день', recipientKey: 'responsible' },
+      { name: 'Отдать рушки в печать', description: '1 день', recipientKey: 'responsible' },
     ],
   },
   {
