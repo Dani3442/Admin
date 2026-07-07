@@ -583,8 +583,9 @@ export function ProductCardClient({ product: initial, users, productTemplates = 
     }
   }
 
-  const handleCompleteStage = async (stage: any) => {
-    if (stage.isCompleted || stage.status === 'COMPLETED') return
+  const handleToggleStageComplete = async (stage: any) => {
+    const isCompleted = stage.isCompleted || stage.status === 'COMPLETED'
+    const nextStatus = isCompleted ? (stage.startDate ? 'IN_PROGRESS' : 'NOT_STARTED') : 'COMPLETED'
 
     setSaving(true)
     try {
@@ -593,14 +594,21 @@ export function ProductCardClient({ product: initial, users, productTemplates = 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           stageId: stage.id,
-          updates: { status: 'COMPLETED' },
+          updates: isCompleted
+            ? {
+                status: nextStatus,
+                isCompleted: false,
+                endDate: null,
+                actualDate: null,
+              }
+            : { status: 'COMPLETED' },
           applyAutomations: false,
         }),
       })
       const data = await res.json().catch(() => null)
 
       if (!res.ok) {
-        throw new Error(data?.error || 'Не удалось закрыть этап')
+        throw new Error(data?.error || 'Не удалось обновить этап')
       }
 
       setProduct((prev: any) => ({
@@ -612,7 +620,7 @@ export function ProductCardClient({ product: initial, users, productTemplates = 
         status: data?.product?.status ?? prev.status,
       }))
     } catch (error: any) {
-      alert(error.message || 'Не удалось закрыть этап')
+      alert(error.message || 'Не удалось обновить этап')
     } finally {
       setSaving(false)
     }
@@ -1855,11 +1863,11 @@ export function ProductCardClient({ product: initial, users, productTemplates = 
             {canEdit ? (
               <button
                 type="button"
-                onClick={() => handleCompleteStage(stage)}
-                disabled={saving || stage.isCompleted || stage.status === 'COMPLETED'}
+                onClick={() => handleToggleStageComplete(stage)}
+                disabled={saving}
                 className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground disabled:cursor-default disabled:opacity-100"
-                title={stage.isCompleted || stage.status === 'COMPLETED' ? 'Этап закрыт' : 'Закрыть этап'}
-                aria-label={stage.isCompleted || stage.status === 'COMPLETED' ? 'Этап закрыт' : 'Закрыть этап'}
+                title={stage.isCompleted || stage.status === 'COMPLETED' ? 'Вернуть этап в работу' : 'Закрыть этап'}
+                aria-label={stage.isCompleted || stage.status === 'COMPLETED' ? 'Вернуть этап в работу' : 'Закрыть этап'}
               >
                 {stage.isCompleted || stage.status === 'COMPLETED'
                   ? <CheckCircle2 className="h-6 w-6 text-emerald-500" />

@@ -13,7 +13,7 @@ import { FilterSelect } from '@/components/ui/FilterSelect'
 import { FloatingContextMenu } from '@/components/ui/FloatingContextMenu'
 import { ProductRenameDialog } from '@/components/products/ProductRenameDialog'
 import { ProductResponsibleDialog } from '@/components/products/ProductResponsibleDialog'
-import { buildProductHref, getRouteWithSearch } from '@/lib/navigation'
+import { buildProductHref } from '@/lib/navigation'
 import { useContextMenu } from '@/hooks/useContextMenu'
 import { filterProducts, sortProducts, type ProductListFilters, type ProductListSortDirection, type ProductListSortField, type ProductQuickView } from '@/lib/product-list'
 import { EDITABLE_PRODUCT_STATUSES } from '@/lib/product-status'
@@ -171,8 +171,16 @@ export function TableViewClient({
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const rowRefs = useRef<Record<string, HTMLElement | null>>({})
   const now = new Date()
-  const currentRoute = getRouteWithSearch(pathname, searchParams.toString())
+  const getProductReturnRoute = useCallback((productId: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.delete('returnTo')
+    params.set('focusProduct', productId)
+    const query = params.toString()
+
+    return `${pathname}${query ? `?${query}` : ''}`
+  }, [pathname, searchParams])
 
   // Stage management state
   const [renamingStage, setRenamingStage] = useState<string | null>(null)
@@ -787,6 +795,17 @@ export function TableViewClient({
     effectiveSortDirection
   ) as unknown as Product[]
 
+  useEffect(() => {
+    const focusProductId = searchParams.get('focusProduct')
+    if (!focusProductId || !filteredProducts.some((product) => product.id === focusProductId)) return
+
+    const timeoutId = window.setTimeout(() => {
+      rowRefs.current[focusProductId]?.scrollIntoView({ block: 'center' })
+    }, 80)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [filteredProducts, searchParams])
+
   const resetFilters = () => {
     setSearch('')
     setStatusFilter('')
@@ -1007,14 +1026,17 @@ export function TableViewClient({
             <article
               key={product.id}
               className="surface-panel space-y-4 p-4"
-              onClick={() => router.push(buildProductHref(product.id, currentRoute))}
+              ref={(node) => {
+                rowRefs.current[product.id] = node
+              }}
+              onClick={() => router.push(buildProductHref(product.id, getProductReturnRoute(product.id)))}
               onContextMenu={(event) => handleProductRowContextMenu(event, product.id)}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <h2 className="text-base font-semibold text-foreground">{product.name}</h2>
                   <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    <span>{product.responsible?.name || 'Без ответственного'}</span>
+                    <span>Ответственный: {product.responsible?.name || '—'}</span>
                     {product.country && (
                       <>
                         <span>•</span>
@@ -1194,7 +1216,10 @@ export function TableViewClient({
                       rowBackgroundClass,
                       'hover:bg-accent/40'
                     )}
-                    onClick={() => router.push(buildProductHref(product.id, currentRoute))}
+                    ref={(node) => {
+                      rowRefs.current[product.id] = node
+                    }}
+                    onClick={() => router.push(buildProductHref(product.id, getProductReturnRoute(product.id)))}
                     onContextMenu={(event) => handleProductRowContextMenu(event, product.id)}
                   >
                     {/* Product Name */}
@@ -1202,7 +1227,7 @@ export function TableViewClient({
                       className={cn('sticky left-0 z-10 border-r border-border/60 px-3 py-2', stickyProductCellBackgroundClass)}
                       style={{ width: columnWidths.__product, minWidth: 180, maxWidth: columnWidths.__product }}
                     >
-                      <Link href={buildProductHref(product.id, currentRoute)} className="block">
+                      <Link href={buildProductHref(product.id, getProductReturnRoute(product.id))} className="block">
                         <div className="whitespace-normal text-[16px] font-medium leading-[1.22] text-foreground transition-colors hover:text-primary [overflow-wrap:anywhere]" title={product.name}>
                           {product.name}
                         </div>
@@ -1383,7 +1408,7 @@ export function TableViewClient({
             <button
               onClick={() => {
                 closeProductMenu()
-                router.push(buildProductHref(contextProduct.id, currentRoute))
+                router.push(buildProductHref(contextProduct.id, getProductReturnRoute(contextProduct.id)))
               }}
               className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-popover-foreground hover:bg-accent"
             >

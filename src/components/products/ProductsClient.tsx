@@ -27,7 +27,7 @@ import {
   getStatusColor,
   getStatusLabel,
 } from '@/lib/utils'
-import { buildProductHref, getRouteWithSearch } from '@/lib/navigation'
+import { buildProductHref } from '@/lib/navigation'
 import { FilterSelect } from '@/components/ui/FilterSelect'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { FloatingContextMenu } from '@/components/ui/FloatingContextMenu'
@@ -119,7 +119,7 @@ export function ProductsClient({
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({})
+  const rowRefs = useRef<Record<string, HTMLElement | null>>({})
   const suppressNavigationRef = useRef(false)
   const dragSessionRef = useRef<{
     productId: string
@@ -171,9 +171,14 @@ export function ProductsClient({
   const canCreateProducts = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER', 'EMPLOYEE'].includes(currentUserRole) && !archiveMode
   const canArchiveProducts = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER', 'EMPLOYEE'].includes(currentUserRole) && !archiveMode
   const canDeleteProducts = ['ADMIN', 'DIRECTOR', 'PRODUCT_MANAGER'].includes(currentUserRole)
-  const currentRoute = typeof window === 'undefined'
-    ? getRouteWithSearch(pathname, searchParams.toString())
-    : `${window.location.pathname}${window.location.search}`
+  const getProductReturnRoute = useCallback((productId: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.delete('returnTo')
+    params.set('focusProduct', productId)
+    const query = params.toString()
+
+    return `${pathname}${query ? `?${query}` : ''}`
+  }, [pathname, searchParams])
   const createProductHref = useMemo(() => {
     const params = new URLSearchParams(searchParams.toString())
     params.delete('create')
@@ -270,6 +275,17 @@ export function ProductsClient({
   useEffect(() => {
     visibleProductsRef.current = visibleProducts
   }, [visibleProducts])
+
+  useEffect(() => {
+    const focusProductId = searchParams.get('focusProduct')
+    if (!focusProductId || !visibleProducts.some((product) => product.id === focusProductId)) return
+
+    const timeoutId = window.setTimeout(() => {
+      rowRefs.current[focusProductId]?.scrollIntoView({ block: 'center' })
+    }, 80)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [searchParams, visibleProducts])
 
   useEffect(() => {
     dragOverStateRef.current = dragOverState
@@ -781,7 +797,7 @@ export function ProductsClient({
 
   const handleOpenProduct = (productId: string) => {
     if (suppressNavigationRef.current || draggingProductId) return
-    router.push(buildProductHref(productId, currentRoute))
+    router.push(buildProductHref(productId, getProductReturnRoute(productId)))
   }
 
   const resetFilters = () => {
@@ -1004,6 +1020,9 @@ export function ProductsClient({
           return (
             <article
               key={product.id}
+              ref={(node) => {
+                rowRefs.current[product.id] = node
+              }}
               className="surface-panel space-y-4 p-4"
               onClick={() => handleOpenProduct(product.id)}
               onContextMenu={(event) => handleProductRowContextMenu(event, product.id)}
@@ -1033,15 +1052,11 @@ export function ProductsClient({
                     <div className="min-w-0">
                       <h2 className="text-base font-semibold leading-6 text-foreground">{product.name}</h2>
                       <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        <span>Ответственный: {product.responsible?.name || '—'}</span>
+                        <span>•</span>
                         <span>{product._count.stages} этапов</span>
                         <span>•</span>
                         <span>{product._count.comments} комм.</span>
-                        {product.responsible?.name && (
-                          <>
-                            <span>•</span>
-                            <span>{product.responsible.name}</span>
-                          </>
-                        )}
                       </div>
                     </div>
 
@@ -1278,6 +1293,8 @@ export function ProductsClient({
                             {product.name}
                           </div>
                           <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[15px] leading-6 text-muted-foreground">
+                            <span>Ответственный: {product.responsible?.name || '—'}</span>
+                            <span>•</span>
                             <span>{product._count.stages} этапов</span>
                             <span>•</span>
                             <span>{product._count.comments} комм.</span>
@@ -1367,7 +1384,7 @@ export function ProductsClient({
               <button
                 onClick={() => {
                   closeContextMenu()
-                  router.push(buildProductHref(contextProduct.id, currentRoute))
+                  router.push(buildProductHref(contextProduct.id, getProductReturnRoute(contextProduct.id)))
                 }}
                 className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-popover-foreground hover:bg-accent"
               >
