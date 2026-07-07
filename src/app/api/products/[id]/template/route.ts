@@ -308,104 +308,74 @@ export async function POST(
         select: { id: true },
       })
 
-      const existingStageByOrder = new Map(product.stages.map((stage) => [stage.stageOrder, stage]))
+      const oldStageIds = product.stages.map((stage) => stage.id)
+      if (oldStageIds.length > 0) {
+        await tx.comment.updateMany({
+          where: { productStageId: { in: oldStageIds } },
+          data: { productStageId: null },
+        })
+
+        await tx.changeHistory.updateMany({
+          where: { productStageId: { in: oldStageIds } },
+          data: { productStageId: null },
+        })
+
+        await tx.productStage.deleteMany({
+          where: { productId },
+        })
+      }
+
       const stageIdByTemplateStageId = new Map<string, string>()
 
       for (const templateStage of template.stages) {
-        const existingStage = existingStageByOrder.get(templateStage.stageOrder)
         const plannedDate = parseDateOnly(templateStage.plannedDate)
         const durationDays = templateStage.durationDays ?? templateStage.stageTemplate.durationDays ?? null
         const startTrigger = normalizeStageStartTrigger(templateStage.startTrigger, templateStage.stageOrder)
         const startDelayDays = normalizeStageStartDelayDays(templateStage.startDelayDays)
         const startReferenceStageOrder = normalizeStageStartReferenceOrder(templateStage.startReferenceStageOrder)
-        let productStageId = existingStage?.id ?? ''
-
-        if (existingStage) {
-          const canReschedule = !existingStage.isCompleted && existingStage.status === 'NOT_STARTED'
-          await tx.productStage.update({
-            where: { id: existingStage.id },
-            data: {
-              stageTemplateId: templateStage.stageTemplateId,
-              stageName: templateStage.stageName,
-              dateValue: plannedDate,
-              plannedDate,
-              durationDays,
-              participatesInAutoshift: templateStage.participatesInAutoshift,
-              isCritical: templateStage.stageTemplate.isCritical,
-              affectsFinalDate: templateStage.stageTemplate.affectsFinalDate,
-              startTrigger,
-              startDelayDays,
-              startReferenceStageOrder,
-              ...(canReschedule
-                ? {
-                    autoStartAt: getInitialStageAutoStartAt({
-                      productCreatedAt: product.createdAt,
-                      stageOrder: templateStage.stageOrder,
-                      startTrigger,
-                      startDelayDays,
-                      plannedDate,
-                    }),
-                  }
-                : {}),
-            },
-            select: { id: true },
-          })
-        } else {
-          const createdStage = await createProductStageCompat(tx as any, {
-            productId,
-            stageTemplateId: templateStage.stageTemplateId,
+        const createdStage = await createProductStageCompat(tx as any, {
+          productId,
+          stageTemplateId: templateStage.stageTemplateId,
+          stageOrder: templateStage.stageOrder,
+          stageName: templateStage.stageName,
+          dateValue: plannedDate,
+          plannedDate,
+          durationDays,
+          isCritical: templateStage.stageTemplate.isCritical,
+          affectsFinalDate: templateStage.stageTemplate.affectsFinalDate,
+          participatesInAutoshift: templateStage.participatesInAutoshift,
+          autoStartAt: getInitialStageAutoStartAt({
+            productCreatedAt: product.createdAt,
             stageOrder: templateStage.stageOrder,
-            stageName: templateStage.stageName,
-            dateValue: plannedDate,
-            plannedDate,
-            durationDays,
-            isCritical: templateStage.stageTemplate.isCritical,
-            affectsFinalDate: templateStage.stageTemplate.affectsFinalDate,
-            participatesInAutoshift: templateStage.participatesInAutoshift,
-            autoStartAt: getInitialStageAutoStartAt({
-              productCreatedAt: product.createdAt,
-              stageOrder: templateStage.stageOrder,
-              startTrigger,
-              startDelayDays,
-              plannedDate,
-            }),
             startTrigger,
             startDelayDays,
-            startReferenceStageOrder,
-            status: 'NOT_STARTED',
-          })
-          productStageId = createdStage.id
-        }
+            plannedDate,
+          }),
+          startTrigger,
+          startDelayDays,
+          startReferenceStageOrder,
+          status: 'NOT_STARTED',
+        })
+        const productStageId = createdStage.id
 
         stageIdByTemplateStageId.set(templateStage.id, productStageId)
 
         if (hasTemplateSubStagesTable && productStageId) {
-          const existingSubStageByOrder = new Map<number, { id: string; name: string; sortOrder: number }>(
-            ((existingStage as any)?.subStages || []).map((subStage: any) => [subStage.sortOrder, subStage])
-          )
-
           for (const templateSubStage of (templateStage as any).subStages || []) {
-            const existingSubStage = existingSubStageByOrder.get(templateSubStage.sortOrder)
             const subStageData = {
               name: templateSubStage.name,
               description: templateSubStage.description,
               ...(hasProductSubStageResponsibleColumn ? { responsibleId: templateSubStage.responsibleId } : {}),
               sortOrder: templateSubStage.sortOrder,
             }
-            const productSubStage = existingSubStage
-              ? await tx.productSubStage.update({
-                  where: { id: existingSubStage.id },
-                  data: subStageData,
-                  select: { id: true },
-                })
-              : await tx.productSubStage.create({
-                  data: {
-                    stageId: productStageId,
-                    ...subStageData,
-                    status: 'NOT_STARTED',
-                  },
-                  select: { id: true },
-                })
+            const productSubStage = await tx.productSubStage.create({
+              data: {
+                stageId: productStageId,
+                ...subStageData,
+                status: 'NOT_STARTED',
+              },
+              select: { id: true },
+            })
 
             await ensureSubStageNotificationSetting(tx, {
               productId,
