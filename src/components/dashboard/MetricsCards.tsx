@@ -39,13 +39,13 @@ export function DashboardMetricsCards({ metrics }: MetricsCardsProps) {
       href: '/products?status=IN_PROGRESS',
     },
     {
-      label: 'Завершено',
+      label: 'Завершённые',
       value: metrics.completed,
       icon: CheckCircle2,
       color: 'text-emerald-600 dark:text-emerald-300',
       bg: 'bg-emerald-50',
       sub: `${metrics.completionRate}% выполнено`,
-      href: '/products?status=COMPLETED',
+      href: '/archive?status=COMPLETED',
     },
     {
       label: 'Под риском',

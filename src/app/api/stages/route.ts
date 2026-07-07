@@ -295,6 +295,11 @@ export async function PATCH(req: NextRequest) {
         progressPercent: true,
         riskScore: true,
         status: true,
+        isArchived: true,
+        closedAt: true,
+        closureComment: true,
+        archivedAt: true,
+        archiveReason: true,
       },
     })
 
@@ -544,6 +549,11 @@ export async function PATCH(req: NextRequest) {
         progressPercent: true,
         riskScore: true,
         status: true,
+        isArchived: true,
+        closedAt: true,
+        closureComment: true,
+        archivedAt: true,
+        archiveReason: true,
       },
     })
 
@@ -734,6 +744,11 @@ export async function PATCH(req: NextRequest) {
       progressPercent: true,
       riskScore: true,
       status: true,
+      isArchived: true,
+      closedAt: true,
+      closureComment: true,
+      archivedAt: true,
+      archiveReason: true,
     },
   })
 

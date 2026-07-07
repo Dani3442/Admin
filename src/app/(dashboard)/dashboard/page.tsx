@@ -30,6 +30,9 @@ async function getDashboardData(viewer: { id?: string | null; role?: string | nu
   const in14 = addDays(now, 14)
   const in30 = addDays(now, 30)
   const activeVisibleProductsWhere = getVisibleProductWhere(viewer, { isArchived: false })
+  const dashboardVisibleProductsWhere = getVisibleProductWhere(viewer, {
+    OR: [{ isArchived: false }, { status: 'COMPLETED' }],
+  })
 
   const productDashboardSelect = {
     id: true,
@@ -53,9 +56,9 @@ async function getDashboardData(viewer: { id?: string | null; role?: string | nu
   }
 
   const [total, inProgress, completed, atRisk, delayed, planned, dueSoon7, dueSoon14, dueSoon30, products, stageTemplates] = await Promise.all([
-    prisma.product.count({ where: activeVisibleProductsWhere }),
+    prisma.product.count({ where: dashboardVisibleProductsWhere }),
     prisma.product.count({ where: getVisibleProductWhere(viewer, { isArchived: false, status: 'IN_PROGRESS' }) }),
-    prisma.product.count({ where: getVisibleProductWhere(viewer, { isArchived: false, status: 'COMPLETED' }) }),
+    prisma.product.count({ where: getVisibleProductWhere(viewer, { status: 'COMPLETED' }) }),
     prisma.product.count({ where: getVisibleProductWhere(viewer, { isArchived: false, status: 'AT_RISK' }) }),
     prisma.product.count({ where: getVisibleProductWhere(viewer, { isArchived: false, status: 'DELAYED' }) }),
     prisma.product.count({ where: getVisibleProductWhere(viewer, { isArchived: false, status: 'PLANNED' }) }),
@@ -63,7 +66,7 @@ async function getDashboardData(viewer: { id?: string | null; role?: string | nu
     prisma.product.count({ where: getVisibleProductWhere(viewer, { isArchived: false, finalDate: { gte: now, lte: in14 } }) }),
     prisma.product.count({ where: getVisibleProductWhere(viewer, { isArchived: false, finalDate: { gte: now, lte: in30 } }) }),
     prisma.product.findMany({
-      where: activeVisibleProductsWhere,
+      where: dashboardVisibleProductsWhere,
       select: productDashboardSelect,
       orderBy: [{ riskScore: 'desc' }, { finalDate: 'asc' }],
     }),
@@ -103,6 +106,10 @@ async function getDashboardData(viewer: { id?: string | null; role?: string | nu
     if (product.status === 'COMPLETED') responsibleMap[respName].completed++
 
     let riskScore = 0
+    if (product.status === 'COMPLETED') {
+      continue
+    }
+
     if (product.finalDate) {
       const daysLeft = Math.round((product.finalDate.getTime() - now.getTime()) / 86400000)
       if (daysLeft < 0) riskScore += 50

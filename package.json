@@ -19,6 +19,8 @@
     "db:prod:templates": "node scripts/seed-rf-template.js",
     "db:prod:rebuild-products:dry": "node scripts/prod-rebuild-product-templates.js",
     "db:prod:rebuild-products": "node scripts/prod-rebuild-product-templates.js --apply",
+    "db:prod:sync-completed-products:dry": "node scripts/prod-sync-completed-products.js",
+    "db:prod:sync-completed-products": "node scripts/prod-sync-completed-products.js --apply",
     "auth:reset-password": "node scripts/auth-reset-password.js",
     "db:studio": "prisma studio",
     "setup": "npm run db:generate && npm run db:push && npm run db:seed"

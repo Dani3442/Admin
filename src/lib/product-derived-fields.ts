@@ -34,6 +34,12 @@ export async function recalculateProductDerivedFields(productId: string) {
     where: { id: productId },
     select: {
       id: true,
+      status: true,
+      isArchived: true,
+      closedAt: true,
+      closureComment: true,
+      archivedAt: true,
+      archiveReason: true,
       stages: {
         orderBy: { stageOrder: 'asc' },
         select: {
@@ -50,12 +56,40 @@ export async function recalculateProductDerivedFields(productId: string) {
 
   const progressPercent = getProgressPercentFromStages(product.stages)
   const finalDate = getFinalDateFromStages(product.stages)
+  const isFullyCompleted =
+    product.stages.length > 0 &&
+    product.stages.every((stage) => stage.isCompleted)
+  const shouldReopenActiveCompletedProduct =
+    !isFullyCompleted &&
+    !product.isArchived &&
+    product.status === 'COMPLETED'
+
+  const lifecycleUpdates = isFullyCompleted
+    ? {
+        status: 'COMPLETED',
+        isArchived: true,
+        closedAt: product.closedAt ?? new Date(),
+        closureComment:
+          product.closureComment ??
+          'Автоматически завершено после закрытия всех этапов',
+        archivedAt: product.archivedAt ?? new Date(),
+        archiveReason:
+          product.archiveReason ??
+          'Автоматически отправлено в архив после завершения всех этапов',
+        riskScore: 0,
+      }
+    : shouldReopenActiveCompletedProduct
+      ? {
+          status: 'IN_PROGRESS',
+        }
+    : {}
 
   return prisma.product.update({
     where: { id: productId },
     data: {
       progressPercent,
       finalDate,
+      ...lifecycleUpdates,
     },
     select: {
       id: true,
@@ -63,6 +97,11 @@ export async function recalculateProductDerivedFields(productId: string) {
       progressPercent: true,
       riskScore: true,
       status: true,
+      isArchived: true,
+      closedAt: true,
+      closureComment: true,
+      archivedAt: true,
+      archiveReason: true,
     },
   })
 }

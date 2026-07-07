@@ -696,6 +696,11 @@ export function ProductCardClient({ product: initial, users, productTemplates = 
         progressPercent: data.product?.progressPercent ?? p.progressPercent,
         riskScore: data.product?.riskScore ?? p.riskScore,
         status: data.product?.status ?? p.status,
+        isArchived: data.product?.isArchived ?? p.isArchived,
+        closedAt: data.product?.closedAt ?? p.closedAt,
+        closureComment: data.product?.closureComment ?? p.closureComment,
+        archivedAt: data.product?.archivedAt ?? p.archivedAt,
+        archiveReason: data.product?.archiveReason ?? p.archiveReason,
       }))
       setEditingStageId(null)
     } catch (error: any) {
@@ -740,6 +745,11 @@ export function ProductCardClient({ product: initial, users, productTemplates = 
         progressPercent: data?.product?.progressPercent ?? prev.progressPercent,
         riskScore: data?.product?.riskScore ?? prev.riskScore,
         status: data?.product?.status ?? prev.status,
+        isArchived: data?.product?.isArchived ?? prev.isArchived,
+        closedAt: data?.product?.closedAt ?? prev.closedAt,
+        closureComment: data?.product?.closureComment ?? prev.closureComment,
+        archivedAt: data?.product?.archivedAt ?? prev.archivedAt,
+        archiveReason: data?.product?.archiveReason ?? prev.archiveReason,
       }))
     } catch (error: any) {
       alert(error.message || 'Не удалось обновить этап')

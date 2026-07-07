@@ -27,6 +27,9 @@ export async function GET(req: NextRequest) {
   const in14 = addDays(now, 14)
   const in30 = addDays(now, 30)
   const activeVisibleProductsWhere = getVisibleProductWhere(viewer, { isArchived: false })
+  const dashboardVisibleProductsWhere = getVisibleProductWhere(viewer, {
+    OR: [{ isArchived: false }, { status: 'COMPLETED' }],
+  })
 
   const analyticsProductSelect = {
     id: true,
@@ -62,9 +65,9 @@ export async function GET(req: NextRequest) {
     stageTemplates,
     products,
   ] = await Promise.all([
-    prisma.product.count({ where: activeVisibleProductsWhere }),
+    prisma.product.count({ where: dashboardVisibleProductsWhere }),
     prisma.product.count({ where: getVisibleProductWhere(viewer, { isArchived: false, status: 'IN_PROGRESS' }) }),
-    prisma.product.count({ where: getVisibleProductWhere(viewer, { isArchived: false, status: 'COMPLETED' }) }),
+    prisma.product.count({ where: getVisibleProductWhere(viewer, { status: 'COMPLETED' }) }),
     prisma.product.count({ where: getVisibleProductWhere(viewer, { isArchived: false, status: 'AT_RISK' }) }),
     prisma.product.count({ where: getVisibleProductWhere(viewer, { isArchived: false, status: 'DELAYED' }) }),
     prisma.product.count({ where: getVisibleProductWhere(viewer, { isArchived: false, status: 'PLANNED' }) }),
@@ -80,7 +83,7 @@ export async function GET(req: NextRequest) {
       orderBy: { order: 'asc' },
     }),
     prisma.product.findMany({
-      where: activeVisibleProductsWhere,
+      where: dashboardVisibleProductsWhere,
       select: analyticsProductSelect,
     }),
   ])
@@ -95,6 +98,8 @@ export async function GET(req: NextRequest) {
   const atRiskProducts: Array<{ id: string; name: string; riskScore: number; finalDate: Date | null }> = []
 
   for (const product of products) {
+    if (product.status === 'COMPLETED') continue
+
     let riskScore = 0
 
     if (product.finalDate) {
