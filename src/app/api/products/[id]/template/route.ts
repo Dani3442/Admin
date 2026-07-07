@@ -220,6 +220,9 @@ export async function POST(
     const { id: productId } = await params
     const body = sanitizeDeepStrings(await req.json(), { preserveNewlines: true }) as any
     const productTemplateId = sanitizeTextValue(body?.productTemplateId, { maxLength: 128 })
+    const country = Object.prototype.hasOwnProperty.call(body || {}, 'country')
+      ? sanitizeTextValue(body?.country, { maxLength: 80 }) || null
+      : undefined
     const resetNotificationOverrides = Boolean(body?.resetNotificationOverrides)
     const [hasTemplateSubStagesTable, hasProductSubStageResponsibleColumn] = await Promise.all([
       supportsProductTemplateSubStagesTable(),
@@ -304,7 +307,10 @@ export async function POST(
 
       await tx.product.update({
         where: { id: productId },
-        data: { productTemplateId: template.id },
+        data: {
+          productTemplateId: template.id,
+          ...(country !== undefined ? { country } : {}),
+        },
         select: { id: true },
       })
 
@@ -415,6 +421,7 @@ export async function POST(
       where: { id: productId },
       select: {
         id: true,
+        country: true,
         productTemplateId: true,
         finalDate: true,
         progressPercent: true,

@@ -56,6 +56,11 @@ const TELEGRAM_TEMPLATES = [
   { id: 'custom', label: 'Свой текст' },
 ]
 
+const PRODUCT_COUNTRY_OPTIONS = [
+  { value: 'Китай', label: 'Китай', templateKeywords: ['китай', 'china'] },
+  { value: 'РФ', label: 'РФ', templateKeywords: ['рф', 'россия', 'russia'] },
+]
+
 const STAGE_STATUS_LABELS: Record<string, string> = {
   NOT_STARTED: 'Не начат',
   IN_PROGRESS: 'Начат',
@@ -69,6 +74,40 @@ function getStageStatusStyle(status: string, isCompleted?: boolean) {
   if (status === 'IN_PROGRESS') return 'status-chip-info'
   if (status === 'BLOCKED') return 'status-chip-danger'
   return 'status-chip-neutral'
+}
+
+function normalizeCountryValue(value: string | null | undefined) {
+  const normalized = (value || '').trim().toLowerCase()
+  if (!normalized) return ''
+  if (normalized === 'рф' || normalized.includes('рос') || normalized.includes('russia')) return 'РФ'
+  if (normalized.includes('китай') || normalized.includes('china')) return 'Китай'
+  return value || ''
+}
+
+function findTemplateForCountry(productTemplates: any[], country: string) {
+  const option = PRODUCT_COUNTRY_OPTIONS.find((item) => item.value === normalizeCountryValue(country))
+  if (!option) return null
+
+  const candidates = productTemplates
+    .map((template) => {
+      const name = String(template?.name || '').trim().toLowerCase()
+      const hasKeyword = option.templateKeywords.some((keyword) => name.includes(keyword))
+      if (!hasKeyword) return null
+
+      const score =
+        name === option.value.toLowerCase()
+          ? 0
+          : option.templateKeywords.some((keyword) => name === keyword || name === `шаблон ${keyword}`)
+            ? 1
+            : 2
+
+      return { template, score }
+    })
+    .filter(Boolean) as Array<{ template: any; score: number }>
+
+  candidates.sort((left, right) => left.score - right.score)
+
+  return candidates[0]?.template || null
 }
 
 export function ProductCardClient({ product: initial, users, productTemplates = [], currentUser }: ProductCardClientProps) {
@@ -135,10 +174,13 @@ export function ProductCardClient({ product: initial, users, productTemplates = 
   const markedSeenProductRef = useRef<string | null>(null)
   const priorityMenuRef = useRef<HTMLDivElement>(null)
   const statusMenuRef = useRef<HTMLDivElement>(null)
+  const countryMenuRef = useRef<HTMLDivElement>(null)
   const [priorityMenuOpen, setPriorityMenuOpen] = useState(false)
   const [prioritySaving, setPrioritySaving] = useState(false)
   const [statusMenuOpen, setStatusMenuOpen] = useState(false)
   const [statusSaving, setStatusSaving] = useState(false)
+  const [countryMenuOpen, setCountryMenuOpen] = useState(false)
+  const [countrySaving, setCountrySaving] = useState(false)
   const {
     menu: stageMenu,
     menuRef,
@@ -227,6 +269,28 @@ export function ProductCardClient({ product: initial, users, productTemplates = 
       document.removeEventListener('keydown', handleEscape)
     }
   }, [statusMenuOpen])
+
+  useEffect(() => {
+    if (!countryMenuOpen) return
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node
+      if (countryMenuRef.current?.contains(target)) return
+      setCountryMenuOpen(false)
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setCountryMenuOpen(false)
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleEscape)
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [countryMenuOpen])
 
   const backNavigation = resolveBackNavigation(searchParams.get('returnTo'))
   const mentionableUsers = useMemo(
@@ -540,6 +604,64 @@ export function ProductCardClient({ product: initial, users, productTemplates = 
       alert(error.message || 'Не удалось изменить приоритет продукта')
     } finally {
       setPrioritySaving(false)
+    }
+  }
+
+  const changeProductCountry = async (nextCountry: string) => {
+    const normalizedCurrentCountry = normalizeCountryValue(product.country)
+    const normalizedNextCountry = normalizeCountryValue(nextCountry)
+    if (!canEdit || normalizedCurrentCountry === normalizedNextCountry) {
+      setCountryMenuOpen(false)
+      return
+    }
+
+    const template = findTemplateForCountry(productTemplates, nextCountry)
+    if (!template) {
+      setCountryMenuOpen(false)
+      alert(`Не найден шаблон для направления «${nextCountry}»`)
+      return
+    }
+
+    const previousProduct = product
+    setCountrySaving(true)
+    setCountryMenuOpen(false)
+    setProduct((prev: any) => ({
+      ...prev,
+      country: nextCountry,
+      productTemplateId: template.id,
+    }))
+
+    try {
+      const res = await fetch(`/api/products/${encodeURIComponent(product.id)}/template`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productTemplateId: template.id,
+          country: nextCountry,
+          resetNotificationOverrides: true,
+        }),
+      })
+      const data = await res.json().catch(() => null)
+
+      if (!res.ok) {
+        throw new Error(data?.error || 'Не удалось изменить страну и применить шаблон')
+      }
+
+      setProduct((prev: any) => ({
+        ...prev,
+        ...(data?.product || {}),
+        country: data?.product?.country ?? nextCountry,
+        productTemplateId: data?.product?.productTemplateId ?? template.id,
+        stages: Array.isArray(data?.stages) ? data.stages : prev.stages,
+      }))
+      setTemplateApplyId(template.id)
+      setTemplateResetNotificationOverrides(false)
+      router.refresh()
+    } catch (error: any) {
+      setProduct(previousProduct)
+      alert(error.message || 'Не удалось изменить страну и применить шаблон')
+    } finally {
+      setCountrySaving(false)
     }
   }
 
@@ -2292,7 +2414,53 @@ export function ProductCardClient({ product: initial, users, productTemplates = 
               ) : (
                 <span className={cn('badge', getStatusColor(product.status))}>{getStatusLabel(product.status)}</span>
               )}
-              {product.country && <span className="badge bg-muted text-muted-foreground">{product.country}</span>}
+              {canEdit ? (
+                <div className="relative" ref={countryMenuRef}>
+                  <button
+                    type="button"
+                    onClick={() => setCountryMenuOpen((open) => !open)}
+                    disabled={countrySaving}
+                    className="badge bg-muted text-muted-foreground transition hover:bg-accent hover:text-foreground disabled:opacity-60"
+                    aria-haspopup="menu"
+                    aria-expanded={countryMenuOpen}
+                    title="Изменить страну и применить шаблон"
+                  >
+                    {countrySaving ? 'Меняем...' : normalizeCountryValue(product.country) || 'Страна'}
+                  </button>
+                  {countryMenuOpen && (
+                    <div className="absolute left-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-[18px] border border-border/70 bg-popover p-1.5 text-popover-foreground shadow-xl" role="menu">
+                      {PRODUCT_COUNTRY_OPTIONS.map((countryOption) => {
+                        const active = normalizeCountryValue(product.country) === countryOption.value
+                        const template = findTemplateForCountry(productTemplates, countryOption.value)
+
+                        return (
+                          <button
+                            key={countryOption.value}
+                            type="button"
+                            onClick={() => changeProductCountry(countryOption.value)}
+                            disabled={countrySaving || !template}
+                            className={cn(
+                              'flex w-full items-start gap-2 rounded-[14px] px-3 py-2 text-left text-sm transition disabled:cursor-not-allowed disabled:opacity-50',
+                              active ? 'bg-accent text-popover-foreground' : 'hover:bg-accent/70'
+                            )}
+                            role="menuitem"
+                          >
+                            <span className="min-w-0 flex-1">
+                              <span className="block font-medium">{countryOption.label}</span>
+                              <span className="block text-xs text-muted-foreground">
+                                {template ? `Шаблон: ${template.name}` : 'Шаблон не найден'}
+                              </span>
+                            </span>
+                            {active && <span className="mt-0.5 text-xs text-muted-foreground">сейчас</span>}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                product.country && <span className="badge bg-muted text-muted-foreground">{product.country}</span>
+              )}
             </div>
             <div className="mb-2 flex items-start gap-3">
               {canEdit && (
