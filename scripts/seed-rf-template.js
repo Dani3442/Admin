@@ -302,18 +302,11 @@ const CHINA_STAGE_SEEDS = [
   },
   {
     name: '6.1. Декларация',
-    durationText: '2,5 календарных месяца. Старт через 30 дней после запуска продукта.',
-    durationDays: 75,
+    durationText: '30 календарных дней. Старт через 30 дней после запуска продукта.',
+    durationDays: 30,
     startTrigger: 'PRODUCT_CREATED',
     startDelayDays: 30,
     stageNotifications: [{ eventType: 'stage_started', recipientKey: 'katya' }],
-  },
-  {
-    name: '6.2. Декларация',
-    durationText: '18 дней. Старт вместе с 6.1.',
-    durationDays: 18,
-    startTrigger: 'STAGE_STARTED',
-    startReferenceStageOrder: 9,
     subStages: [
       { name: 'Подкрепить ДС в карточку ЧЗ', description: 'Оля + Аделя + пр.', responsibleName: 'Аделя', recipientKey: 'adel' },
     ],
@@ -342,7 +335,7 @@ const CHINA_STAGE_SEEDS = [
     durationText: 'Старт через 15 дней после запуска 7.3.',
     durationDays: null,
     startTrigger: 'STAGE_STARTED',
-    startReferenceStageOrder: 12,
+    startReferenceStageOrder: 11,
     startDelayDays: 15,
     subStages: [
       { name: 'Чек-лист подготовка + согласовать', description: '2 рабочих дня. Катя + пр.', responsibleName: 'Катя', recipientKey: 'katya' },
@@ -355,7 +348,7 @@ const CHINA_STAGE_SEEDS = [
     durationText: 'Старт через 15 дней после запуска 7.3.',
     durationDays: null,
     startTrigger: 'STAGE_STARTED',
-    startReferenceStageOrder: 12,
+    startReferenceStageOrder: 11,
     startDelayDays: 15,
     stageNotifications: [
       {
@@ -377,7 +370,7 @@ const CHINA_STAGE_SEEDS = [
     durationText: '7 рабочих дней',
     durationDays: 7,
     startTrigger: 'STAGE_COMPLETED',
-    startReferenceStageOrder: 12,
+    startReferenceStageOrder: 11,
     subStages: [
       { name: 'Оля + ответственный', recipientKey: 'responsible' },
     ],
