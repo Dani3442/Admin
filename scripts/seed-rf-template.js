@@ -259,17 +259,6 @@ const CHINA_STAGE_SEEDS = [
     stageNotifications: [{ eventType: 'stage_started', recipientKey: 'katya' }],
   },
   {
-    name: '5.2. Образец 064',
-    durationText: '2 календарные недели',
-    durationDays: 14,
-    startTrigger: 'PREVIOUS_STAGE_COMPLETED',
-    subStages: [
-      { name: 'Подготовка образцов', recipientKey: 'responsible' },
-      { name: 'Вопросы ввоза', recipientKey: 'olya' },
-      { name: 'Ввоз', recipientKey: 'olya' },
-    ],
-  },
-  {
     name: '5.1. Документация 064',
     durationText: '2,5 календарных месяца. Старт через 1 месяц после начала 4.1.',
     durationDays: 75,
@@ -285,11 +274,22 @@ const CHINA_STAGE_SEEDS = [
     ],
   },
   {
+    name: '5.2. Образец 064',
+    durationText: '2 календарные недели',
+    durationDays: 14,
+    startTrigger: 'PREVIOUS_STAGE_COMPLETED',
+    subStages: [
+      { name: 'Подготовка образцов', recipientKey: 'responsible' },
+      { name: 'Вопросы ввоза', recipientKey: 'olya' },
+      { name: 'Ввоз', recipientKey: 'olya' },
+    ],
+  },
+  {
     name: '7.1. Подготовка к запуску',
     durationText: '15 календарных дней. Старт одновременно с 5.1.',
     durationDays: 15,
     startTrigger: 'STAGE_STARTED',
-    startReferenceStageOrder: 7,
+    startReferenceStageOrder: 6,
     stageNotifications: [{ eventType: 'stage_started', recipientKey: 'responsible' }],
     subStages: [
       { name: 'Создать карточки в нашем каталоге', description: '2 дня. Аделя + пр.', responsibleName: 'Аделя', recipientKey: 'adel' },

@@ -23,6 +23,8 @@
     "db:prod:sync-completed-products": "node scripts/prod-sync-completed-products.js --apply",
     "db:prod:rename-workflow-texts:dry": "node scripts/prod-rename-workflow-texts.js",
     "db:prod:rename-workflow-texts": "node scripts/prod-rename-workflow-texts.js --apply",
+    "db:prod:swap-china-064-stages:dry": "node scripts/prod-swap-china-064-stages.js",
+    "db:prod:swap-china-064-stages": "node scripts/prod-swap-china-064-stages.js --apply",
     "auth:reset-password": "node scripts/auth-reset-password.js",
     "db:studio": "prisma studio",
     "setup": "npm run db:generate && npm run db:push && npm run db:seed"
