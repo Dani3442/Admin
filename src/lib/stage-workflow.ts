@@ -8,6 +8,7 @@ import {
   normalizeStageStartReferenceOrder,
   normalizeStageStartTrigger,
 } from '@/lib/stage-start-rules'
+import { getParallelStartRuleUpdates } from '@/lib/stage-parallel-rules'
 
 type WorkflowDb = typeof prisma
 
@@ -44,6 +45,8 @@ export async function scheduleStageAutoStartDates(productId: string) {
           startDate: true,
           endDate: true,
           autoStartAt: true,
+          stageName: true,
+          durationDays: true,
           startTrigger: true,
           startDelayDays: true,
           startReferenceStageOrder: true,
@@ -54,9 +57,34 @@ export async function scheduleStageAutoStartDates(productId: string) {
 
   if (!product) return
 
-  const stageByOrder = new Map(product.stages.map((stage) => [stage.stageOrder, stage]))
+  const startRuleUpdates = getParallelStartRuleUpdates(product.stages)
+  const stages = product.stages.map((stage) => {
+    const startRuleUpdate = startRuleUpdates.get(stage.id)
+    return startRuleUpdate ? { ...stage, ...startRuleUpdate } : stage
+  })
 
   for (const stage of product.stages) {
+    const startRuleUpdate = startRuleUpdates.get(stage.id)
+    if (!startRuleUpdate) continue
+
+    if (
+      stage.startTrigger === startRuleUpdate.startTrigger &&
+      stage.startDelayDays === startRuleUpdate.startDelayDays &&
+      stage.startReferenceStageOrder === startRuleUpdate.startReferenceStageOrder
+    ) {
+      continue
+    }
+
+    await prisma.productStage.update({
+      where: { id: stage.id },
+      data: startRuleUpdate,
+      select: { id: true },
+    })
+  }
+
+  const stageByOrder = new Map(stages.map((stage) => [stage.stageOrder, stage]))
+
+  for (const stage of stages) {
     if (stage.isCompleted || stage.status === 'COMPLETED' || stage.status === 'IN_PROGRESS') continue
 
     const trigger = normalizeStageStartTrigger(stage.startTrigger, stage.stageOrder)
